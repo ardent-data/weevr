@@ -45,6 +45,8 @@ def load_config(
     path: str | Path | ConfigLocation,
     runtime_params: dict[str, Any] | None = None,
     project_root: Path | ConfigLocation | None = None,
+    *,
+    strict_params: bool | None = None,
 ) -> Thread | Weave | Loom | dict[str, Any]:
     """Load and validate a weevr configuration file.
 
@@ -78,6 +80,13 @@ def load_config(
             omitted, the nearest folder above the file holding ``weevr.yaml``
             is the root; with none, the file's directory is. Accepts a
             :class:`ConfigLocation` or a bare :class:`pathlib.Path`.
+        strict_params: Overrides every document's ``strict_params:``. ``True``
+            fails the load on a ``${param.x}`` no declaration in its chain
+            covers (``P120``) and on a runtime param nothing declares or
+            references (``P121``); ``False`` keeps both warnings even where a
+            document sets ``strict_params: true``. ``None`` (the default)
+            leaves each document's setting, most specific wins, absent is
+            lenient.
 
     Returns:
         A frozen, typed domain model instance (Thread, Weave, or Loom) for
@@ -88,7 +97,8 @@ def load_config(
         ConfigVersionError: Unsupported config version
         ConfigSchemaError: Schema validation failures
         ConfigError: Extension or name validation failures
-        VariableResolutionError: Unresolved variables without defaults
+        VariableResolutionError: Unresolved variables without defaults, and
+            undeclared or unused params under strict params
         ReferenceResolutionError: Missing referenced files, circular dependencies
         ModelValidationError: Semantic validation failures during model hydration
     """
@@ -98,7 +108,12 @@ def load_config(
     else:
         root = LocalConfigLocation(Path(project_root))
     with collecting(), attribute_errors(file_path):
-        resolved = _resolve_config(file_path, runtime_params=runtime_params, project_root=root)
+        resolved = _resolve_config(
+            file_path,
+            runtime_params=runtime_params,
+            project_root=root,
+            strict_params=strict_params,
+        )
         if resolved.config_type not in _COMPONENT_TYPES:
             return resolved.data
         document, warnings = _hydrate_resolved(resolved)

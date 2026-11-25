@@ -73,6 +73,7 @@
         }
       }
     ],
+    "strict_params": null,
     "tags": null,
     "target": {
       "alias": "curated.fact_transactions",

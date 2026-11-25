@@ -114,6 +114,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "forms.loom",
+    "strict_params": null,
     "variables": {
       "loom_var": {
         "default": "a",
@@ -187,6 +188,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.conv",
@@ -338,6 +340,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.base",
@@ -443,6 +446,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "out.inline_core",
@@ -535,6 +539,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.tpl_a",
@@ -627,6 +632,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.tpl_b",
@@ -714,6 +720,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.inline_t",
@@ -1807,6 +1814,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "conv.weave",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,
@@ -1895,6 +1903,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "weaves/core.weave",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,
@@ -1986,6 +1995,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "inline_w",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,

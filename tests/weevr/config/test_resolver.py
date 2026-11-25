@@ -152,7 +152,7 @@ class TestUnusedParamWarnings:
 
     def test_unused_entry_param_warns(self, tmp_path):
         """Entry param not consumed by thread emits P123 at the entry."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "simple.thread"
         write_document(
@@ -173,12 +173,12 @@ class TestUnusedParamWarnings:
             ],
         }
         warnings: list = []
-        resolve_references(weave_config, "weave", tmp_path, warnings=warnings)
+        resolve_tree(weave_config, "weave", tmp_path, warnings=warnings)
         assert [(d.code, d.pointer) for d in warnings] == [("P123", "/threads/0/params/unused_key")]
 
     def test_all_params_consumed_no_warning(self, tmp_path):
         """All entry params consumed by thread emits no warning."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "parameterized.thread"
         write_document(
@@ -200,12 +200,12 @@ class TestUnusedParamWarnings:
             ],
         }
         warnings: list = []
-        resolve_references(weave_config, "weave", tmp_path, warnings=warnings)
+        resolve_tree(weave_config, "weave", tmp_path, warnings=warnings)
         assert warnings == []
 
     def test_shadowed_default_no_warning(self, tmp_path):
         """A thread with no entry pins emits no warning."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "with_default.thread"
         write_document(
@@ -223,7 +223,7 @@ class TestUnusedParamWarnings:
             ],
         }
         warnings: list = []
-        resolve_references(weave_config, "weave", tmp_path, warnings=warnings)
+        resolve_tree(weave_config, "weave", tmp_path, warnings=warnings)
         assert warnings == []
 
 
@@ -239,7 +239,7 @@ class TestStandaloneTemplateErrors:
 
     def test_ref_loaded_thread_unresolved_param_shows_ref(self, tmp_path):
         """Thread loaded via ref with unresolved ${param.x} raises with ref."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "template.thread"
         write_document(
@@ -255,7 +255,7 @@ class TestStandaloneTemplateErrors:
             "threads": [{"ref": "template.thread"}],
         }
         with pytest.raises(VariableResolutionError, match="param.table"):
-            resolve_references(weave_config, "weave", tmp_path)
+            resolve_tree(weave_config, "weave", tmp_path)
 
 
 class TestFabricVariableResolution:
@@ -509,7 +509,7 @@ class TestReferenceResolution:
 
     def test_resolve_references_loom_to_weave_to_thread(self, tmp_path):
         """Resolve full hierarchy via ref entries: loom -> weave -> thread."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         # Create thread file
         thread_file = tmp_path / "dim_customer.thread"
@@ -530,7 +530,7 @@ class TestReferenceResolution:
             "weaves": [{"ref": "dimensions.weave"}],
         }
 
-        result = resolve_references(loom_config, "loom", tmp_path)
+        result = resolve_tree(loom_config, "loom", tmp_path)
 
         assert len(result) == 1
         weave = result[0]
@@ -541,7 +541,7 @@ class TestReferenceResolution:
 
     def test_resolve_references_missing_file(self, tmp_path):
         """Raise ReferenceResolutionError for missing referenced file."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
         from weevr.errors import ReferenceResolutionError
 
         config = {
@@ -550,7 +550,7 @@ class TestReferenceResolution:
         }
 
         with pytest.raises(ReferenceResolutionError) as exc_info:
-            resolve_references(config, "loom", tmp_path)
+            resolve_tree(config, "loom", tmp_path)
         assert "not found" in str(exc_info.value)
 
     def test_resolve_variables_var_namespace_passthrough(self):
@@ -569,7 +569,7 @@ class TestReferenceResolution:
 
     def test_ref_loom_weave_resolution(self, tmp_path):
         """Loom ref weave entries resolve the referenced file."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         # Create a weave file at the project root
         weave_file = tmp_path / "dimensions.weave"
@@ -580,7 +580,7 @@ class TestReferenceResolution:
             "weaves": [{"ref": "dimensions.weave"}],
         }
 
-        result = resolve_references(loom_config, "loom", tmp_path)
+        result = resolve_tree(loom_config, "loom", tmp_path)
 
         assert len(result) == 1
         assert result[0].data["name"] == "dimensions"
@@ -592,7 +592,7 @@ class TestEntryStashPattern:
 
     def test_ref_entry_with_as_stashed(self, tmp_path):
         """A ref entry's 'as' is on the child's entry; the dict carries no stash key."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -606,14 +606,14 @@ class TestEntryStashPattern:
             "config_version": "2.0",
             "threads": [{"ref": "sap_table.thread", "as": "sap_adr6"}],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert result[0].entry["as"] == "sap_adr6"
         assert result[0].source_path == str(thread_file)
         assert not any(key.startswith("_") for key in result[0].data)
 
     def test_ref_entry_with_params_stashed(self, tmp_path):
         """A ref entry's 'params' are on the child's entry."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -629,12 +629,12 @@ class TestEntryStashPattern:
                 {"ref": "sap_table.thread", "params": {"table": "ADR6"}},
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert result[0].entry["params"] == {"table": "ADR6"}
 
     def test_ref_entry_without_as_no_stash(self, tmp_path):
         """A ref entry without 'as' or 'params' has neither on its entry."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -648,13 +648,13 @@ class TestEntryStashPattern:
             "config_version": "2.0",
             "threads": [{"ref": "sap_table.thread"}],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert "as" not in result[0].entry
         assert "params" not in result[0].entry
 
     def test_ref_entry_params_resolve_in_thread(self, tmp_path):
         """ThreadEntry params are injected and resolve ${param.x} in thread."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -675,13 +675,13 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "ADR6"
 
     def test_two_phase_param_expression_resolution(self, tmp_path):
         """ThreadEntry param values with ${param.x} resolve against parent."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -702,13 +702,13 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path, runtime_params={"env": "prod"})
+        result = resolve_tree(weave_config, "weave", tmp_path, runtime_params={"env": "prod"})
         resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "prod_silver"
 
     def test_literal_params_pass_through(self, tmp_path):
         """ThreadEntry params with literal values pass through unchanged."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -729,13 +729,13 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "ADR6"
 
     def test_sibling_refs_same_file_no_cycle_error(self, tmp_path):
         """Two ThreadEntry objects with same ref and different aliases resolve."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -761,7 +761,7 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = [child.data for child in result]
         assert len(resolved) == 2
         assert resolved[0]["sources"]["data"]["alias"] == "ADR6"
@@ -769,7 +769,7 @@ class TestEntryStashPattern:
 
     def test_duplicate_ref_without_alias_raises(self, tmp_path):
         """Same ref twice without 'as' raises ConfigError."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
         from weevr.errors import ConfigError
 
         thread_file = tmp_path / "sap_table.thread"
@@ -788,11 +788,11 @@ class TestEntryStashPattern:
             ],
         }
         with pytest.raises(ConfigError, match="appears multiple times"):
-            resolve_references(weave_config, "weave", tmp_path)
+            resolve_tree(weave_config, "weave", tmp_path)
 
     def test_duplicate_ref_with_aliases_succeeds(self, tmp_path):
         """Same ref twice with different aliases resolves successfully."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -809,12 +809,12 @@ class TestEntryStashPattern:
                 {"ref": "sap_table.thread", "as": "instance_b"},
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert len(result) == 2
 
     def test_duplicate_effective_name_raises(self, tmp_path):
         """Two entries with same effective name raise ConfigError."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
         from weevr.errors import ConfigError
 
         thread_a = tmp_path / "a.thread"
@@ -840,11 +840,11 @@ class TestEntryStashPattern:
             ],
         }
         with pytest.raises(ConfigError, match="same_name"):
-            resolve_references(weave_config, "weave", tmp_path)
+            resolve_tree(weave_config, "weave", tmp_path)
 
     def test_inline_entry_with_as_stashed(self):
         """An inline entry's 'as' is on the child's entry, which has no own file."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         weave_config = {
             "config_version": "2.0",
@@ -858,7 +858,7 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", Path("/tmp"))
+        result = resolve_tree(weave_config, "weave", Path("/tmp"))
         assert result[0].entry["as"] == "my_alias"
         assert result[0].source_path is None
 
@@ -1293,7 +1293,7 @@ class TestThreadParameterizationE2E:
 
     def test_two_instances_resolve_independently(self, tmp_path):
         """Two instances of same ref with different params resolve independently."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         self._write_template(tmp_path)
 
@@ -1312,7 +1312,7 @@ class TestThreadParameterizationE2E:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = [child.data for child in result]
 
         assert len(resolved) == 2
@@ -1325,7 +1325,7 @@ class TestThreadParameterizationE2E:
 
     def test_three_instances_same_ref(self, tmp_path):
         """Three instances of same ref all resolve independently."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         self._write_template(tmp_path)
 
@@ -1349,14 +1349,14 @@ class TestThreadParameterizationE2E:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = [child.data for child in result]
         assert len(resolved) == 3
         assert resolved[2]["sources"]["data"]["alias"] == "stg.C"
 
     def test_nested_param_expression(self, tmp_path):
         """ThreadEntry param values with ${param.env} resolve against parent."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         f = tmp_path / "schema_thread.thread"
         write_document(
@@ -1380,7 +1380,7 @@ class TestThreadParameterizationE2E:
                 },
             ],
         }
-        result = resolve_references(
+        result = resolve_tree(
             weave_config,
             "weave",
             tmp_path,
@@ -1392,7 +1392,7 @@ class TestThreadParameterizationE2E:
 
     def test_loom_with_aliased_threads_in_weave(self, tmp_path):
         """Loom resolves weave with aliased thread instances."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         self._write_template(tmp_path)
 
@@ -1417,7 +1417,7 @@ class TestThreadParameterizationE2E:
             "config_version": "2.0",
             "weaves": [{"ref": "silver.weave"}],
         }
-        result = resolve_references(loom_config, "loom", tmp_path)
+        result = resolve_tree(loom_config, "loom", tmp_path)
         threads = result[0].children
         assert len(threads) == 2
         assert threads[0].entry["as"] == "sap_adr6"
@@ -1436,7 +1436,7 @@ class TestThreadParameterizationE2E:
 
     def test_backwards_compat_no_as_no_params(self, tmp_path):
         """Existing weave configs without as/params still work."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "simple.thread"
         write_document(
@@ -1450,7 +1450,7 @@ class TestThreadParameterizationE2E:
             "config_version": "2.0",
             "threads": [{"ref": "simple.thread"}],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert len(result) == 1
         assert "as" not in result[0].entry
         assert "params" not in result[0].entry

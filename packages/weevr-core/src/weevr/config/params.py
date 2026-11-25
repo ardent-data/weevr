@@ -34,7 +34,7 @@ from datetime import date, datetime
 from types import MappingProxyType
 from typing import Any, Literal
 
-from weevr.diagnostics import Diagnostic, diagnostic
+from weevr.diagnostics import Diagnostic, Severity, diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import ConfigSchemaError
 from weevr.model.params import ParamSpec
@@ -324,7 +324,7 @@ class ParamScope:
             for name in specs or {}:
                 binding = opened.bindings.get(name)
                 if binding is not None:
-                    reads.note(binding)
+                    reads.note(name, binding)
         return opened
 
     def values(self) -> dict[str, Any]:
@@ -337,26 +337,33 @@ ScopePositions = dict[tuple[str | int, ...], ParamScope]
 
 
 class BindingReads:
-    """The bindings a load read, by identity.
+    """The bindings a load read, by identity, and the names they were read under.
 
     A pin is consumed when some binding read in its subtree is the very
     binding the pin created, or a coercion of it: a nearer pin for the same
     name makes a new binding, so it does not count as reading the outer one.
+    The names are tracked too, for ``P121``: a supplied name is used when any
+    binding was read under it, whichever scope bound it. A declaration counts
+    as use: a scope that declares the name reads its binding when it opens
+    (:meth:`ParamScope.open_child`), as a ``${param.x}`` reference does.
     """
 
     def __init__(self) -> None:
         """Start with nothing read."""
         self._read: dict[int, Binding] = {}
+        self._names: set[str] = set()
 
-    def note(self, binding: Binding) -> None:
-        """Record that ``binding`` was read.
+    def note(self, name: str, binding: Binding) -> None:
+        """Record that ``binding`` was read under ``name``.
 
         Args:
+            name: The param name the binding is bound to.
             binding: The binding a reference or declaration used.
         """
         supplied = binding.supplied_binding
         # Holding the binding keeps its id from being reused by a later one.
         self._read[id(supplied)] = supplied
+        self._names.add(name)
 
     def was_read(self, binding: Binding) -> bool:
         """Whether ``binding`` was read.
@@ -370,6 +377,152 @@ class BindingReads:
         """
         supplied = binding.supplied_binding
         return self._read.get(id(supplied)) is supplied
+
+    def name_used(self, name: str) -> bool:
+        """Whether any binding was read under ``name``.
+
+        Args:
+            name: A param name.
+
+        Returns:
+            ``True`` when a reference or a declaration anywhere in the load
+            read a binding of ``name``.
+        """
+        return name in self._names
+
+
+@dataclass
+class _Undeclared:
+    """The first reference to one undeclared name in a file."""
+
+    value: Any
+    pointer: str | None
+    strict: bool
+
+
+class UndeclaredParams:
+    """Bound ``${param.x}`` references no declaration in their chain covers.
+
+    Kept by file and name, so each name warns once per file (``P120``) at its
+    first reference; the warning is an error when any of the file's
+    references to the name sits in a strict scope.
+    """
+
+    def __init__(self) -> None:
+        """Start with none found."""
+        self._by_file: dict[str | None, dict[str, _Undeclared]] = {}
+
+    def note(
+        self, name: str, value: Any, *, file: str | None, pointer: str | None, strict: bool
+    ) -> None:
+        """Record a reference to the undeclared ``name``.
+
+        Args:
+            name: The param name.
+            value: The value the reference read, to suggest the declared type.
+            file: The referencing file.
+            pointer: Where the reference sits in ``file``.
+            strict: Whether the reference's scope is strict.
+        """
+        names = self._by_file.setdefault(file, {})
+        found = names.get(name)
+        if found is None:
+            names[name] = _Undeclared(value, pointer, strict)
+        elif strict:
+            found.strict = True
+
+    def diagnostics(self) -> list[Diagnostic]:
+        """One ``P120`` per file and name, in the order they were found.
+
+        Each one's hint is a ``params:`` block declaring every undeclared
+        name the file references, ready to paste.
+
+        Returns:
+            The diagnostics: warnings, or errors for names referenced from a
+            strict scope.
+        """
+        found: list[Diagnostic] = []
+        for file, names in self._by_file.items():
+            block = declaration_block({name: ref.value for name, ref in names.items()})
+            found.extend(
+                diagnostic(
+                    "P120",
+                    f"Parameter '{name}' is referenced but declared nowhere in its scope chain",
+                    severity=Severity.ERROR if ref.strict else None,
+                    file=file,
+                    pointer=ref.pointer,
+                    hint=block,
+                )
+                for name, ref in names.items()
+            )
+        return found
+
+
+def _type_of(value: Any) -> str:
+    """The ``ParamSpec.type`` a value binds as; ``string`` when no other type fits."""
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, datetime):
+        return "timestamp"
+    if isinstance(value, date):
+        return "date"
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return "list[string]"
+    return "string"
+
+
+def declaration_block(values: Mapping[str, Any]) -> str:
+    """A ``params:`` block declaring each name, typed by its bound value.
+
+    Args:
+        values: The bound value by param name.
+
+    Returns:
+        YAML text, one ``name``/``type`` spec per name.
+    """
+    lines = ["params:"]
+    for name, value in values.items():
+        lines += [f"  {name}:", f"    name: {name}", f"    type: {_type_of(value)}"]
+    return "\n".join(lines)
+
+
+def unused_runtime_params(
+    runtime_params: Mapping[str, Any] | None,
+    reads: BindingReads,
+    *,
+    file: str | None,
+    strict: bool,
+) -> list[Diagnostic]:
+    """``P121`` for each runtime key nothing in the load declared or referenced.
+
+    A ``None`` value is treated as absent, as when it binds, and the
+    ``fabric`` key stands in for the Fabric context rather than a param.
+
+    Args:
+        runtime_params: The invoker's runtime params.
+        reads: The bindings the whole load read.
+        file: The root config's file, which the diagnostics name.
+        strict: Whether the root config is strict, making each an error.
+
+    Returns:
+        One diagnostic per unused key, in the order supplied.
+    """
+    return [
+        diagnostic(
+            "P121",
+            f"Runtime parameter '{name}' is supplied but nothing declares or references it",
+            severity=Severity.ERROR if strict else None,
+            file=file,
+            expected=[name],
+            hint=f"Stop passing '{name}', or reference it as ${{param.{name}}}.",
+        )
+        for name, value in (runtime_params or {}).items()
+        if value is not None and name != "fabric" and not reads.name_used(name)
+    ]
 
 
 def _not_a_mapping(

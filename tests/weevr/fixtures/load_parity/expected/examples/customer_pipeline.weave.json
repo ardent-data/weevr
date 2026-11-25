@@ -34,6 +34,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "customer_pipeline.weave",
+    "strict_params": null,
     "threads": [
       {
         "as_": null,
@@ -106,6 +107,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "curated.dim_customer",
@@ -210,6 +212,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "curated.fact_customer_orders",
@@ -279,6 +282,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "staging.customers",

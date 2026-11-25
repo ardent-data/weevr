@@ -280,6 +280,7 @@ def _lookup(
     names: BareNames,
     consumed_keys: set[str] | None,
     at: tuple[str | int, ...],
+    read_at: dict[str, str] | None = None,
 ) -> Any:
     """The value of one reference, or ``_KEEP`` to leave it in place."""
     namespace, dotted, _ = var_name.partition(".")
@@ -301,6 +302,8 @@ def _lookup(
         raise _unresolved(var_name, context, at) from exc
     if consumed_keys is not None:
         consumed_keys.add(var_name)
+    if read_at is not None and var_name not in read_at:
+        read_at[var_name] = _pointer(at)
     return value
 
 
@@ -311,6 +314,7 @@ def resolve_variables(
     at: tuple[str | int, ...] = (),
     *,
     names: BareNames | None = None,
+    read_at: dict[str, str] | None = None,
 ) -> Any:
     """Recursively resolve variable references in config.
 
@@ -329,6 +333,8 @@ def resolve_variables(
         at: Where ``config`` sits in its file, so an unresolved variable can
             point at the value that holds it.
         names: What a bare reference is classified by for its rewrite.
+        read_at: Optional mapping filled with each resolved dotted key and
+            the JSON pointer of the first string that read it.
 
     Returns:
         Config with all variables resolved
@@ -342,13 +348,13 @@ def resolve_variables(
         names = BareNames()
     if isinstance(config, dict):
         return {
-            k: resolve_variables(v, context, consumed_keys, (*at, k), names=names)
+            k: resolve_variables(v, context, consumed_keys, (*at, k), names=names, read_at=read_at)
             for k, v in config.items()
         }
 
     elif isinstance(config, list):
         return [
-            resolve_variables(item, context, consumed_keys, (*at, i), names=names)
+            resolve_variables(item, context, consumed_keys, (*at, i), names=names, read_at=read_at)
             for i, item in enumerate(config)
         ]
 
@@ -358,12 +364,14 @@ def resolve_variables(
         whole_match = WHOLE_VALUE_PATTERN.match(config.strip())
         if whole_match:
             var_name = whole_match.group(1).strip()
-            value = _lookup(var_name, whole_match.group(2), context, names, consumed_keys, at)
+            value = _lookup(
+                var_name, whole_match.group(2), context, names, consumed_keys, at, read_at
+            )
             return config if value is _KEEP else value
 
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1).strip()
-            value = _lookup(var_name, match.group(2), context, names, consumed_keys, at)
+            value = _lookup(var_name, match.group(2), context, names, consumed_keys, at, read_at)
             return match.group(0) if value is _KEEP else str(value)
 
         return VARIABLE_PATTERN.sub(replace_var, config)

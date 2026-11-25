@@ -63,6 +63,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "daily.loom",
+    "strict_params": null,
     "variables": null,
     "weaves": [
       {
@@ -159,6 +160,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "silver.dim_customer",
@@ -272,6 +274,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "silver.dim_product",
@@ -408,6 +411,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "staging.stg_customers",
@@ -516,6 +520,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "staging.stg_products",
@@ -706,6 +711,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "silver.fact_orders",
@@ -1006,6 +1012,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "dimensions.weave",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,
@@ -1118,6 +1125,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "facts.weave",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,

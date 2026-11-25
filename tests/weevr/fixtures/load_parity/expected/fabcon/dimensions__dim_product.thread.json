@@ -62,6 +62,7 @@
         }
       }
     ],
+    "strict_params": null,
     "tags": null,
     "target": {
       "alias": "silver.dim_product",

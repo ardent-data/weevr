@@ -80,6 +80,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "enrichment_pipeline.weave",
+    "strict_params": null,
     "threads": [
       {
         "as_": null,
@@ -177,6 +178,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "curated.customers_enriched",
@@ -281,6 +283,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "curated.orders_enriched",

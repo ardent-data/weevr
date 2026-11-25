@@ -51,6 +51,7 @@
         }
       }
     ],
+    "strict_params": null,
     "tags": null,
     "target": {
       "alias": "gold.fact_orders",

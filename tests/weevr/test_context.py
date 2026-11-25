@@ -7,6 +7,7 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -488,6 +489,73 @@ connections:
         with pytest.raises(ConfigSchemaError) as exc_info:
             ctx.load("spartech_silver.loom")
         assert "workspace_id" in str(exc_info.value)
+
+
+_STRICT_THREAD = """\
+config_version: "2.0"
+sources:
+  data:
+    type: delta
+    alias: raw.customers
+target:
+  alias: "out.${param.x}"
+"""
+
+
+class TestContextStrictParams:
+    """``Context(strict_params=...)`` overrides every document's setting."""
+
+    @staticmethod
+    def _context(
+        tmp_path: Path,
+        body: str,
+        strict_params: bool | None,
+        params: dict[str, Any] | None = None,
+    ) -> Context:
+        project = write_project(tmp_path / "strict.weevr")
+        write_document(project / "t.thread", body)
+        return Context(
+            spark=MagicMock(spec=SparkSession),
+            project=str(project),
+            params=params or {"x": "a"},
+            strict_params=strict_params,
+        )
+
+    def test_true_escalates_a_lenient_document(self, tmp_path: Path) -> None:
+        ctx = self._context(tmp_path, _STRICT_THREAD, strict_params=True)
+        with pytest.raises(ConfigError) as info:
+            ctx.load("t.thread")
+        assert [d.code for d in info.value.diagnostics] == ["P120"]
+
+    def test_false_relaxes_a_strict_document(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "strict_params: true\n"
+        loaded = self._context(tmp_path, body, strict_params=False).load("t.thread")
+        assert [d.code for d in loaded.diagnostics] == ["P120"]
+        assert not loaded.diagnostics[0].is_error
+
+    def test_unset_leaves_the_document_setting(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "strict_params: true\n"
+        with pytest.raises(ConfigError):
+            self._context(tmp_path, body, strict_params=None).load("t.thread")
+
+    def test_context_param_a_config_does_not_use_warns(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "params:\n  x: {name: x, type: string}\n"
+        ctx = self._context(tmp_path, body, strict_params=None, params={"x": "a", "b": "c"})
+        (warning,) = ctx.load("t.thread").diagnostics
+        assert (warning.code, warning.expected, warning.is_error) == ("P121", ("b",), False)
+
+    def test_context_param_a_config_does_not_use_fails_strict(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "params:\n  x: {name: x, type: string}\n"
+        ctx = self._context(tmp_path, body, strict_params=True, params={"x": "a", "b": "c"})
+        with pytest.raises(ConfigError) as info:
+            ctx.load("t.thread")
+        assert [(d.code, d.expected) for d in info.value.diagnostics] == [("P121", ("b",))]
+
+    def test_validate_records_the_error(self, tmp_path: Path) -> None:
+        ctx = self._context(tmp_path, _STRICT_THREAD, strict_params=True)
+        result = ctx.run("t.thread", mode="validate")
+        assert result.status == "failure"
+        assert "P120" in {d.code for d in result.diagnostics}
 
 
 _ATTR_THREAD = """\

@@ -8,17 +8,18 @@ from typing import Any
 
 from weevr.config.collect import skip_on_error
 from weevr.config.locations import ConfigLocation
-from weevr.config.params import BindingReads, ParamScope, ScopePositions
+from weevr.config.params import ScopePositions
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.config.scoping import (
+    WalkState,
     enter_child,
+    entry_pins,
     is_inline_thread,
     is_inline_weave,
     resolve_scoped,
-    scope_context,
     substitute,
 )
-from weevr.diagnostics import Diagnostic, diagnostic
+from weevr.diagnostics import diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import (
     ConfigError,
@@ -262,17 +263,12 @@ def resolve_references(
     config: dict[str, Any],
     config_type: str,
     project_root: ConfigLocation | Path,
-    runtime_params: dict[str, Any] | None = None,
+    walk: WalkState,
     visited: dict[str, None] | None = None,
     authored: dict[str, Any] | None = None,
     at: tuple[str | int, ...] = (),
     *,
-    scope: ParamScope | None = None,
-    file: str | None = None,
     inline_scopes: ScopePositions | None = None,
-    warnings: list[Diagnostic] | None = None,
-    reads: BindingReads | None = None,
-    pins_resolved: bool = False,
 ) -> list[ResolvedChild]:
     """Resolve references to other config files.
 
@@ -280,34 +276,28 @@ def resolve_references(
     (``name`` + body keys). Recursively loads referenced configs with
     circular reference detection. ``config`` itself is not modified.
 
-    A ``ref:`` entry's ``params:`` pin values for the child's whole subtree:
-    each resolves in ``config``'s scope, then binds in the child over any
-    inherited value. A pin nothing beneath the entry reads warns ``P123``.
+    ``config`` comes from the variable pass (:func:`resolve_config_variables`),
+    which resolved its entries' ``params:`` pins in its scope. Each pin binds
+    in the child over any inherited value, for the child's whole subtree. A
+    pin nothing beneath the entry reads warns ``P123``.
 
     Args:
-        config: Config dict to resolve references in.
+        config: Config dict to resolve references in, variables resolved.
         config_type: Type of this config (``'weave'`` or ``'loom'``).
         project_root: The ``.weevr`` project directory. A bare
             :class:`pathlib.Path` is wrapped in a
             :class:`LocalConfigLocation` for backward compatibility.
-        runtime_params: Runtime parameters to pass to child configs.
+        walk: The load's walk walk at ``config``: its scope, file, runtime
+            params, and the records the walk shares (bindings read, load
+            warnings). Each child opens its own from it.
         visited: Refs already being loaded, in load order (for cycle detection).
         authored: ``config`` before variable substitution, so inline
             children can keep their authored form.
         at: Where ``config`` sits in its file; empty unless it is an
             inline weave in a loom.
-        scope: ``config``'s param scope; each child opens its own from it.
-            Defaults to the runtime params' root scope.
-        file: ``config``'s file, named by errors at inline declarations.
         inline_scopes: The scopes :func:`resolve_config_variables` opened for
             ``config``'s inline children, by position; an inline weave
             reuses its scope from here.
-        warnings: Receives the load warnings found (``P123``).
-        reads: The bindings read so far, shared down the walk. Defaults to a
-            fresh record.
-        pins_resolved: Whether ``config`` came from the variable pass
-            (:func:`resolve_config_variables`), which already resolved its
-            entries' pins; otherwise they are resolved here.
 
     Returns:
         The resolved children in entry order: a loom's weaves (each with its
@@ -328,13 +318,7 @@ def resolve_references(
 
     if visited is None:
         visited = {}
-    env = scope if scope is not None else ParamScope.root(runtime_params)
-    if warnings is None:
-        warnings = []
-    if reads is None:
-        reads = BindingReads()
-    # Entry pins belong to this config: they resolve in its scope, once.
-    parent_context = None if pins_resolved else scope_context(env, runtime_params=runtime_params)
+    file = walk.file
 
     def authored_entry(key: str, index: int) -> dict[str, Any] | None:
         entries = (authored or {}).get(key)
@@ -364,17 +348,14 @@ def resolve_references(
                     weave_path = resolve_ref_path(ref, project_root, ref_pointer)
                     visited[ref] = None
                     try:
+                        entry_at = (*at, "weaves", index)
                         with (
                             enter_child(
                                 entry,
-                                parent_context,
-                                env,
-                                reads,
-                                (*at, "weaves", index),
-                                warnings,
-                                file=file,
+                                entry_pins(entry),
+                                walk,
+                                entry_at,
                                 alias_key="name",
-                                defaults=config.get("defaults"),
                             ) as entered,
                             attribute_errors(weave_path),
                         ):
@@ -388,30 +369,18 @@ def resolve_references(
                             # Set qualified key
                             child_dict["qualified_key"] = ref
 
-                            weave_scope = entered.open(child_dict, str(weave_path))
+                            weave_walk = entered.open(child_dict, str(weave_path))
                             resolved_child = resolve_scoped(
-                                child_dict,
-                                child_type,
-                                weave_scope,
-                                child_dict.get("defaults"),
-                                runtime_params=runtime_params,
-                                fabric_context=None,
-                                file=str(weave_path),
-                                reads=reads,
+                                child_dict, child_type, weave_walk, child_dict.get("defaults")
                             )
 
                             grandchildren = resolve_references(
                                 resolved_child,
                                 child_type,
                                 project_root,
-                                runtime_params,
+                                weave_walk,
                                 visited.copy(),
                                 authored=child_dict,
-                                scope=weave_scope,
-                                file=str(weave_path),
-                                warnings=warnings,
-                                reads=reads,
-                                pins_resolved=True,
                             )
                         children.append(
                             ResolvedChild(
@@ -455,7 +424,9 @@ def resolve_references(
                     # that skipped it gets the scope opened here instead.
                     weave_scope = (inline_scopes or {}).get(inline_at)
                     if weave_scope is None:
-                        weave_scope = env.open_child(inline.get("params"), file=file, at=inline_at)
+                        weave_scope = walk.scope.open_child(
+                            inline.get("params"), file=file, at=inline_at
+                        )
                     children.append(
                         ResolvedChild(
                             entry=entry,
@@ -465,15 +436,10 @@ def resolve_references(
                                 inline,
                                 "weave",
                                 project_root,
-                                runtime_params,
+                                walk.inline(weave_scope, inline),
                                 visited.copy(),
                                 authored=inline_authored,
                                 at=inline_at,
-                                scope=weave_scope,
-                                file=file,
-                                warnings=warnings,
-                                reads=reads,
-                                pins_resolved=pins_resolved,
                             ),
                             at=inline_at,
                         )
@@ -522,17 +488,10 @@ def resolve_references(
                     try:
                         # Entry params belong to this weave, so they resolve
                         # outside the referenced thread's attribution scope.
+                        entry_at = (*at, "threads", index)
                         with (
                             enter_child(
-                                entry,
-                                parent_context,
-                                env,
-                                reads,
-                                (*at, "threads", index),
-                                warnings,
-                                file=file,
-                                alias_key="as",
-                                defaults=config.get("defaults"),
+                                entry, entry_pins(entry), walk, entry_at, alias_key="as"
                             ) as entered,
                             attribute_errors(thread_path),
                         ):
@@ -546,14 +505,9 @@ def resolve_references(
                             # Set qualified key
                             child_dict["qualified_key"] = ref
 
-                            thread_scope = entered.open(child_dict, str(thread_path))
-                            context = scope_context(thread_scope, runtime_params=runtime_params)
+                            thread_walk = entered.open(child_dict, str(thread_path))
                             resolved_child = substitute(
-                                child_dict,
-                                context,
-                                thread_scope,
-                                reads,
-                                defaults=child_dict.get("defaults"),
+                                child_dict, thread_walk, defaults=child_dict.get("defaults")
                             )
 
                         # Track effective name uniqueness

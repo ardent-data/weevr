@@ -59,6 +59,7 @@
         }
       }
     ],
+    "strict_params": null,
     "tags": null,
     "target": {
       "alias": "staging.stg_products",

@@ -21,6 +21,7 @@ from weevr.config import load_resolved
 from weevr.config.loader import collect_resolved_config
 from weevr.config.locations import LocalConfigLocation
 from weevr.config.params import Binding, ParamScope
+from weevr.config.scoping import ChildEntry, WalkState, enter_child
 from weevr.errors import ConfigError, ConfigSchemaError
 from weevr.model.loom import Loom, WeaveEntry
 
@@ -426,3 +427,31 @@ class TestParamScope:
         scope = ParamScope.root().child(_optional(x="d"))
         with pytest.raises(TypeError):
             del scope.specs["x"]  # type: ignore[attr-defined]
+
+
+class TestEnterChild:
+    """Entering a ``ref:`` entry must open the child's scope before leaving."""
+
+    def test_leaving_without_opening_raises(self) -> None:
+        walk = WalkState(scope=ParamScope.root())
+        with (
+            pytest.raises(RuntimeError),
+            enter_child({"ref": "t.thread"}, None, walk, (), alias_key="as"),
+        ):
+            pass
+
+    def test_name_before_opening_raises(self) -> None:
+        entered = ChildEntry(None, WalkState(scope=ParamScope.root()))
+        with pytest.raises(RuntimeError):
+            _ = entered.name
+
+    def test_opened_state_is_the_childs(self) -> None:
+        walk = WalkState(scope=ParamScope.root({"x": "rt"}), file="w.weave")
+        entered = ChildEntry({"x": "pin"}, walk)
+        opened = entered.open({"name": "t", "strict_params": True}, "t.thread")
+        assert (opened.file, opened.strict, opened.scope.values()) == (
+            "t.thread",
+            True,
+            {"x": "pin"},
+        )
+        assert opened.reads is walk.reads

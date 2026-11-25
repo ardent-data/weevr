@@ -752,6 +752,26 @@
       "docs_anchor": "p112"
     },
     {
+      "code": "P120",
+      "name": "undeclared-parameter",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${param.x} reference is bound, but no params: declaration in its scope chain covers it. An error under strict_params.",
+      "docs_anchor": "p120"
+    },
+    {
+      "code": "P121",
+      "name": "unused-supplied-parameter",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A runtime parameter is supplied that nothing in the loaded tree declares or references. An error under strict_params.",
+      "docs_anchor": "p121"
+    },
+    {
       "code": "P123",
       "name": "unconsumed-pin",
       "category": "config",

@@ -13,7 +13,7 @@ propagate as they always have.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 
@@ -90,6 +90,47 @@ def skip_on_error() -> Iterator[None]:
 def recorded() -> list[ConfigError] | None:
     """The errors recorded so far in the active :func:`collecting`, or ``None`` outside one."""
     return _collected.get()
+
+
+def errors_recorded() -> int:
+    """How many errors the active :func:`collecting` has recorded; 0 outside one."""
+    errors = recorded()
+    return len(errors) if errors is not None else 0
+
+
+def raise_or_record(
+    found: Iterable[Diagnostic],
+    *,
+    file: str | None = None,
+    error_type: type[ConfigError] = ConfigError,
+) -> list[Diagnostic]:
+    """Split diagnostics a load found: return the warnings, fail on the errors.
+
+    For checks whose severity a setting escalates (``strict_params``). The
+    errors are raised together as one ``error_type`` under
+    :func:`skip_on_error`, so a collecting load records them and carries on,
+    and any other load stops.
+
+    Args:
+        found: The diagnostics, warnings and errors mixed.
+        file: The file the raised error names.
+        error_type: The error class to raise.
+
+    Returns:
+        The diagnostics that are not errors, in order.
+
+    Raises:
+        ConfigError: ``error_type``, outside :func:`collecting`, when any of
+            ``found`` is an error.
+    """
+    found = list(found)
+    errors = [d for d in found if d.is_error]
+    if errors:
+        with skip_on_error():
+            raise error_type(
+                "; ".join(d.message for d in errors), file_path=file, diagnostics=errors
+            )
+    return [d for d in found if not d.is_error]
 
 
 def _position(diagnostic: Diagnostic) -> tuple[str, int, int]:

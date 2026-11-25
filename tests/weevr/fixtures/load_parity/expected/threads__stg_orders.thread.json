@@ -58,6 +58,7 @@
         }
       }
     ],
+    "strict_params": null,
     "tags": null,
     "target": {
       "alias": "stg.orders",

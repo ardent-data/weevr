@@ -55,6 +55,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "sales_lakehouse.loom",
+    "strict_params": null,
     "variables": null,
     "weaves": [
       {
@@ -118,6 +119,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": null,
@@ -209,6 +211,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": null,
@@ -337,6 +340,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "dimensions",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,
@@ -364,6 +368,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "facts",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,

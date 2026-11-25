@@ -13,7 +13,7 @@ from weevr.model.execution import ExecutionConfig
 from weevr.model.hooks import HookStep, reject_pre_step_baseline_checks
 from weevr.model.lookup import Lookup
 from weevr.model.naming import NamingConfig
-from weevr.model.params import ParamSpec
+from weevr.model.params import STRICT_PARAMS_DESCRIPTION, ParamSpec
 from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec
 
@@ -73,7 +73,11 @@ class WeaveEntry(FrozenBase):
 
 
 class Loom(FrozenBase):
-    """A deployment unit containing weave references with optional shared defaults."""
+    """A deployment unit containing weave references with optional shared defaults.
+
+    ``strict_params: true`` makes the params warnings errors for the loom and
+    everything beneath it, unless a weave or thread sets its own.
+    """
 
     name: str = Field(
         default="",
@@ -103,6 +107,10 @@ class Loom(FrozenBase):
     params: dict[str, ParamSpec] | None = Field(
         default=None,
         description="Typed parameter declarations with defaults and validation.",
+    )
+    strict_params: bool | None = Field(
+        default=None,
+        description=STRICT_PARAMS_DESCRIPTION,
     )
     execution: ExecutionConfig | None = Field(
         default=None,

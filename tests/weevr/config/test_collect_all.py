@@ -10,13 +10,14 @@ import pytest
 
 from documents import write_document
 from weevr.config import load_config, load_resolved
-from weevr.config.collect import collecting, combine, skip_on_error
-from weevr.diagnostics import REGISTRY, diagnostic
+from weevr.config.collect import collecting, combine, raise_or_record, skip_on_error
+from weevr.diagnostics import REGISTRY, Severity, diagnostic
 from weevr.errors import (
     ConfigError,
     ConfigParseError,
     ModelValidationError,
     ReferenceResolutionError,
+    VariableResolutionError,
 )
 
 
@@ -218,3 +219,34 @@ class TestCollectInto:
     def test_stray_error_with_nothing_recorded_propagates(self) -> None:
         with pytest.raises(KeyError), collecting(into=[]):
             _fail_with(KeyError("bug"))
+
+
+class TestRaiseOrRecord:
+    """Escalated diagnostics fail the load; the rest are returned as warnings."""
+
+    @staticmethod
+    def _found(strict: bool) -> list[Any]:
+        severity = Severity.ERROR if strict else None
+        return [
+            diagnostic("P120", "undeclared", severity=severity, file="t.thread"),
+            diagnostic("P123", "unconsumed pin", file="t.thread"),
+        ]
+
+    def test_lenient_returns_every_warning(self) -> None:
+        found = self._found(strict=False)
+        assert raise_or_record(found, file="t.thread") == found
+
+    def test_strict_raises_the_errors(self) -> None:
+        with pytest.raises(VariableResolutionError) as info:
+            raise_or_record(
+                self._found(strict=True), file="t.thread", error_type=VariableResolutionError
+            )
+        assert [(d.code, d.is_error) for d in info.value.diagnostics] == [("P120", True)]
+        assert info.value.file_path == "t.thread"
+
+    def test_collect_records_the_errors_and_carries_on(self) -> None:
+        errors: list[ConfigError] = []
+        with collecting(into=errors):
+            warnings = raise_or_record(self._found(strict=True))
+        assert [d.code for d in warnings] == ["P123"]
+        assert [d.code for error in errors for d in error.diagnostics] == ["P120"]

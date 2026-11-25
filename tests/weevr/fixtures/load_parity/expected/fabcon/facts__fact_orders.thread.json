@@ -139,6 +139,7 @@
         }
       }
     ],
+    "strict_params": null,
     "tags": null,
     "target": {
       "alias": "silver.fact_orders",

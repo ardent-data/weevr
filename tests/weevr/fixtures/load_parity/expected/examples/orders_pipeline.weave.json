@@ -132,6 +132,7 @@
       }
     ],
     "qualified_key": "orders_pipeline.weave",
+    "strict_params": null,
     "threads": [
       {
         "as_": null,
@@ -203,6 +204,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "curated.fact_orders",
@@ -272,6 +274,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "staging.orders",

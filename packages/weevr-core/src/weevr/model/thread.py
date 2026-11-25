@@ -17,7 +17,7 @@ from weevr.model.hooks import HookStep, reject_pre_step_baseline_checks
 from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.lookup import Lookup
-from weevr.model.params import ParamSpec
+from weevr.model.params import STRICT_PARAMS_DESCRIPTION, ParamSpec
 from weevr.model.pipeline import JoinStep, Step, UnionStep
 from weevr.model.source import Source
 from weevr.model.sub_pipeline import SubPipeline
@@ -34,7 +34,8 @@ class Thread(FrozenBase):
     """Complete domain model for a thread configuration.
 
     A thread is the smallest unit of work: one or more sources, a sequence
-    of transformation steps, and a single target.
+    of transformation steps, and a single target. ``strict_params``
+    overrides the enclosing weave's or loom's setting for the thread.
     """
 
     model_config = {"frozen": True, "populate_by_name": True}
@@ -160,6 +161,10 @@ class Thread(FrozenBase):
     params: dict[str, ParamSpec] | None = Field(
         default=None,
         description="Typed parameter declarations with defaults and validation.",
+    )
+    strict_params: bool | None = Field(
+        default=None,
+        description=STRICT_PARAMS_DESCRIPTION,
     )
     defaults: dict[str, Any] | None = Field(
         default=None,

@@ -4651,7 +4651,7 @@
       "type": "object"
     }
   },
-  "description": "Complete domain model for a thread configuration.\n\nA thread is the smallest unit of work: one or more sources, a sequence\nof transformation steps, and a single target.",
+  "description": "Complete domain model for a thread configuration.\n\nA thread is the smallest unit of work: one or more sources, a sequence\nof transformation steps, and a single target. ``strict_params``\noverrides the enclosing weave's or loom's setting for the thread.",
   "properties": {
     "name": {
       "default": "",
@@ -4896,6 +4896,19 @@
       "default": null,
       "description": "Typed parameter declarations with defaults and validation.",
       "title": "Params"
+    },
+    "strict_params": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Enforce the params contract in this scope and below: a ${param.x} reference must be declared (P120) and, at the root, every runtime param must be declared or referenced (P121). The most specific setting wins; unset inherits, and is lenient at the root.",
+      "title": "Strict Params"
     },
     "defaults": {
       "anyOf": [

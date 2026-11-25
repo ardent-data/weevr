@@ -23,6 +23,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "pair_file.weave",
+    "strict_params": null,
     "threads": [
       {
         "as_": null,
@@ -83,6 +84,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.pair",

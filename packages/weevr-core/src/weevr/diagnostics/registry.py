@@ -405,6 +405,18 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "of a thread, weave or loom namespace.",
     ),
     _config_warning(
+        "P120",
+        "undeclared-parameter",
+        "A ${param.x} reference is bound, but no params: declaration in its scope chain "
+        "covers it. An error under strict_params.",
+    ),
+    _config_warning(
+        "P121",
+        "unused-supplied-parameter",
+        "A runtime parameter is supplied that nothing in the loaded tree declares or "
+        "references. An error under strict_params.",
+    ),
+    _config_warning(
         "P123",
         "unconsumed-pin",
         "A weave or thread entry pins a parameter that nothing beneath the entry reads "

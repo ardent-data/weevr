@@ -83,13 +83,26 @@ class Context:
             ``weevr.yaml`` (``kind: project``); the ``.weevr`` folder suffix
             is only the naming convention of the name forms. Without one,
             construction fails with ``C209``, listing the location probed.
-        params: Runtime parameter overrides.
+        params: Runtime parameter overrides. They are the run root of every
+            config this Context loads, and each load judges them on its own:
+            a param the loaded config neither declares nor references warns
+            ``P121``. Shared environment params therefore warn when a config
+            doesn't use them.
         log_level: Logging verbosity — ``"minimal"``, ``"standard"`` (default),
             ``"verbose"``, or ``"debug"``.
         workspace: Fabric workspace ID for cross-lakehouse resolution.
         lakehouse: Fabric lakehouse ID for cross-lakehouse resolution.
         run_store: Run Store settings that replace the ``run_store`` block of
             ``weevr.yaml`` whole (see :attr:`run_store`).
+        strict_params: Overrides every document's ``strict_params:`` for each
+            config this Context loads. ``True`` fails the load on a
+            ``${param.x}`` no declaration in its chain covers (``P120``) and
+            on a param in ``params`` nothing declares or references
+            (``P121``); ``False`` keeps both warnings even where a document
+            sets ``strict_params: true``. ``None`` (the default) leaves each
+            document's setting, most specific wins, absent is lenient. Under
+            strict params, pass only the params each run needs, or declare
+            the shared ones: a declared param counts as used.
     """
 
     def __init__(
@@ -102,6 +115,7 @@ class Context:
         workspace: str | None = None,
         lakehouse: str | None = None,
         run_store: RunStore | None = None,
+        strict_params: bool | None = None,
     ) -> None:
         """Initialize a Context with a SparkSession and project reference."""
         if not isinstance(spark, SparkSession):
@@ -126,6 +140,7 @@ class Context:
 
         self._spark = spark
         self._params = params
+        self._strict_params = strict_params
         self._log_level = resolved_level
         self._project_root, self._project = self._resolve_project_path(
             project, workspace, lakehouse
@@ -1184,6 +1199,7 @@ class Context:
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
             project=self._project,
+            strict_params=self._strict_params,
         )
         for warning in render_diagnostics(warnings):
             logger.warning(warning)
@@ -1225,6 +1241,7 @@ class Context:
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
             project=self._project,
+            strict_params=self._strict_params,
         )
         if log_warnings:
             for warning in render_diagnostics(warnings):

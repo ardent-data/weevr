@@ -501,6 +501,20 @@ A ${...} reference names no namespace: ${x} instead of ${param.x}.
 A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave or
 loom namespace.
 
+### P120
+
+`undeclared-parameter` · warning · stable
+
+A ${param.x} reference is bound, but no params: declaration in its scope chain covers it. An error
+under strict_params.
+
+### P121
+
+`unused-supplied-parameter` · warning · stable
+
+A runtime parameter is supplied that nothing in the loaded tree declares or references. An error
+under strict_params.
+
 ### P123
 
 `unconsumed-pin` · warning · stable

@@ -39,6 +39,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "nightly.loom",
+    "strict_params": null,
     "variables": null,
     "weaves": [
       {
@@ -100,6 +101,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "ops.audit",
@@ -174,6 +176,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "ops.audit_summary",
@@ -264,6 +267,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.orders_east",
@@ -361,6 +365,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.orders_west",
@@ -457,6 +462,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "stg.orders",
@@ -638,6 +644,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "inline_ops",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,
@@ -679,6 +686,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "weaves/sales.weave",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,
