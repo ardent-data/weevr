@@ -1,0 +1,31 @@
+# Variable references: a loom whose defaults act as variables in v1.
+kind: loom
+config_version: "2.0"
+
+params:
+  env:
+    name: env
+    type: string
+    default: prod  # the environment the threads read
+  batch_size:
+    name: batch_size
+    type: int
+    default: 500
+  cutoff:
+    name: cutoff
+    type: string
+    default: "2024-01-01"
+  partitions:
+    name: partitions
+    type: list[string]
+    default: [region, day]
+  dry_run:
+    name: dry_run
+    type: bool
+    default: false
+
+defaults:
+  retention_days: 30
+
+weaves:
+  - ref: ingest.weave

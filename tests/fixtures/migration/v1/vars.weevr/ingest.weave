@@ -1,0 +1,10 @@
+config_version: "1.0"
+
+params:
+  region:
+    name: region
+    type: string
+    default: eastus
+
+threads:
+  - ref: threads/orders.thread
