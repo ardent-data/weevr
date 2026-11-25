@@ -488,6 +488,12 @@ A date or timestamp parameter is not in the expected ISO format.
 
 A ${...} variable has no value and no default.
 
+### P123
+
+`unconsumed-pin` · warning · stable
+
+A weave or thread entry pins a parameter that nothing beneath the entry reads or declares.
+
 ## R1xx — Lookups and column sets
 
 ### R101

@@ -260,3 +260,83 @@ class TestUnchangedBehavior:
     def test_bare_runtime_reference_still_resolves_in_ref_thread(self, tmp_path: Path) -> None:
         path = _tree(tmp_path, alias="out.${x}")
         assert _alias(_leaf(_load(path, {"x": "rt"}))) == "out.rt"
+
+
+def _declaring_thread(tmp_path: Path, params: dict[str, Any], **body: Any) -> Path:
+    """Write a thread declaring ``params`` (name -> spec fields) plus ``body`` overrides."""
+    declared = {name: {"name": name, **spec} for name, spec in params.items()}
+    return write_document(tmp_path / "t.thread", {**THREAD, "params": declared, **body})
+
+
+def _model(path: Path, runtime: dict[str, Any] | None = None) -> Any:
+    return load_resolved(path, runtime_params=runtime, project_root=path.parent).model
+
+
+def _code(path: Path, runtime: dict[str, Any] | None = None) -> str:
+    with pytest.raises(ConfigError) as exc:
+        _model(path, runtime)
+    assert len(exc.value.diagnostics) == 1
+    return exc.value.diagnostics[0].code
+
+
+class TestExplicitNoneRuntimeValue:
+    """An explicit ``None`` runtime value is absent: default or required check apply."""
+
+    def test_declared_default_applies(self, tmp_path: Path) -> None:
+        path = _declaring_thread(
+            tmp_path,
+            {"n": {"type": "string", "required": False, "default": "dflt"}},
+            target={"alias": "out.${param.n}"},
+        )
+        assert _model(path, {"n": None}).target.alias == "out.dflt"
+
+    def test_required_check_raises(self, tmp_path: Path) -> None:
+        path = _declaring_thread(
+            tmp_path,
+            {"n": {"type": "string", "required": True}},
+            target={"alias": "out.${param.n}"},
+        )
+        assert _code(path, {"n": None}) == "P101"
+
+
+class TestOptionalParamWithoutDefault:
+    """An optional param with no default is unbound: its reference fails unless ``:-``."""
+
+    SPEC = {"n": {"type": "string", "required": False}}
+
+    def test_reference_fails(self, tmp_path: Path) -> None:
+        path = _declaring_thread(tmp_path, self.SPEC, target={"alias": "out.${param.n}"})
+        assert _code(path) == "P110"
+
+    def test_fallback_applies(self, tmp_path: Path) -> None:
+        path = _declaring_thread(tmp_path, self.SPEC, target={"alias": "out.${param.n:-fb}"})
+        assert _model(path).target.alias == "out.fb"
+
+    def test_fallback_applies_for_explicit_none(self, tmp_path: Path) -> None:
+        path = _declaring_thread(tmp_path, self.SPEC, target={"alias": "out.${param.n:-fb}"})
+        assert _model(path, {"n": None}).target.alias == "out.fb"
+
+
+class TestWholeValueReferencesKeepNativeType:
+    """A value that is only a reference resolves to the param's native type."""
+
+    @pytest.mark.parametrize(
+        ("ptype", "value"),
+        [("int", 7), ("bool", True), ("float", 1.5), ("list[string]", ["a", "b"])],
+    )
+    def test_native_type(self, tmp_path: Path, ptype: str, value: Any) -> None:
+        path = _declaring_thread(
+            tmp_path,
+            {"p": {"type": ptype, "required": True}},
+            sources={
+                "s": {
+                    "type": "delta",
+                    "alias": "raw.t",
+                    "options": {"probe": "${param.p}"},
+                }
+            },
+        )
+        source = _model(path, {"p": value}).sources["s"]
+        resolved = source.options["probe"]
+        assert resolved == value
+        assert type(resolved) is type(value)

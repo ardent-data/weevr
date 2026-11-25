@@ -210,12 +210,10 @@ class TestConsumedKeysTracking:
 
 
 class TestUnusedParamWarnings:
-    """Test unused-param telemetry warnings (M121 Task 13)."""
+    """An entry pin the referenced thread never reads warns ``P123``."""
 
-    def test_unused_entry_param_warns(self, tmp_path, caplog):
-        """Entry param not consumed by thread emits warning."""
-        import logging
-
+    def test_unused_entry_param_warns(self, tmp_path):
+        """Entry param not consumed by thread emits P123 at the entry."""
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "simple.thread"
@@ -236,14 +234,12 @@ class TestUnusedParamWarnings:
                 },
             ],
         }
-        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
-            resolve_references(weave_config, "weave", tmp_path)
-        assert any("unused_key" in r.message for r in caplog.records)
+        warnings: list = []
+        resolve_references(weave_config, "weave", tmp_path, warnings=warnings)
+        assert [(d.code, d.pointer) for d in warnings] == [("P123", "/threads/0/params/unused_key")]
 
-    def test_all_params_consumed_no_warning(self, tmp_path, caplog):
+    def test_all_params_consumed_no_warning(self, tmp_path):
         """All entry params consumed by thread emits no warning."""
-        import logging
-
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "parameterized.thread"
@@ -265,14 +261,12 @@ class TestUnusedParamWarnings:
                 },
             ],
         }
-        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
-            resolve_references(weave_config, "weave", tmp_path)
-        assert not any("unused" in r.message.lower() for r in caplog.records)
+        warnings: list = []
+        resolve_references(weave_config, "weave", tmp_path, warnings=warnings)
+        assert warnings == []
 
-    def test_shadowed_default_no_warning(self, tmp_path, caplog):
-        """Entry param that shadows a thread default emits no warning."""
-        import logging
-
+    def test_shadowed_default_no_warning(self, tmp_path):
+        """A thread with no entry pins emits no warning."""
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "with_default.thread"
@@ -291,10 +285,9 @@ class TestUnusedParamWarnings:
                 {"ref": "with_default.thread"},
             ],
         }
-        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
-            resolve_references(weave_config, "weave", tmp_path)
-        # env is consumed, no warning expected
-        assert not any("unused" in r.message.lower() for r in caplog.records)
+        warnings: list = []
+        resolve_references(weave_config, "weave", tmp_path, warnings=warnings)
+        assert warnings == []
 
 
 class TestStandaloneTemplateErrors:

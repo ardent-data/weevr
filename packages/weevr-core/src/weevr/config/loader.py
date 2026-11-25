@@ -38,6 +38,7 @@ from weevr.config.params import ParamScope
 from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
     ResolvedChild,
+    ScopePositions,
     resolve_config_variables,
     resolve_references,
     validate_params,
@@ -174,6 +175,7 @@ def resolve_config(
     # Type validation only — required-missing already raised above.
     validate_params(declared_param_specs, scope.values())
 
+    inline_scopes: ScopePositions = {}
     try:
         resolved = resolve_config_variables(
             config_dict,
@@ -182,6 +184,7 @@ def resolve_config(
             fabric_context=fabric_context,
             scope=scope,
             file=str(location),
+            inline_scopes=inline_scopes,
         )
     except VariableResolutionError as exc:
         if config_type == "thread" and "param." in str(exc):
@@ -197,6 +200,7 @@ def resolve_config(
         raise
 
     data = resolved
+    pin_warnings: list[Diagnostic] = []
     children = resolve_references(
         resolved,
         config_type,
@@ -205,12 +209,15 @@ def resolve_config(
         authored=config_dict,
         scope=scope,
         file=str(location),
+        inline_scopes=inline_scopes,
+        warnings=pin_warnings,
+        pins_resolved=True,
     )
 
     # Execution-scope warnings come from the PRE-cascade dicts: after the
     # cascade an authored execution block is indistinguishable from one
     # injected by defaults.execution.
-    warnings = (
+    warnings = pin_warnings + (
         collect_execution_warnings(config_type, data, children)
         if config_type in COMPONENT_TYPES
         else []

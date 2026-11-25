@@ -7871,7 +7871,7 @@
         "type": "object"
       },
       "WeaveEntry": {
-        "description": "A weave reference within a loom, with optional condition.\n\nAttributes:\n    name: Weave name. Required for inline definitions; derived from\n        filename stem for external references.\n    ref: Path to an external ``.weave`` file, relative to project root.\n        Mutually exclusive with inline definition (name + body).\n    condition: Optional condition for conditional execution.",
+        "description": "A weave reference within a loom, with optional condition.\n\nAttributes:\n    name: Weave name. Required for inline definitions; derived from\n        filename stem for external references.\n    ref: Path to an external ``.weave`` file, relative to project root.\n        Mutually exclusive with inline definition (name + body).\n    params: Values pinned for the referenced weave's whole subtree, under\n        the ``param`` namespace. Each value resolves in the loom's scope\n        first, then binds in the weave, where it beats runtime params. On\n        an inline weave, ``params`` holds the weave's own declarations.\n    condition: Optional condition for conditional execution.",
         "properties": {
           "name": {
             "default": "",
@@ -7891,6 +7891,20 @@
             "default": null,
             "description": "Path to an external .weave file, relative to project root. Mutually exclusive with inline definition.",
             "title": "Ref"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Values pinned for the referenced weave and everything beneath it, under the param namespace. Resolved in the loom's scope; they beat runtime params within the subtree.",
+            "title": "Params"
           },
           "condition": {
             "anyOf": [

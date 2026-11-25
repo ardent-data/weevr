@@ -44,11 +44,13 @@
       {
         "condition": null,
         "name": "",
+        "params": null,
         "ref": "weaves/sales.weave"
       },
       {
         "condition": null,
         "name": "inline_ops",
+        "params": null,
         "ref": null
       }
     ]

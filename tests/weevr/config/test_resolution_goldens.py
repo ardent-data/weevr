@@ -29,9 +29,7 @@ from typing import Any
 import pytest
 from validate_examples_core import CONFIG_FILES, EXAMPLES_DIR, REQUIRED_PARAMS, project_root
 
-from documents import write_document
 from weevr.config import load_resolved
-from weevr.errors import ConfigError
 
 REPO = Path(__file__).resolve().parents[3]
 GOLDEN_DIR = Path(__file__).parent / "goldens"
@@ -155,92 +153,3 @@ class TestCorpus:
         expected = {c.golden.name for c in CORPUS}
         orphans = sorted({p.name for p in GOLDEN_DIR.glob("*.json")} - expected)
         assert not orphans, f"orphan goldens, delete them: {orphans}"
-
-
-THREAD: dict[str, Any] = {
-    "config_version": "2.0",
-    "sources": {"s": {"type": "delta", "alias": "raw.t"}},
-    "target": {"alias": "out.t"},
-}
-
-
-def _thread(tmp_path: Path, params: dict[str, Any], **body: Any) -> Path:
-    """Write a thread declaring ``params`` (name -> spec fields) plus ``body`` overrides."""
-    declared = {name: {"name": name, **spec} for name, spec in params.items()}
-    return write_document(tmp_path / "t.thread", json.dumps({**THREAD, "params": declared, **body}))
-
-
-def _load(path: Path, runtime: dict[str, Any] | None = None) -> Any:
-    return load_resolved(path, runtime_params=runtime, project_root=path.parent).model
-
-
-def _code(path: Path, runtime: dict[str, Any] | None = None) -> str:
-    with pytest.raises(ConfigError) as exc:
-        _load(path, runtime)
-    assert len(exc.value.diagnostics) == 1
-    return exc.value.diagnostics[0].code
-
-
-class TestExplicitNoneRuntimeValue:
-    """An explicit ``None`` runtime value is absent: default or required check apply."""
-
-    def test_declared_default_applies(self, tmp_path: Path) -> None:
-        path = _thread(
-            tmp_path,
-            {"n": {"type": "string", "required": False, "default": "dflt"}},
-            target={"alias": "out.${param.n}"},
-        )
-        assert _load(path, {"n": None}).target.alias == "out.dflt"
-
-    def test_required_check_raises(self, tmp_path: Path) -> None:
-        path = _thread(
-            tmp_path,
-            {"n": {"type": "string", "required": True}},
-            target={"alias": "out.${param.n}"},
-        )
-        assert _code(path, {"n": None}) == "P101"
-
-
-class TestOptionalParamWithoutDefault:
-    """An optional param with no default is unbound: its reference fails unless ``:-``."""
-
-    SPEC = {"n": {"type": "string", "required": False}}
-
-    def test_reference_fails(self, tmp_path: Path) -> None:
-        path = _thread(tmp_path, self.SPEC, target={"alias": "out.${param.n}"})
-        assert _code(path) == "P110"
-
-    def test_fallback_applies(self, tmp_path: Path) -> None:
-        path = _thread(tmp_path, self.SPEC, target={"alias": "out.${param.n:-fb}"})
-        assert _load(path).target.alias == "out.fb"
-
-    def test_fallback_applies_for_explicit_none(self, tmp_path: Path) -> None:
-        path = _thread(tmp_path, self.SPEC, target={"alias": "out.${param.n:-fb}"})
-        assert _load(path, {"n": None}).target.alias == "out.fb"
-
-
-class TestWholeValueReferencesKeepNativeType:
-    """A value that is only a reference resolves to the param's native type."""
-
-    @pytest.mark.parametrize(
-        ("ptype", "value"),
-        [("int", 7), ("bool", True), ("float", 1.5), ("list[string]", ["a", "b"])],
-    )
-    def test_native_type(self, tmp_path: Path, ptype: str, value: Any) -> None:
-        path = _thread(
-            tmp_path,
-            {"p": {"type": ptype, "required": True}},
-            tags=None,
-            target={"alias": "out.t", "mode": "overwrite"},
-            sources={
-                "s": {
-                    "type": "delta",
-                    "alias": "raw.t",
-                    "options": {"probe": "${param.p}"},
-                }
-            },
-        )
-        source = _load(path, {"p": value}).sources["s"]
-        resolved = source.options["probe"]
-        assert resolved == value
-        assert type(resolved) is type(value)

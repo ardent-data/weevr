@@ -60,6 +60,7 @@
       {
         "condition": null,
         "name": "dimensions",
+        "params": null,
         "ref": null
       },
       {
@@ -67,6 +68,7 @@
           "when": "table_exists('curated.dim_customer')"
         },
         "name": "facts",
+        "params": null,
         "ref": null
       }
     ]

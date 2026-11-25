@@ -180,6 +180,39 @@ class ParamScope:
         return {name: binding.value for name, binding in self.bindings.items()}
 
 
+class BindingReads:
+    """The bindings a load read, by identity.
+
+    A pin is consumed when some binding read in its subtree is the very
+    binding the pin created: a nearer pin for the same name makes a new
+    binding, so it does not count as reading the outer one.
+    """
+
+    def __init__(self) -> None:
+        """Start with nothing read."""
+        self._read: dict[int, Binding] = {}
+
+    def note(self, binding: Binding) -> None:
+        """Record that ``binding`` was read.
+
+        Args:
+            binding: The binding a reference or declaration used.
+        """
+        # Holding the binding keeps its id from being reused by a later one.
+        self._read[id(binding)] = binding
+
+    def was_read(self, binding: Binding) -> bool:
+        """Whether ``binding`` was read.
+
+        Args:
+            binding: A binding from some scope.
+
+        Returns:
+            ``True`` when :meth:`note` recorded this exact binding.
+        """
+        return self._read.get(id(binding)) is binding
+
+
 def _checked(name: str, spec: Any, file: str | None, at: tuple[str | int, ...]) -> Any:
     """``spec`` when it is a ParamSpec or mapping; else a ``C102`` error."""
     if isinstance(spec, dict) or hasattr(spec, "required"):

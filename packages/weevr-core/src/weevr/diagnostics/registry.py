@@ -393,6 +393,12 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unresolved-variable",
         "A ${...} variable has no value and no default.",
     ),
+    _config_warning(
+        "P123",
+        "unconsumed-pin",
+        "A weave or thread entry pins a parameter that nothing beneath the entry reads "
+        "or declares.",
+    ),
     # R101–R119 — lookup and column-set definitions (model/*.py)
     _config(
         "R101",

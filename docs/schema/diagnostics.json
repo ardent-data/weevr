@@ -732,6 +732,16 @@
       "docs_anchor": "p110"
     },
     {
+      "code": "P123",
+      "name": "unconsumed-pin",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A weave or thread entry pins a parameter that nothing beneath the entry reads or declares.",
+      "docs_anchor": "p123"
+    },
+    {
       "code": "R101",
       "name": "lookup-key-values-overlap",
       "category": "config",

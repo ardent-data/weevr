@@ -38,8 +38,8 @@ class EntryMeta:
             an inline child or a weave found by name.
         alias: The entry's ``as`` name, which becomes the child's effective
             name (threads only).
-        params: Values the entry passes to a template thread's ``params``
-            (threads only).
+        params: The entry's ``params``: values a ``ref:`` entry pins for its
+            subtree (an inline child's own declarations).
         dependencies: Threads this one waits for, as declared on the entry
             (threads only).
         condition: The entry's run condition.
@@ -60,7 +60,7 @@ class EntryMeta:
     def from_entry(cls, entry: ThreadEntry | WeaveEntry) -> EntryMeta:
         """Build from a hydrated weave's thread entry or a loom's weave entry."""
         if isinstance(entry, WeaveEntry):
-            return cls(ref=entry.ref, condition=entry.condition)
+            return cls(ref=entry.ref, params=entry.params, condition=entry.condition)
         return cls(
             ref=entry.ref,
             alias=entry.as_,

@@ -130,16 +130,19 @@
           "when": "'dev' == 'dev'"
         },
         "name": "",
+        "params": null,
         "ref": "weaves/core.weave"
       },
       {
         "condition": null,
         "name": "",
+        "params": null,
         "ref": "conv.weave"
       },
       {
         "condition": null,
         "name": "inline_w",
+        "params": null,
         "ref": null
       }
     ]
