@@ -17,15 +17,14 @@ without a declaration. Per-child manifests are not reported.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
 from weevr.config.document_load import load_document
-from weevr.config.interpolation import VARIABLE_PATTERN
-from weevr.config.interpolation_errors import param_name
+from weevr.config.interpolation import param_references
 from weevr.config.loader import COMPONENT_TYPES, resolve_project_root
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.config.manifest_types import ManifestParam, ParamManifest
@@ -157,24 +156,9 @@ class _Walk:
 
     def _scan(self, value: Any, scope: _Scope) -> None:
         """Note each ``${param.x}`` in ``value`` that ``scope`` neither declares nor pins."""
-        for name in _param_references(value):
+        for name in param_references(value):
             if name not in scope.specs and name not in scope.pinned:
                 self.undeclared.setdefault(name, None)
-
-
-def _param_references(value: Any) -> Iterator[str]:
-    """The param names the ``${param.x}`` references in ``value``'s strings read."""
-    if isinstance(value, dict):
-        for item in value.values():
-            yield from _param_references(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _param_references(item)
-    elif isinstance(value, str):
-        for match in VARIABLE_PATTERN.finditer(value):
-            name = param_name(match.group(1))
-            if name is not None:
-                yield name
 
 
 def param_manifest(

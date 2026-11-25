@@ -18,13 +18,16 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from documents import write_document
+from documents import loom_body, thread_body, weave_body, write_document, write_named
 from weevr.config import load_config, load_resolved
 from weevr.config.interpolation import _Rendered, resolve_variables
-from weevr.config.params import ParamScope
+from weevr.config.param_types import param_text
+from weevr.config.params import Binding, ParamScope
 from weevr.config.scoping import scope_context
 from weevr.diagnostics import Diagnostic
+from weevr.engine.conditions import evaluate_condition
 from weevr.errors import ConfigError, ConfigSchemaError
+from weevr.model.weave import ConditionSpec
 
 THREAD: dict[str, Any] = {
     "config_version": "2.0",
@@ -217,12 +220,9 @@ class TestWinningSpec:
 
 
 def _tree(root: Path, *, loom: dict[str, Any], thread: dict[str, Any], alias: str) -> Path:
-    write_document(root / "t.thread", {**THREAD, "target": {"alias": alias}, "params": thread})
-    write_document(root / "w.weave", {"config_version": "2.0", "threads": [{"ref": "t.thread"}]})
-    return write_document(
-        root / "l.loom",
-        {"config_version": "2.0", "weaves": [{"ref": "w.weave"}], "params": loom},
-    )
+    write_named(root, "t.thread", thread_body(alias, params=thread))
+    write_named(root, "w.weave", weave_body([{"ref": "t.thread"}]))
+    return write_named(root, "l.loom", loom_body([{"ref": "w.weave"}], params=loom))
 
 
 class TestThroughLoad:
@@ -313,7 +313,7 @@ class TestThroughLoad:
         resolved = load_resolved(path, project_root=tmp_path)
         thread: Any = resolved.document.children["w"].children["t"].model
         assert thread.target.alias == "out.007"
-        assert [d.code for d in resolved.warnings if d.code == "P123"] == []
+        assert [d.code for d in resolved.diagnostics if d.code == "P123"] == []
 
 
 def _embedded(scope: ParamScope) -> str:
@@ -413,6 +413,20 @@ class TestEmbeddedText:
         assert resolve_variables("x_${param.p.env}", context) == "x_dev"
         assert resolve_variables("${param.p.env}", context) == "dev"
 
+    def test_dotted_reference_to_a_nested_bool_renders_as_yaml_writes_it(self) -> None:
+        scope = ParamScope.root({"on": True, "cfg": {"flag": True, "off": False}}).child(None)
+        context = scope_context(scope)
+        rendered = resolve_variables(
+            "x-${param.on} y-${param.cfg.flag} z-${param.cfg.off}", context
+        )
+        assert rendered == "x-true y-true z-false"
+        assert resolve_variables("${param.cfg.flag}", context) is True
+
+    def test_dotted_reference_to_a_nested_string_keeps_its_text(self) -> None:
+        scope = ParamScope.root({"cfg": {"flag": "True"}}).child(None)
+        context = scope_context(scope)
+        assert resolve_variables("y-${param.cfg.flag}", context) == "y-True"
+
     def test_loom_condition_compares_the_supplied_text(self, tmp_path: Path) -> None:
         write_document(tmp_path / "t.thread", THREAD)
         write_document(
@@ -478,3 +492,19 @@ class TestPinsReadTheSuppliedText:
         assert thread.sources["s"].options["flag"] is True
         assert _wrapped(thread) == []
         assert _wrapped(doc.model) == []
+
+
+class TestParamTextParity:
+    """One bool-text rule: a binding's text, an embedded reference, and the engine agree."""
+
+    @pytest.mark.parametrize("value", [True, False, 0, 7, 1.5, ["a", "b"], {"k": True}])
+    def test_native_value_text_agrees(self, value: Any) -> None:
+        context = scope_context(ParamScope.root({"p": value}).child(None))
+        binding_text = Binding(value, "runtime").text
+        assert binding_text == param_text(value)
+        assert resolve_variables("<${param.p}>", context) == f"<{binding_text}>"
+
+    def test_engine_renders_by_the_core_rule(self) -> None:
+        cond = ConditionSpec(when="${param.flag} == 'false'")
+        assert evaluate_condition(cond, params={"flag": False}) is True
+        assert param_text(False) == "false"

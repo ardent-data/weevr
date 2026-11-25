@@ -281,44 +281,6 @@ def _layered_defaults(above: Mapping[str, Any], document: Mapping[str, Any]) -> 
     return {**above, **(own if isinstance(own, dict) else {})}
 
 
-def resolve_config_variables(
-    config: dict[str, Any],
-    config_type: str,
-    walk: WalkState,
-    *,
-    inline_scopes: ScopePositions | None = None,
-) -> dict[str, Any]:
-    """Resolve variable references in a top-level config.
-
-    ``${param.x}`` resolves from ``walk``'s scope, the config's own. An
-    inline child (a loom's inline weave, a weave's inline thread) opens its
-    own scope from its parent's, so its declared ``params:`` bind for it the
-    way a child file's do. The child's entry keys (``name``, ``condition``,
-    and a thread's ``as`` and ``dependencies``) belong to the parent and
-    resolve in the parent's scope, as do a ``ref:`` entry's pins. A bare
-    ``${x}`` fails with its rewrite, classified by the scope's declarations
-    and the ``defaults`` in force (each config's own ``defaults`` layered over
-    its enclosing configs').
-
-    Args:
-        config: Schema-validated config dict.
-        config_type: The config kind (``"thread"``, ``"weave"``, ...).
-        walk: The load's walk state at this config (:meth:`WalkState.start`).
-        inline_scopes: Filled with the scope opened for each inline child, so
-            :func:`resolve_references` reuses it rather than opening another.
-
-    Returns:
-        The config dict with variables resolved.
-
-    Raises:
-        VariableResolutionError: A variable has no value and no default, or
-            a reference is bare or in an unknown namespace.
-        ConfigSchemaError: A required param declared by an inline child has
-            no value.
-    """
-    return resolve_scoped(config, config_type, walk, inline_scopes=inline_scopes)
-
-
 def scope_context(
     scope: ParamScope, *, fabric_context: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -400,7 +362,7 @@ def substitute(config: Any, walk: WalkState, at: tuple[str | int, ...] = ()) -> 
     return resolved
 
 
-def resolve_scoped(
+def resolve_config_variables(
     config: dict[str, Any],
     config_type: str,
     walk: WalkState,
@@ -408,9 +370,36 @@ def resolve_scoped(
     at: tuple[str | int, ...] = (),
     inline_scopes: ScopePositions | None = None,
 ) -> dict[str, Any]:
-    """Resolve ``config`` in ``walk``'s scope, each inline child in its own scope opened from it.
+    """Resolve ``config``'s variable references, each inline child in its own scope.
 
-    An inline child's entry keys resolve in ``walk``'s scope, its body in the child's.
+    ``${param.x}`` resolves from ``walk``'s scope, the config's own. An
+    inline child (a loom's inline weave, a weave's inline thread) opens its
+    own scope from its parent's, so its declared ``params:`` bind for it the
+    way a child file's do. The child's entry keys (``name``, ``condition``,
+    and a thread's ``as`` and ``dependencies``) belong to the parent and
+    resolve in the parent's scope, as do a ``ref:`` entry's pins. A bare
+    ``${x}`` fails with its rewrite, classified by the scope's declarations
+    and the ``defaults`` in force (each config's own ``defaults`` layered over
+    its enclosing configs').
+
+    Args:
+        config: Schema-validated config dict.
+        config_type: The config kind (``"thread"``, ``"weave"``, ...).
+        walk: The load's walk state at this config (:meth:`WalkState.start`
+            for a top-level config).
+        at: Where ``config`` sits in its file; empty for a config in its own
+            file.
+        inline_scopes: Filled with the scope opened for each inline child, so
+            :func:`resolve_references` reuses it rather than opening another.
+
+    Returns:
+        The config dict with variables resolved.
+
+    Raises:
+        VariableResolutionError: A variable has no value and no default, or
+            a reference is bare or in an unknown namespace.
+        ConfigSchemaError: A required param declared by an inline child has
+            no value.
     """
     key, child_type, child_entry_keys = CHILD_LISTS.get(config_type, ("", "", frozenset()))
     entries = config.get(key) if key else None
@@ -437,7 +426,7 @@ def resolve_scoped(
         if inline_scopes is not None:
             inline_scopes[where] = child_scope
         placement = substitute({k: v for k, v in entry.items() if k in entry_keys}, walk, where)
-        body = resolve_scoped(
+        body = resolve_config_variables(
             {k: v for k, v in entry.items() if k not in entry_keys},
             child_type,
             walk.inline(child_scope, entry, at=where),
@@ -452,7 +441,7 @@ def entry_pins(entry: dict[str, Any]) -> dict[str, Any] | None:
     """A ``ref:`` entry's pins, as the variable pass resolved them; ``None`` when it pins none.
 
     The pins resolve in the parent's scope with the rest of the parent
-    (:func:`resolve_config_variables`, :func:`resolve_scoped`). Entries reach
+    (:func:`resolve_config_variables`). Entries reach
     here unvalidated: a ``params:`` that is not a mapping is left for the
     entry model to reject when the parent hydrates.
     """
@@ -491,7 +480,8 @@ class ChildEntry:
         self._parent = parent
         self._alias = alias
         self._at = at
-        self._opened: tuple[str, WalkState] | None = None
+        self._name: str | None = None
+        self._state: WalkState | None = None
 
     def open(self, child: dict[str, Any], path: str, kind: str) -> WalkState:
         """Open the child's scope: its declared ``params:`` bound with the entry's pins.
@@ -504,7 +494,8 @@ class ChildEntry:
         Returns:
             The child's walk state, also kept as :attr:`opened`.
         """
-        entry = PinEntry(self._alias or child["name"], self._parent.file, self._at)
+        self._name = child["name"]
+        entry = PinEntry(self.entry_name, self._parent.file, self._at)
         scope = self._parent.scope.open_child(
             child.get("params"),
             file=path,
@@ -513,29 +504,35 @@ class ChildEntry:
             tier=param_tier(kind),
             pinned_by=entry,
         )
-        state = self._parent.in_file(scope, child, path)
-        self._opened = (child["name"], state)
-        return state
+        self._state = self._parent.in_file(scope, child, path)
+        return self._state
 
-    def _require_opened(self) -> tuple[str, WalkState]:
-        """The child's name and walk state, once :meth:`open` has run.
-
-        Raises:
-            RuntimeError: :meth:`open` was not called.
-        """
-        if self._opened is None:
-            raise RuntimeError("ChildEntry.open() was never called for this entry")
-        return self._opened
+    @staticmethod
+    def _never_opened() -> RuntimeError:
+        """The error for reading the child before :meth:`open`."""
+        return RuntimeError("ChildEntry.open() was never called for this entry")
 
     @property
     def opened(self) -> WalkState:
         """The child's walk state; raises ``RuntimeError`` before :meth:`open`."""
-        return self._require_opened()[1]
+        if self._state is None:
+            raise self._never_opened()
+        return self._state
 
     @property
     def name(self) -> str:
         """The child's own name; raises ``RuntimeError`` before :meth:`open`."""
-        return self._require_opened()[0]
+        if self._name is None:
+            raise self._never_opened()
+        return self._name
+
+    @property
+    def entry_name(self) -> str:
+        """The entry's effective name: its alias, else the child's own name.
+
+        Raises ``RuntimeError`` before :meth:`open` when the entry has no alias.
+        """
+        return self._alias or self.name
 
 
 @contextmanager
@@ -587,7 +584,7 @@ def enter_child(
                 child.pins,
                 opened.scope,
                 walk.reads,
-                entry_name=entry.get(alias_key) or child.name,
+                entry_name=child.entry_name,
                 file=walk.file,
                 at=at,
                 upstream_readers=upstream_readers(child.pins, walk.assets, opened.assets),

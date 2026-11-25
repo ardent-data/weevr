@@ -7,7 +7,7 @@ from typing import Any
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import collecting
 from weevr.config.discovery import DiscoveredDocument, discover_documents
-from weevr.config.document import EntryMeta, ResolvedDocument, ScopeRegistries
+from weevr.config.document import EntryMeta, Provenance, ResolvedDocument, ScopeRegistries
 from weevr.config.loader import COMPONENT_TYPES as _COMPONENT_TYPES
 from weevr.config.loader import hydrate_resolved as _hydrate_resolved
 from weevr.config.loader import load_resolved
@@ -15,6 +15,13 @@ from weevr.config.loader import resolve_config as _resolve_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.config.manifest import param_manifest
 from weevr.config.manifest_types import ManifestParam, ParamManifest
+from weevr.config.param_provenance import (
+    ParamDeclaration,
+    ParamPin,
+    ParamProvenance,
+    ParamSource,
+    ParamTier,
+)
 from weevr.config.root import find_project_root
 from weevr.config.run_store import (
     RUN_STORE_TABLES,
@@ -32,7 +39,13 @@ __all__ = [
     "DiscoveredDocument",
     "EntryMeta",
     "ManifestParam",
+    "ParamDeclaration",
     "ParamManifest",
+    "ParamPin",
+    "ParamProvenance",
+    "ParamSource",
+    "ParamTier",
+    "Provenance",
     "ResolvedDocument",
     "RunStoreLocation",
     "ScopeRegistries",

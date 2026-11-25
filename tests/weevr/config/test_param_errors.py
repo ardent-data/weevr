@@ -15,8 +15,8 @@ from typing import Any
 
 import pytest
 
-from documents import write_document
-from weevr.config import load_resolved
+from documents import loom_body, string_specs, thread_body, weave_body, write_document, write_named
+from resolving import load_at
 from weevr.config.interpolation import resolve_variables
 from weevr.config.interpolation_errors import ReferenceScope
 from weevr.config.params import ParamDeclaration, declaration_block
@@ -29,32 +29,27 @@ THREAD: dict[str, Any] = {
 }
 
 
-def _specs(**specs: dict[str, Any]) -> dict[str, Any]:
-    """ParamSpec mappings keyed by name."""
-    return {name: {"name": name, "type": "string", **spec} for name, spec in specs.items()}
-
-
 def _optional(default: str | None = None) -> dict[str, Any]:
     return {"required": False, "default": default}
 
 
 def _thread(root: Path, alias: str, **extra: Any) -> Path:
-    return write_document(root / "t.thread", {**THREAD, "target": {"alias": alias}, **extra})
+    return write_named(root, "t.thread", thread_body(alias, **extra))
 
 
 def _tree(root: Path, alias: str, *, loom: dict[str, Any] | None = None, **loom_extra: Any) -> Path:
     """A loom → ref weave → ref thread tree; the loom optionally declares params."""
     _thread(root, alias)
-    write_document(root / "w.weave", {"config_version": "2.0", "threads": [{"ref": "t.thread"}]})
-    body: dict[str, Any] = {"config_version": "2.0", "weaves": [{"ref": "w.weave"}], **loom_extra}
+    write_named(root, "w.weave", weave_body([{"ref": "t.thread"}]))
+    body = loom_body([{"ref": "w.weave"}], **loom_extra)
     if loom is not None:
         body["params"] = loom
-    return write_document(root / "l.loom", body)
+    return write_named(root, "l.loom", body)
 
 
 def _failure(path: Path, runtime: dict[str, Any] | None = None) -> Diagnostic:
     with pytest.raises(VariableResolutionError) as exc:
-        load_resolved(path, runtime_params=runtime, project_root=path.parent)
+        load_at(path, runtime)
     assert len(exc.value.diagnostics) == 1
     return exc.value.diagnostics[0]
 
@@ -76,7 +71,7 @@ class TestUndeclaredUnsupplied:
         assert 'params={"x":' in hint
 
     def test_expected_lists_bound_and_declared_names(self, tmp_path: Path) -> None:
-        params = _specs(a=_optional("da"), b=_optional())
+        params = string_specs(a=_optional("da"), b=_optional())
         path = _thread(tmp_path, "out.${param.x}", params=params)
         found = _failure(path, {"c": "rc"})
         assert found.code == "P110"
@@ -85,7 +80,7 @@ class TestUndeclaredUnsupplied:
 
 class TestDeclaredUnbound:
     def test_hint_traces_the_scope_from_declaration_to_reference(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, "out.${param.x}", loom=_specs(x=_optional()))
+        path = _tree(tmp_path, "out.${param.x}", loom=string_specs(x=_optional()))
         found = _failure(path)
         assert found.code == "P110"
         assert found.file == str(tmp_path / "t.thread")
@@ -97,7 +92,7 @@ class TestDeclaredUnbound:
         assert "${param.x}" in (found.expected or ())
 
     def test_declared_in_the_referencing_file(self, tmp_path: Path) -> None:
-        path = _thread(tmp_path, "out.${param.x}", params=_specs(x=_optional()))
+        path = _thread(tmp_path, "out.${param.x}", params=string_specs(x=_optional()))
         found = _failure(path)
         assert found.code == "P110"
         assert "t.thread" in _hint(found)
@@ -142,7 +137,7 @@ class TestReferenceScope:
 
 class TestNearestName:
     def test_near_miss_of_a_declared_name_is_suggested(self, tmp_path: Path) -> None:
-        path = _thread(tmp_path, "out.${param.regoin}", params=_specs(region=_optional("eu")))
+        path = _thread(tmp_path, "out.${param.regoin}", params=string_specs(region=_optional("eu")))
         found = _failure(path)
         assert found.code == "P110"
         assert "${param.region}" in _hint(found)
@@ -153,7 +148,7 @@ class TestNearestName:
         assert "${param.table}" in _hint(found)
 
     def test_far_name_suggests_nothing(self, tmp_path: Path) -> None:
-        path = _thread(tmp_path, "out.${param.zone}", params=_specs(region=_optional("eu")))
+        path = _thread(tmp_path, "out.${param.zone}", params=string_specs(region=_optional("eu")))
         found = _failure(path)
         assert found.code == "P110"
         assert "${param.region}" not in _hint(found)

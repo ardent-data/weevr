@@ -13,7 +13,8 @@ from typing import Any
 
 import pytest
 
-from documents import write_document
+from documents import loom_body, string_specs, thread_body, weave_body, write_document
+from resolving import load_at
 from weevr.config import load_resolved
 from weevr.config.document import ResolvedDocument
 from weevr.diagnostics import Diagnostic
@@ -26,13 +27,8 @@ THREAD: dict[str, Any] = {
 }
 
 
-def _specs(**specs: dict[str, Any]) -> dict[str, Any]:
-    """ParamSpec mappings keyed by name."""
-    return {name: {"name": name, "type": "string", **spec} for name, spec in specs.items()}
-
-
 def _thread(root: Path, alias: str, params: dict[str, Any] | None = None, name: str = "t") -> Path:
-    body: dict[str, Any] = {**THREAD, "target": {"alias": alias}}
+    body = thread_body(alias)
     if params is not None:
         body["params"] = params
     return write_document(root / f"{name}.thread", body)
@@ -44,21 +40,21 @@ def _weave(
     params: dict[str, Any] | None = None,
     name: str = "w",
 ) -> Path:
-    body: dict[str, Any] = {"config_version": "2.0", "threads": threads}
+    body = weave_body(threads)
     if params is not None:
         body["params"] = params
     return write_document(root / f"{name}.weave", body)
 
 
 def _loom(root: Path, weaves: list[Any], params: dict[str, Any] | None = None) -> Path:
-    body: dict[str, Any] = {"config_version": "2.0", "weaves": weaves}
+    body = loom_body(weaves)
     if params is not None:
         body["params"] = params
     return write_document(root / "l.loom", body)
 
 
 def _load(path: Path, runtime: dict[str, Any] | None = None) -> ResolvedDocument:
-    return load_resolved(path, runtime_params=runtime, project_root=path.parent).document
+    return load_at(path, runtime).document
 
 
 def _error(path: Path, runtime: dict[str, Any] | None = None) -> Diagnostic:
@@ -100,7 +96,7 @@ class TestGoldens:
         assert _alias(_load(path, {"table": "orders"})) == "out.orders"
 
     def test_declare_once_in_loom_reaches_ref_thread(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, loom=_specs(x={"required": False, "default": "lm"}))
+        path = _tree(tmp_path, loom=string_specs(x={"required": False, "default": "lm"}))
         assert _alias(_leaf(_load(path))) == "out.lm"
 
 
@@ -108,35 +104,37 @@ class TestPrecedence:
     """Inherited binding > nearest declared default > ``:-`` fallback > error."""
 
     def test_runtime_beats_thread_default(self, tmp_path: Path) -> None:
-        path = _thread(tmp_path, "out.${param.x}", _specs(x={"required": False, "default": "d"}))
+        path = _thread(
+            tmp_path, "out.${param.x}", string_specs(x={"required": False, "default": "d"})
+        )
         assert _alias(_load(path, {"x": "rt"})) == "out.rt"
 
     def test_runtime_beats_thread_default_two_tiers_down(self, tmp_path: Path) -> None:
         path = _tree(
             tmp_path,
-            loom=_specs(x={"required": False, "default": "lm"}),
-            thread=_specs(x={"required": False, "default": "th"}),
+            loom=string_specs(x={"required": False, "default": "lm"}),
+            thread=string_specs(x={"required": False, "default": "th"}),
         )
         assert _alias(_leaf(_load(path, {"x": "rt"}))) == "out.rt"
 
     def test_child_redeclaration_shadows_default(self, tmp_path: Path) -> None:
         path = _tree(
             tmp_path,
-            loom=_specs(x={"required": False, "default": "lm"}),
-            thread=_specs(x={"required": False, "default": "th"}),
+            loom=string_specs(x={"required": False, "default": "lm"}),
+            thread=string_specs(x={"required": False, "default": "th"}),
         )
         assert _alias(_leaf(_load(path))) == "out.th"
 
     def test_nearest_default_is_the_weaves(self, tmp_path: Path) -> None:
         path = _tree(
             tmp_path,
-            loom=_specs(x={"required": False, "default": "lm"}),
-            weave=_specs(x={"required": False, "default": "wv"}),
+            loom=string_specs(x={"required": False, "default": "lm"}),
+            weave=string_specs(x={"required": False, "default": "wv"}),
         )
         assert _alias(_leaf(_load(path))) == "out.wv"
 
     def test_weave_declared_default_reaches_ref_thread(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, weave=_specs(x={"required": False, "default": "wv"}))
+        path = _tree(tmp_path, weave=string_specs(x={"required": False, "default": "wv"}))
         assert _alias(_leaf(_load(path))) == "out.wv"
 
     def test_runtime_undeclared_reaches_ref_thread(self, tmp_path: Path) -> None:
@@ -144,7 +142,7 @@ class TestPrecedence:
         assert _alias(_leaf(_load(path, {"x": "rt"}))) == "out.rt"
 
     def test_explicit_none_runtime_falls_to_default(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, loom=_specs(x={"required": False, "default": "lm"}))
+        path = _tree(tmp_path, loom=string_specs(x={"required": False, "default": "lm"}))
         assert _alias(_leaf(_load(path, {"x": None}))) == "out.lm"
 
     def test_fallback_when_unbound(self, tmp_path: Path) -> None:
@@ -154,7 +152,7 @@ class TestPrecedence:
     def test_default_beats_fallback(self, tmp_path: Path) -> None:
         path = _tree(
             tmp_path,
-            loom=_specs(x={"required": False, "default": "lm"}),
+            loom=string_specs(x={"required": False, "default": "lm"}),
             alias="out.${param.x:-fb}",
         )
         assert _alias(_leaf(_load(path))) == "out.lm"
@@ -164,35 +162,35 @@ class TestUnbound:
     """No value anywhere: ``P101`` at a required spec, else ``P110`` at the reference."""
 
     def test_required_in_ref_thread_names_its_file(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, thread=_specs(x={"required": True}))
+        path = _tree(tmp_path, thread=string_specs(x={"required": True}))
         found = _error(path)
         assert found.code == "P101"
         assert found.file == str(tmp_path / "t.thread")
         assert found.pointer == "/params/x"
 
     def test_required_in_ref_weave_names_its_file(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, weave=_specs(x={"required": True}))
+        path = _tree(tmp_path, weave=string_specs(x={"required": True}))
         found = _error(path)
         assert found.code == "P101"
         assert found.file == str(tmp_path / "w.weave")
         assert found.pointer == "/params/x"
 
     def test_required_in_loom_names_the_loom(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, loom=_specs(x={"required": True}))
+        path = _tree(tmp_path, loom=string_specs(x={"required": True}))
         found = _error(path)
         assert found.code == "P101"
         assert found.file == str(path)
         assert found.pointer == "/params/x"
 
     def test_required_satisfied_by_runtime(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, thread=_specs(x={"required": True}))
+        path = _tree(tmp_path, thread=string_specs(x={"required": True}))
         assert _alias(_leaf(_load(path, {"x": "rt"}))) == "out.rt"
 
     def test_undeclared_unsupplied_in_ref_thread(self, tmp_path: Path) -> None:
         assert _error(_tree(tmp_path)).code == "P110"
 
     def test_optional_without_default_in_loom(self, tmp_path: Path) -> None:
-        path = _tree(tmp_path, loom=_specs(x={"required": False}))
+        path = _tree(tmp_path, loom=string_specs(x={"required": False}))
         assert _error(path).code == "P110"
 
 
@@ -204,7 +202,7 @@ class TestInlineChildren:
         path = _loom(
             tmp_path,
             [{"name": "w", "config_version": "2.0", "threads": [{"ref": "t.thread"}]}],
-            _specs(x={"required": False, "default": "lm"}),
+            string_specs(x={"required": False, "default": "lm"}),
         )
         assert _alias(_leaf(_load(path))) == "out.lm"
 
@@ -216,11 +214,11 @@ class TestInlineChildren:
                 {
                     "name": "w",
                     "config_version": "2.0",
-                    "params": _specs(x={"required": False, "default": "wv"}),
+                    "params": string_specs(x={"required": False, "default": "wv"}),
                     "threads": [{"ref": "t.thread"}],
                 }
             ],
-            _specs(x={"required": False, "default": "lm"}),
+            string_specs(x={"required": False, "default": "lm"}),
         )
         assert _alias(_leaf(_load(path))) == "out.wv"
 
@@ -228,15 +226,15 @@ class TestInlineChildren:
         inline = {
             **THREAD,
             "name": "t",
-            "params": _specs(x={"required": False, "default": "th"}),
+            "params": string_specs(x={"required": False, "default": "th"}),
             "target": {"alias": "out.${param.x}"},
         }
-        path = _weave(tmp_path, [inline], _specs(x={"required": False, "default": "wv"}))
+        path = _weave(tmp_path, [inline], string_specs(x={"required": False, "default": "wv"}))
         assert _alias(_load(path).children["t"]) == "out.th"
 
     def test_inline_thread_sees_weave_default(self, tmp_path: Path) -> None:
         inline = {**THREAD, "name": "t", "target": {"alias": "out.${param.x}"}}
-        path = _weave(tmp_path, [inline], _specs(x={"required": False, "default": "wv"}))
+        path = _weave(tmp_path, [inline], string_specs(x={"required": False, "default": "wv"}))
         assert _alias(_load(path).children["t"]) == "out.wv"
 
 
@@ -253,7 +251,7 @@ class TestUnchangedBehavior:
         path = _weave(
             tmp_path,
             [{"ref": "t.thread", "params": {"x": "${param.y}_p"}}],
-            _specs(y={"required": False, "default": "wv"}),
+            string_specs(y={"required": False, "default": "wv"}),
         )
         assert _alias(_load(path).children["t"]) == "out.wv_p"
 

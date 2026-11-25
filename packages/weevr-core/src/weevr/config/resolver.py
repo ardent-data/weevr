@@ -18,7 +18,7 @@ from weevr.config.scoping import (
     entry_pins,
     is_inline_thread,
     is_inline_weave,
-    resolve_scoped,
+    resolve_config_variables,
     substitute,
 )
 from weevr.diagnostics import diagnostic
@@ -292,7 +292,7 @@ def resolve_references(
         project_root: The ``.weevr`` project directory. A bare
             :class:`pathlib.Path` is wrapped in a
             :class:`LocalConfigLocation` for backward compatibility.
-        walk: The load's walk walk at ``config``: its scope, file, runtime
+        walk: The load's walk state at ``config``: its scope, file, runtime
             params, and the records the walk shares (bindings read, load
             warnings). Each child opens its own from it.
         visited: Refs already being loaded, in load order (for cycle detection).
@@ -376,7 +376,7 @@ def resolve_references(
 
                             weave_walk = entered.open(child_dict, str(weave_path), child_type)
                             weave_scopes: ScopePositions = {}
-                            resolved_child = resolve_scoped(
+                            resolved_child = resolve_config_variables(
                                 child_dict, child_type, weave_walk, inline_scopes=weave_scopes
                             )
 

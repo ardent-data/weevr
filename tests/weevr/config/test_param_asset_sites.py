@@ -16,7 +16,8 @@ from typing import Any
 
 import pytest
 
-from documents import write_document
+from documents import loom_body, weave_body, write_named
+from resolving import load_at
 from weevr.config import load_resolved
 from weevr.config.assets import declared_assets
 from weevr.diagnostics import Severity
@@ -46,26 +47,13 @@ ASSETS: dict[str, Any] = {
 WS = {"ws": {"name": "ws", "type": "string", "required": False, "default": "loom_ws"}}
 
 
-def _write(root: Path, name: str, body: dict[str, Any]) -> Path:
-    return write_document(root / name, body)
-
-
 def _thread(alias: str = "out.t", **extra: Any) -> dict[str, Any]:
     target = {"alias": alias, "audit_template": "tpl"}
     return {**THREAD, "target": target, **extra}
 
 
-def _weave(threads: list[Any], **extra: Any) -> dict[str, Any]:
-    return {"config_version": "2.0", "threads": threads, **extra}
-
-
 def _loom(root: Path, weaves: list[Any], **extra: Any) -> Path:
-    body = {"config_version": "2.0", "params": WS, "weaves": weaves, **ASSETS, **extra}
-    return _write(root, "l.loom", body)
-
-
-def _loaded(path: Path, runtime: dict[str, Any] | None = None) -> Any:
-    return load_resolved(path, runtime_params=runtime, project_root=path.parent)
+    return write_named(root, "l.loom", loom_body(weaves, **{"params": WS, **ASSETS, **extra}))
 
 
 def _p122(loaded: Any) -> list[Any]:
@@ -101,10 +89,10 @@ class TestPinDivergence:
 
     @pytest.fixture
     def loaded(self, tmp_path: Path) -> Any:
-        _write(tmp_path, "t.thread", _thread(alias="out.${param.ws}"))
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread(alias="out.${param.ws}"))
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"ws": "pinned"}}])
-        return _loaded(path)
+        return load_at(path)
 
     def test_thread_fields_see_the_pin(self, loaded: Any) -> None:
         thread = loaded.document.children["w"].children["t"]
@@ -123,17 +111,17 @@ class TestPinDivergence:
         assert "P123" not in _codes(loaded)
 
     def test_assets_take_the_runtime_binding_at_the_loom(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"ws": "pinned"}}])
-        thread = _loaded(path, {"ws": "rt"}).document.children["w"].children["t"]
+        thread = load_at(path, {"ws": "rt"}).document.children["w"].children["t"]
         assert _asset_values(thread) == _all("rt")
 
     def test_thread_pin_does_not_retarget_a_weave_asset(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread(alias="out.${param.ws}"))
-        weave = _weave([{"ref": "t.thread", "params": {"ws": "pinned"}}], params=WS, **ASSETS)
-        path = _write(tmp_path, "w.weave", weave)
-        loaded = _loaded(path)
+        write_named(tmp_path, "t.thread", _thread(alias="out.${param.ws}"))
+        weave = weave_body([{"ref": "t.thread", "params": {"ws": "pinned"}}], params=WS, **ASSETS)
+        path = write_named(tmp_path, "w.weave", weave)
+        loaded = load_at(path)
         thread = loaded.document.children["t"]
         assert thread.model.target.alias == "out.pinned"
         assert _asset_values(thread) == _all("loom_ws")
@@ -149,15 +137,15 @@ class TestShadowing:
 
     @pytest.fixture
     def loaded(self, tmp_path: Path) -> Any:
-        _write(tmp_path, "t.thread", _thread())
-        shadowing = _weave([{"ref": "t.thread"}], params=WS, **ASSETS)
-        _write(tmp_path, "w1.weave", shadowing)
-        _write(tmp_path, "w2.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread())
+        shadowing = weave_body([{"ref": "t.thread"}], params=WS, **ASSETS)
+        write_named(tmp_path, "w1.weave", shadowing)
+        write_named(tmp_path, "w2.weave", weave_body([{"ref": "t.thread"}]))
         path = _loom(
             tmp_path,
             [{"ref": "w1.weave", "params": {"ws": "pinned"}}, {"ref": "w2.weave"}],
         )
-        return _loaded(path)
+        return load_at(path)
 
     def test_shadowing_weave_resolves_with_the_pin(self, loaded: Any) -> None:
         thread = loaded.document.children["w1"].children["t"]
@@ -177,19 +165,19 @@ class TestPinIgnoredByUpstreamAsset:
 
     @pytest.fixture
     def tree(self, tmp_path: Path) -> Path:
-        _write(tmp_path, "t.thread", _thread())
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         return _loom(tmp_path, [{"ref": "w.weave", "params": {"ws": "pinned"}}])
 
     def test_warns_at_the_pin(self, tree: Path) -> None:
-        found = _p122(_loaded(tree))
+        found = _p122(load_at(tree))
         assert len(found) == 1
         assert found[0].severity is Severity.WARNING
         assert found[0].pointer == "/weaves/0/params/ws"
         assert found[0].file == str(tree)
 
     def test_names_each_asset_and_its_declaring_file(self, tree: Path) -> None:
-        (found,) = _p122(_loaded(tree))
+        (found,) = _p122(load_at(tree))
         assert list(found.expected or []) == [
             f"connections.lake ({tree})",
             f"lookups.ref_lookup ({tree})",
@@ -198,7 +186,7 @@ class TestPinIgnoredByUpstreamAsset:
         ]
 
     def test_replaces_p123_for_the_pin(self, tree: Path) -> None:
-        assert "P123" not in _codes(_loaded(tree))
+        assert "P123" not in _codes(load_at(tree))
 
     def test_stays_a_warning_under_strict_params(self, tree: Path) -> None:
         loaded = load_resolved(tree, project_root=tree.parent, strict_params=True)
@@ -206,25 +194,25 @@ class TestPinIgnoredByUpstreamAsset:
         assert found.severity is Severity.WARNING
 
     def test_thread_entry_pin_under_a_weave_asset(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", THREAD)
+        write_named(tmp_path, "t.thread", THREAD)
         connections = {"connections": ASSETS["connections"]}
-        weave = _weave([{"ref": "t.thread", "params": {"ws": "p"}}], params=WS, **connections)
-        path = _write(tmp_path, "w.weave", weave)
-        (found,) = _p122(_loaded(path))
+        weave = weave_body([{"ref": "t.thread", "params": {"ws": "p"}}], params=WS, **connections)
+        path = write_named(tmp_path, "w.weave", weave)
+        (found,) = _p122(load_at(path))
         assert found.pointer == "/threads/0/params/ws"
         assert list(found.expected or []) == [f"connections.lake ({path})"]
 
     def test_names_the_declaring_file_of_an_outer_asset(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread", "params": {"ws": "p"}}]))
+        write_named(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread", "params": {"ws": "p"}}]))
         path = _loom(tmp_path, [{"ref": "w.weave"}])
-        (found,) = _p122(_loaded(path))
+        (found,) = _p122(load_at(path))
         assert found.file == str(tmp_path / "w.weave")
         assert found.pointer == "/threads/0/params/ws"
         assert f"connections.lake ({path})" in (found.expected or ())
 
     def test_inline_weave_asset_is_upstream_of_its_thread_pins(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "t.thread", _thread())
         inline = {
             "name": "iw",
             "config_version": "2.0",
@@ -234,13 +222,13 @@ class TestPinIgnoredByUpstreamAsset:
             },
         }
         path = _loom(tmp_path, [inline])
-        (found,) = _p122(_loaded(path))
+        (found,) = _p122(load_at(path))
         assert found.pointer == "/weaves/0/threads/0/params/ws"
         assert f"connections.lake ({path})" in (found.expected or ())
 
     def test_asset_not_reading_the_pinned_name_is_not_named(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         other = {"other": {"type": "onelake", "workspace": "fixed", "lakehouse": "lh"}}
         connections = {**ASSETS["connections"], **other}
         path = _loom(
@@ -248,71 +236,71 @@ class TestPinIgnoredByUpstreamAsset:
             [{"ref": "w.weave", "params": {"ws": "pinned"}}],
             connections=connections,
         )
-        (found,) = _p122(_loaded(path))
+        (found,) = _p122(load_at(path))
         assert "connections.other" not in " ".join(found.expected or [])
 
     def test_no_warning_when_no_upstream_asset_reads_the_name(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"other": "x"}}])
-        loaded = _loaded(path)
+        loaded = load_at(path)
         assert _p122(loaded) == []
         assert "P123" in _codes(loaded)
 
     def test_asset_declared_below_the_pin_is_not_upstream(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
-        weave = _weave([{"ref": "t.thread"}], params=WS, **ASSETS)
-        _write(tmp_path, "w.weave", weave)
-        path = _write(
+        write_named(tmp_path, "t.thread", _thread())
+        weave = weave_body([{"ref": "t.thread"}], params=WS, **ASSETS)
+        write_named(tmp_path, "w.weave", weave)
+        path = write_named(
             tmp_path,
             "l.loom",
             {"config_version": "2.0", "weaves": [{"ref": "w.weave", "params": {"ws": "p"}}]},
         )
-        assert _p122(_loaded(path)) == []
+        assert _p122(load_at(path)) == []
 
     def test_subtree_reading_the_pin_still_warns(self, tmp_path: Path) -> None:
         # The subtree's own fields see the pin while the asset does not.
-        _write(tmp_path, "t.thread", _thread(alias="out.${param.ws}"))
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread(alias="out.${param.ws}"))
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"ws": "pinned"}}])
-        loaded = _loaded(path)
+        loaded = load_at(path)
         (found,) = _p122(loaded)
         assert found.pointer == "/weaves/0/params/ws"
         assert "P123" not in _codes(loaded)
 
     def test_subtree_declaring_the_pin_still_warns(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}], params=WS))
+        write_named(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}], params=WS))
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"ws": "pinned"}}])
-        assert len(_p122(_loaded(path))) == 1
+        assert len(_p122(load_at(path))) == 1
 
     def test_consumed_pin_without_upstream_readers_warns_nothing(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread(alias="out.${param.other}"))
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", _thread(alias="out.${param.other}"))
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"other": "x"}}])
-        loaded = _loaded(path)
+        loaded = load_at(path)
         assert _p122(loaded) == []
         assert "P123" not in _codes(loaded)
 
     def test_child_shadowing_every_reader_warns_p123(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", _thread())
+        write_named(tmp_path, "t.thread", _thread())
         fixed = {
             "connections": {"lake": {"type": "onelake", "workspace": "w", "lakehouse": "lh"}},
             "lookups": {"ref_lookup": {"source": {"type": "delta", "alias": "d"}, "key": ["id"]}},
             "column_sets": {"cols": {"source": {"type": "delta", "alias": "m"}}},
             "audit_templates": {"tpl": {"columns": {"ws_col": "'w'"}}},
         }
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}], **fixed))
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}], **fixed))
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"ws": "pinned"}}])
-        loaded = _loaded(path)
+        loaded = load_at(path)
         assert _p122(loaded) == []
         assert "P123" in _codes(loaded)
 
     def test_reference_with_a_default_counts(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", THREAD)
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", THREAD)
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         lake = {"type": "onelake", "workspace": "${param.ws:-fallback}", "lakehouse": "lh"}
-        path = _write(
+        path = write_named(
             tmp_path,
             "l.loom",
             {
@@ -322,15 +310,15 @@ class TestPinIgnoredByUpstreamAsset:
                 "weaves": [{"ref": "w.weave", "params": {"ws": "pinned"}}],
             },
         )
-        (found,) = _p122(_loaded(path))
+        (found,) = _p122(load_at(path))
         assert list(found.expected or []) == [f"connections.lake ({path})"]
 
     def test_identical_redeclaration_still_shadows(self, tmp_path: Path) -> None:
         # The weave's copy reads the pin itself, so the pin is consumed: no P123 either.
-        _write(tmp_path, "t.thread", THREAD)
+        write_named(tmp_path, "t.thread", THREAD)
         connections = {"connections": ASSETS["connections"]}
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}], **connections))
-        path = _write(
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}], **connections))
+        path = write_named(
             tmp_path,
             "l.loom",
             {
@@ -340,15 +328,15 @@ class TestPinIgnoredByUpstreamAsset:
                 "weaves": [{"ref": "w.weave", "params": {"ws": "pinned"}}],
             },
         )
-        loaded = _loaded(path)
+        loaded = load_at(path)
         assert _p122(loaded) == []
         assert "P123" not in _codes(loaded)
 
     def test_variable_default_is_an_asset(self, tmp_path: Path) -> None:
-        _write(tmp_path, "t.thread", THREAD)
-        _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        write_named(tmp_path, "t.thread", THREAD)
+        write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
         variables = {"v": {"type": "string", "default": "${param.ws}"}}
-        path = _write(
+        path = write_named(
             tmp_path,
             "l.loom",
             {
@@ -358,7 +346,7 @@ class TestPinIgnoredByUpstreamAsset:
                 "weaves": [{"ref": "w.weave", "params": {"ws": "pinned"}}],
             },
         )
-        loaded = _loaded(path)
+        loaded = load_at(path)
         thread = loaded.document.children["w"].children["t"]
         assert thread.effective.variables["v"].default == "loom_ws"
         (found,) = _p122(loaded)
@@ -378,10 +366,10 @@ class TestPinIgnoredByUpstreamAsset:
 def test_reference_forms(
     tmp_path: Path, workspace: str, runtime: dict[str, Any], warns: bool
 ) -> None:
-    _write(tmp_path, "t.thread", THREAD)
-    _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+    write_named(tmp_path, "t.thread", THREAD)
+    write_named(tmp_path, "w.weave", weave_body([{"ref": "t.thread"}]))
     lake = {"type": "onelake", "workspace": workspace, "lakehouse": "lh"}
-    path = _write(
+    path = write_named(
         tmp_path,
         "l.loom",
         {
@@ -390,7 +378,7 @@ def test_reference_forms(
             "weaves": [{"ref": "w.weave", "params": {"ws": "pinned"}}],
         },
     )
-    found = _p122(_loaded(path, runtime))
+    found = _p122(load_at(path, runtime))
     assert [d.pointer for d in found] == (["/weaves/0/params/ws"] if warns else [])
 
 

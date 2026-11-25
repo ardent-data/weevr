@@ -21,7 +21,8 @@ from typing import Any
 
 import pytest
 
-from documents import write_document
+from documents import string_specs, thread_body, write_document, write_named
+from resolving import load_at
 from weevr.config import load_resolved
 from weevr.config.interpolation import resolve_variables
 from weevr.config.interpolation_errors import NAMESPACES
@@ -33,25 +34,12 @@ from weevr.errors import VariableResolutionError
 SEVEN = ["param", "fabric", "var", "run", "thread", "weave", "loom"]
 
 
-def _thread(alias: str, **extra: Any) -> dict[str, Any]:
-    return {
-        "config_version": "2.0",
-        "sources": {"s": {"type": "delta", "alias": "raw.t"}},
-        "target": {"alias": alias},
-        **extra,
-    }
-
-
 def _specs(**defaults: str | None) -> dict[str, Any]:
-    return {
-        name: {"name": name, "type": "string", "required": False, "default": default}
-        for name, default in defaults.items()
-    }
+    return string_specs(**{name: {"required": False, "default": d} for name, d in defaults.items()})
 
 
 def _load(tmp_path: Path, body: dict[str, Any], runtime: dict[str, Any] | None = None) -> Any:
-    path = write_document(tmp_path / "t.thread", body)
-    return load_resolved(path, runtime_params=runtime, project_root=tmp_path)
+    return load_at(write_named(tmp_path, "t.thread", body), runtime)
 
 
 def _failure(tmp_path: Path, body: dict[str, Any], runtime: dict[str, Any] | None = None):
@@ -76,44 +64,44 @@ class TestBareReference:
     """Rules 1-4: a bare ``${x}`` fails ``P111`` with its rewrite."""
 
     def test_rule1_declared_param(self, tmp_path: Path) -> None:
-        body = _thread("out.${x}", params=_specs(x="a"))
+        body = thread_body("out.${x}", params=_specs(x="a"))
         assert _rewrite(_failure(tmp_path, body)) == "${param.x}"
 
     def test_rule1_declared_wins_over_fabric_key(self, tmp_path: Path) -> None:
-        body = _thread("out.${workspace_id}", params=_specs(workspace_id="w"))
+        body = thread_body("out.${workspace_id}", params=_specs(workspace_id="w"))
         assert _rewrite(_failure(tmp_path, body)) == "${param.workspace_id}"
 
     def test_rule2_defaults_scalar(self, tmp_path: Path) -> None:
-        body = _thread("out.${region}", defaults={"region": "eu"})
+        body = thread_body("out.${region}", defaults={"region": "eu"})
         found = _failure(tmp_path, body)
         assert _rewrite(found) == "${param.region}"
         assert found.hint is not None and "${param.region}" in found.hint
 
     def test_rule2_defaults_scalar_is_not_a_variable(self, tmp_path: Path) -> None:
-        body = _thread("out.${param.region}", defaults={"region": "eu"})
+        body = thread_body("out.${param.region}", defaults={"region": "eu"})
         assert _failure(tmp_path, body).code == "P110"
 
     @pytest.mark.parametrize("key", ["workspace_id", "lakehouse_id", "workspace_name"])
     def test_rule3_fabric_key(self, tmp_path: Path, key: str) -> None:
-        body = _thread(f"out.${{{key}}}")
+        body = thread_body(f"out.${{{key}}}")
         assert _rewrite(_failure(tmp_path, body)) == f"${{fabric.{key}}}"
 
     def test_rule4_otherwise_param(self, tmp_path: Path) -> None:
-        assert _rewrite(_failure(tmp_path, _thread("out.${anything}"))) == "${param.anything}"
+        assert _rewrite(_failure(tmp_path, thread_body("out.${anything}"))) == "${param.anything}"
 
     def test_rule4_supplied_runtime_param(self, tmp_path: Path) -> None:
-        found = _failure(tmp_path, _thread("out.${env}"), {"env": "dev"})
+        found = _failure(tmp_path, thread_body("out.${env}"), {"env": "dev"})
         assert _rewrite(found) == "${param.env}"
 
     def test_keeps_fallback(self, tmp_path: Path) -> None:
-        found = _failure(tmp_path, _thread("out.${env:-dev}"))
+        found = _failure(tmp_path, thread_body("out.${env:-dev}"))
         assert _rewrite(found) == "${param.env:-dev}"
 
     def test_whole_value_reference(self, tmp_path: Path) -> None:
-        assert _rewrite(_failure(tmp_path, _thread("${env}"))) == "${param.env}"
+        assert _rewrite(_failure(tmp_path, thread_body("${env}"))) == "${param.env}"
 
     def test_points_at_the_value(self, tmp_path: Path) -> None:
-        found = _failure(tmp_path, _thread("out.${env}"))
+        found = _failure(tmp_path, thread_body("out.${env}"))
         assert found.pointer == "/target/alias"
 
 
@@ -122,19 +110,19 @@ class TestDottedBareReference:
 
     def test_supplied_first_segment(self, tmp_path: Path) -> None:
         runtime = {"env": {"lakehouse": "lh"}}
-        found = _failure(tmp_path, _thread("out.${env.lakehouse}"), runtime)
+        found = _failure(tmp_path, thread_body("out.${env.lakehouse}"), runtime)
         assert _rewrite(found) == "${param.env.lakehouse}"
 
     def test_declared_first_segment(self, tmp_path: Path) -> None:
-        body = _thread("out.${env.lakehouse:-x}", params=_specs(env=None))
+        body = thread_body("out.${env.lakehouse:-x}", params=_specs(env=None))
         assert _rewrite(_failure(tmp_path, body)) == "${param.env.lakehouse:-x}"
 
     def test_defaults_first_segment(self, tmp_path: Path) -> None:
-        body = _thread("out.${env.lakehouse}", defaults={"env": {"lakehouse": "lh"}})
+        body = thread_body("out.${env.lakehouse}", defaults={"env": {"lakehouse": "lh"}})
         assert _rewrite(_failure(tmp_path, body)) == "${param.env.lakehouse}"
 
     def test_unknown_first_segment_is_an_unknown_namespace(self, tmp_path: Path) -> None:
-        found = _failure(tmp_path, _thread("out.${env.lakehouse}"))
+        found = _failure(tmp_path, thread_body("out.${env.lakehouse}"))
         assert found.code == "P112"
         assert list(found.expected or []) == SEVEN
 
@@ -142,18 +130,18 @@ class TestDottedBareReference:
 class TestUnknownNamespace:
     @pytest.mark.parametrize("ref", ["${params.x}", "${prm.x}", "${params.x:-d}"])
     def test_fails_listing_the_namespaces(self, tmp_path: Path, ref: str) -> None:
-        found = _failure(tmp_path, _thread(f"out.{ref}"))
+        found = _failure(tmp_path, thread_body(f"out.{ref}"))
         assert found.code == "P112"
         assert list(found.expected or []) == SEVEN
 
     @pytest.mark.parametrize("ref", ["${thread.nme}", "${weave.nmae}", "${loom.id}"])
     def test_unknown_hierarchy_key(self, tmp_path: Path, ref: str) -> None:
-        found = _failure(tmp_path, _thread(f"out.{ref}"))
+        found = _failure(tmp_path, thread_body(f"out.{ref}"))
         assert found.code == "P112"
         assert found.pointer == "/target/alias"
 
     def test_unknown_hierarchy_key_lists_the_known_ones(self, tmp_path: Path) -> None:
-        found = _failure(tmp_path, _thread("out.${thread.nme}"))
+        found = _failure(tmp_path, thread_body("out.${thread.nme}"))
         assert "${thread.name}" in (found.expected or [])
 
     @pytest.mark.parametrize(
@@ -161,22 +149,22 @@ class TestUnknownNamespace:
     )
     def test_execution_time_references_stay_in_place(self, tmp_path: Path, ref: str) -> None:
         audit = {"c": f"'{ref}'"}
-        body = {**_thread("out.t"), "target": {"alias": "out.t", "audit_columns": audit}}
+        body = {**thread_body("out.t"), "target": {"alias": "out.t", "audit_columns": audit}}
         assert _load(tmp_path, body).model.target.audit_columns == audit
 
 
 class TestIndependentNamespaces:
     def test_param_traverses_into_its_value(self, tmp_path: Path) -> None:
         runtime = {"env": {"lakehouse": "lh"}}
-        loaded = _load(tmp_path, _thread("out.${param.env.lakehouse}"), runtime)
+        loaded = _load(tmp_path, thread_body("out.${param.env.lakehouse}"), runtime)
         assert loaded.model.target.alias == "out.lh"
 
     def test_runtime_param_does_not_answer_a_hierarchy_name(self, tmp_path: Path) -> None:
         runtime = {"thread": {"nme": "x"}}
-        assert _failure(tmp_path, _thread("out.${thread.nme}"), runtime).code == "P112"
+        assert _failure(tmp_path, thread_body("out.${thread.nme}"), runtime).code == "P112"
 
     def test_fabric_reads_only_the_fabric_context(self, tmp_path: Path) -> None:
-        path = write_document(tmp_path / "t.thread", _thread("out.${fabric.workspace_id}"))
+        path = write_document(tmp_path / "t.thread", thread_body("out.${fabric.workspace_id}"))
         resolved = resolve_config(
             LocalConfigLocation(path),
             runtime_params={"workspace_id": "from-param"},
@@ -188,7 +176,7 @@ class TestIndependentNamespaces:
 
 class TestNestedDocuments:
     def test_bare_reference_in_a_ref_thread_fails(self, tmp_path: Path) -> None:
-        write_document(tmp_path / "t.thread", _thread("out.${x}"))
+        write_document(tmp_path / "t.thread", thread_body("out.${x}"))
         weave = write_document(
             tmp_path / "w.weave",
             {"config_version": "2.0", "threads": [{"ref": "t.thread", "params": {"x": "a"}}]},
@@ -199,7 +187,7 @@ class TestNestedDocuments:
         assert list(exc.value.diagnostics[0].expected or []) == ["${param.x}"]
 
     def test_bare_pin_value_fails(self, tmp_path: Path) -> None:
-        write_document(tmp_path / "t.thread", _thread("out.${param.x}"))
+        write_document(tmp_path / "t.thread", thread_body("out.${param.x}"))
         weave = write_document(
             tmp_path / "w.weave",
             {

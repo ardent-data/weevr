@@ -88,51 +88,32 @@ class TestScopeContext:
         assert context["param"]["table"] == "ADR6"
 
 
-class TestConsumedKeysTracking:
-    """Test consumed_keys param tracking in resolve_variables (M121 Task 12)."""
+class TestReadAtTracking:
+    """``read_at`` records each resolved key and where it was first read."""
 
     def test_param_keys_tracked(self):
-        """${param.x} and ${param.y} usage tracked in consumed_keys."""
+        """${param.x} and ${param.y} reads are recorded at their values."""
         context = {"param": {"x": 1, "y": 2}}
-        consumed: set[str] = set()
-        resolve_variables(
-            {"a": "${param.x}", "b": "${param.y}"},
-            context,
-            consumed_keys=consumed,
-        )
-        assert consumed == {"param.x", "param.y"}
+        read_at: dict[str, str] = {}
+        resolve_variables({"a": "${param.x}", "b": "${param.y}"}, context, read_at=read_at)
+        assert read_at == {"param.x": "/a", "param.y": "/b"}
 
-    def test_duplicate_usage_idempotent(self):
-        """Same param used twice produces single entry in consumed_keys."""
+    def test_duplicate_usage_records_first_read(self):
+        """A param read twice is recorded once, at its first read."""
         context = {"param": {"x": 1}}
-        consumed: set[str] = set()
-        resolve_variables(
-            {"a": "${param.x}", "b": "${param.x}"},
-            context,
-            consumed_keys=consumed,
-        )
-        assert consumed == {"param.x"}
-
-    def test_no_param_refs_empty_set(self):
-        """Config with no param references yields empty consumed_keys."""
-        context = {"param": {"env": "prod"}}
-        consumed: set[str] = set()
-        resolve_variables({"a": "${param.env}"}, context, consumed_keys=consumed)
-        assert consumed == {"param.env"}
+        read_at: dict[str, str] = {}
+        resolve_variables({"a": "${param.x}", "b": "${param.x}"}, context, read_at=read_at)
+        assert read_at == {"param.x": "/a"}
 
     def test_var_namespace_not_tracked(self):
         """${var.x} references are runtime-deferred, not tracked."""
         context = {"param": {"env": "prod"}}
-        consumed: set[str] = set()
-        resolve_variables(
-            {"a": "${param.env}", "b": "${var.x}"},
-            context,
-            consumed_keys=consumed,
-        )
-        assert consumed == {"param.env"}
+        read_at: dict[str, str] = {}
+        resolve_variables({"a": "${param.env}", "b": "${var.x}"}, context, read_at=read_at)
+        assert read_at == {"param.env": "/a"}
 
-    def test_consumed_keys_none_no_error(self):
-        """consumed_keys=None (default) causes no tracking or error."""
+    def test_untracked_resolution(self):
+        """Without ``read_at`` nothing is tracked and the value still resolves."""
         context = {"param": {"env": "prod"}}
         result = resolve_variables({"a": "${param.env}"}, context)
         assert result == {"a": "prod"}

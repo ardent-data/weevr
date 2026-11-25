@@ -12,8 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from weevr.config.interpolation import VARIABLE_PATTERN
-from weevr.config.interpolation_errors import param_name
+from weevr.config.interpolation import param_references
 
 # The registry blocks a config can declare; every one is substituted with the rest of
 # its declaring config, so its ${param.x} references resolve in that config's scope.
@@ -52,18 +51,6 @@ class DeclaredAsset:
         return f"{label} ({self.file})" if self.file is not None else label
 
 
-def _referenced_params(value: Any) -> set[str]:
-    """The names ``value`` references as ``${param.x}``, with or without a ``:-`` default."""
-    if isinstance(value, Mapping):
-        return {name for item in value.values() for name in _referenced_params(item)}
-    if isinstance(value, list):
-        return {name for item in value for name in _referenced_params(item)}
-    if not isinstance(value, str):
-        return set()
-    names = (param_name(match.group(1)) for match in VARIABLE_PATTERN.finditer(value))
-    return {name for name in names if name is not None}
-
-
 def declared_assets(
     document: Mapping[str, Any], file: str | None, at: tuple[str | int, ...] = ()
 ) -> dict[AssetKey, DeclaredAsset]:
@@ -86,7 +73,7 @@ def declared_assets(
         if not isinstance(block, Mapping):
             continue
         for name, body in block.items():
-            params = frozenset(_referenced_params(body))
+            params = frozenset(param_references(body))
             assets[(kind, str(name))] = DeclaredAsset(kind, str(name), file, at, params)
     return assets
 

@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from documents import write_document
+from documents import string_spec, write_named
 from weevr.config import load_resolved
 from weevr.config.document import Provenance, ResolvedDocument
 from weevr.config.param_provenance import (
@@ -34,12 +34,8 @@ THREAD: dict[str, Any] = {
 }
 
 
-def _spec(name: str, **extra: Any) -> dict[str, Any]:
-    return {"name": name, "type": "string", **extra}
-
-
 def _write(root: Path, name: str, body: dict[str, Any]) -> str:
-    return str(write_document(root / name, body))
+    return str(write_named(root, name, body))
 
 
 @pytest.fixture
@@ -57,7 +53,7 @@ def tree(tmp_path: Path) -> dict[str, str]:
         "t.thread",
         {
             **THREAD,
-            "params": {"r": _spec("r")},
+            "params": {"r": string_spec("r")},
             "target": {
                 "alias": "out.${param.r}.${param.p}.${param.d}.${param.u}.${param.f:-fb}",
             },
@@ -68,7 +64,7 @@ def tree(tmp_path: Path) -> dict[str, str]:
         "w.weave",
         {
             "config_version": "2.0",
-            "params": {"d": _spec("d", required=False, default=f"{SECRET}-wd")},
+            "params": {"d": string_spec("d", required=False, default=f"{SECRET}-wd")},
             "threads": [{"ref": "t.thread"}],
         },
     )
@@ -78,9 +74,9 @@ def tree(tmp_path: Path) -> dict[str, str]:
         {
             "config_version": "2.0",
             "params": {
-                "r": _spec("r"),
-                "d": _spec("d", required=False, default=f"{SECRET}-ld"),
-                "o": _spec("o", required=False),
+                "r": string_spec("r"),
+                "d": string_spec("d", required=False, default=f"{SECRET}-ld"),
+                "o": string_spec("o", required=False),
             },
             "weaves": [
                 {
@@ -146,7 +142,7 @@ class TestSources:
         path = _write(
             tmp_path,
             "t.thread",
-            {**THREAD, "params": {"x": _spec("x")}, "target": {"alias": "${param.x:-d}"}},
+            {**THREAD, "params": {"x": string_spec("x")}, "target": {"alias": "${param.x:-d}"}},
         )
         doc = load_resolved(path, runtime_params={"x": "v"}, project_root=tmp_path).document
         assert doc.provenance.params["x"].source == "runtime"
@@ -157,7 +153,7 @@ class TestSources:
             "t.thread",
             {
                 **THREAD,
-                "params": {"x": _spec("x", required=False)},
+                "params": {"x": string_spec("x", required=False)},
                 "target": {"alias": "out.t"},
             },
         )
@@ -170,7 +166,7 @@ class TestInlineChildren:
         inline_thread = {
             **THREAD,
             "name": "it",
-            "params": {"y": _spec("y", required=False, default="dy")},
+            "params": {"y": string_spec("y", required=False, default="dy")},
             "target": {"alias": "out.${param.y}.${param.g:-fb}"},
         }
         path = _write(
@@ -178,7 +174,7 @@ class TestInlineChildren:
             "l.loom",
             {
                 "config_version": "2.0",
-                "params": {"r": _spec("r")},
+                "params": {"r": string_spec("r")},
                 "weaves": [{"name": "iw", "config_version": "2.0", "threads": [inline_thread]}],
             },
         )
@@ -209,7 +205,7 @@ class TestPinEntries:
         _write(
             tmp_path,
             "t.thread",
-            {**THREAD, "params": {"x": _spec("x")}, "target": {"alias": "o.${param.x}"}},
+            {**THREAD, "params": {"x": string_spec("x")}, "target": {"alias": "o.${param.x}"}},
         )
         _write(tmp_path, "w.weave", {"config_version": "2.0", "threads": [{"ref": "t.thread"}]})
         path = _write(
@@ -228,7 +224,7 @@ class TestPinEntries:
         thread = _write(
             tmp_path,
             "t.thread",
-            {**THREAD, "params": {"x": _spec("x")}, "target": {"alias": "o.${param.x}"}},
+            {**THREAD, "params": {"x": string_spec("x")}, "target": {"alias": "o.${param.x}"}},
         )
         path = _write(
             tmp_path,

@@ -15,7 +15,7 @@ diagnostics a reference fails with are built in
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,11 +28,13 @@ from weevr.config.interpolation_errors import (
     bare,
     deferred_fabric,
     namespace_without_key,
+    param_name,
     pointer,
     unknown_fabric_context_key,
     unknown_key,
     unresolved,
 )
+from weevr.config.param_types import param_text
 from weevr.diagnostics import Diagnostic
 
 __all__ = [
@@ -41,6 +43,7 @@ __all__ = [
     "check_fabric_context",
     "fabric_namespace",
     "load_context",
+    "param_references",
     "resolve_variables",
 ]
 
@@ -105,9 +108,10 @@ def load_context(
         fabric: The ``fabric`` namespace (:func:`fabric_namespace`); ``None``
             when the load has no Fabric context.
         texts: By param name, the text a reference embedded in a larger
-            string renders in place of ``str()`` of the value: the value as
+            string renders in place of the value's own text
+            (:func:`~weevr.config.param_types.param_text`): the value as
             supplied. A whole-value reference still reads the value. A value
-            whose text is its ``str()`` is held as it is.
+            whose text is its own is held as it is.
 
     Returns:
         ``{"param": ..., "fabric": ...}``: ``param`` present when it has
@@ -121,7 +125,7 @@ def load_context(
         texts = texts or {}
         context["param"] = {
             name: _Rendered(value, text)
-            if (text := texts.get(name)) is not None and text != str(value)
+            if (text := texts.get(name)) is not None and text != param_text(value)
             else value
             for name, value in params.items()
         }
@@ -159,7 +163,7 @@ def _native(value: Any) -> Any:
 
 def _embedded(value: Any) -> str:
     """The text a reference embedded in a larger string renders."""
-    return value.text if isinstance(value, _Rendered) else str(value)
+    return value.text if isinstance(value, _Rendered) else param_text(value)
 
 
 # Regex pattern for ${name} and ${name:-default}
@@ -171,6 +175,33 @@ VARIABLE_PATTERN = re.compile(r"\$\{([^}:]+?)(?::-(.*?))?\}")
 WHOLE_VALUE_PATTERN = re.compile(r"^\$\{([^}:]+?)(?::-([^}]*))?\}$")
 
 
+def param_references(value: Any) -> Iterator[str]:
+    """The param names the ``${param.x}`` references in ``value``'s strings read.
+
+    Mappings and lists are walked; a reference counts with or without a
+    ``:-`` default, and a dotted reference reads its first key
+    (:func:`~weevr.config.interpolation_errors.param_name`). A name is
+    yielded once per reference.
+
+    Args:
+        value: A config value, as written.
+
+    Yields:
+        Each referenced param name.
+    """
+    if isinstance(value, Mapping):
+        for item in value.values():
+            yield from param_references(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from param_references(item)
+    elif isinstance(value, str):
+        for match in VARIABLE_PATTERN.finditer(value):
+            name = param_name(match.group(1))
+            if name is not None:
+                yield name
+
+
 # Returned by _lookup for a reference left in place for execution.
 _KEEP = object()
 
@@ -180,7 +211,6 @@ def _lookup(
     default_value: str | None,
     context: dict[str, Any],
     scope: ReferenceScope,
-    consumed_keys: set[str] | None,
     at: tuple[str | int, ...],
     read_at: dict[str, str] | None = None,
     deferred: list[Diagnostic] | None = None,
@@ -213,8 +243,6 @@ def _lookup(
                 fell_back.add(var_name)
             return default_value
         raise unresolved(var_name, context, scope, at) from exc
-    if consumed_keys is not None:
-        consumed_keys.add(var_name)
     if read_at is not None and var_name not in read_at:
         read_at[var_name] = pointer(at)
     return value
@@ -223,7 +251,6 @@ def _lookup(
 def resolve_variables(
     config: dict[str, Any] | list[Any] | str | Any,
     context: dict[str, Any],
-    consumed_keys: set[str] | None = None,
     at: tuple[str | int, ...] = (),
     *,
     scope: ReferenceScope | None = None,
@@ -238,7 +265,9 @@ def resolve_variables(
     to the default; ``param`` values can be traversed (``${param.env.lakehouse}``).
     A string that is one whole reference becomes the value itself; a reference
     embedded in a larger string renders the param's supplied text where
-    :func:`load_context` was given one, else ``str()`` of the value.
+    :func:`load_context` was given one, else the value's own text
+    (:func:`~weevr.config.param_types.param_text`: a bool as ``true`` or
+    ``false``, anything else by ``str()``).
     Left in place for execution time: ``${var.*}`` and ``${run.*}``, and the known
     hierarchy variables (``HIERARCHY_CONTEXT_KEYS``) when no default is given.
     A ``${fabric.x}`` with no default is left in place too when ``context``
@@ -248,9 +277,6 @@ def resolve_variables(
     Args:
         config: Config structure to resolve (dict, list, str, or primitive)
         context: The load-time namespaces (:func:`load_context`).
-        consumed_keys: Optional set to track which context keys were consumed
-            during resolution. When provided, each resolved dotted key is
-            added to the set for post-resolution unused-param analysis.
         at: Where ``config`` sits in its file, so an unresolved variable can
             point at the value that holds it.
         scope: The scope the references resolve in, which a bare
@@ -281,7 +307,6 @@ def resolve_variables(
             k: resolve_variables(
                 v,
                 context,
-                consumed_keys,
                 (*at, k),
                 scope=scope,
                 read_at=read_at,
@@ -296,7 +321,6 @@ def resolve_variables(
             resolve_variables(
                 item,
                 context,
-                consumed_keys,
                 (*at, i),
                 scope=scope,
                 read_at=read_at,
@@ -317,7 +341,6 @@ def resolve_variables(
                 whole_match.group(2),
                 context,
                 scope,
-                consumed_keys,
                 at,
                 read_at,
                 deferred,
@@ -332,7 +355,6 @@ def resolve_variables(
                 match.group(2),
                 context,
                 scope,
-                consumed_keys,
                 at,
                 read_at,
                 deferred,
