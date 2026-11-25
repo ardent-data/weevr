@@ -3,9 +3,10 @@
 Characterizes today's resolution so later changes to the param/variable binding
 model prove they resolve the same configs identically. The corpus is every
 ``.thread`` / ``.weave`` / ``.loom`` under ``examples/`` and the ``load_parity``
-fixture projects, minus any file holding a bare ``${name}`` reference (a
-``${...}`` whose first segment is not ``param``, ``fabric``, ``var``, ``run``,
-``thread``, ``weave`` or ``loom``): those change by design.
+fixture projects. A file holding a bare ``${name}`` reference (a ``${...}``
+whose first segment is not ``param``, ``fabric``, ``var``, ``run``, ``thread``,
+``weave`` or ``loom``) would be excluded, since bare references fail at load;
+none is left.
 
 Each golden is the hydrated models' ``model_dump(mode="json", exclude_none=True,
 exclude_defaults=True)`` for the loaded config, its weaves and its threads, with
@@ -133,8 +134,8 @@ def _serialize(data: dict[str, Any]) -> str:
 
 
 class TestCorpus:
-    def test_bare_reference_fixtures_are_the_only_exclusions(self) -> None:
-        assert sorted(c.path.name for c in BARE_EXCLUDED) == ["forms.loom", "nightly.loom"]
+    def test_no_config_is_excluded(self) -> None:
+        assert BARE_EXCLUDED == []
 
     @pytest.mark.parametrize("case", CORPUS, ids=[c.label for c in CORPUS])
     def test_resolves_to_golden(self, case: Case) -> None:

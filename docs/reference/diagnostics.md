@@ -488,6 +488,19 @@ A date or timestamp parameter is not in the expected ISO format.
 
 A ${...} variable has no value and no default.
 
+### P111
+
+`bare-variable-reference` · error · stable
+
+A ${...} reference names no namespace: ${x} instead of ${param.x}.
+
+### P112
+
+`unknown-variable-namespace` · error · stable
+
+A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave or
+loom namespace.
+
 ### P123
 
 `unconsumed-pin` · warning · stable

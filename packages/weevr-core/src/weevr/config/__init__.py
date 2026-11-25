@@ -55,8 +55,8 @@ def load_config(
     3. Take the config kind from the document's ``kind`` (checked against a typed
        extension), else from the extension or content
     4. Validate schema with Pydantic
-    5. Build parameter context (runtime > defaults)
-    6. Resolve variable references (${var} and ${var:-default})
+    5. Bind params per scope (pin > runtime > declared default)
+    6. Resolve variable references (``${namespace.name}`` and ``${namespace.name:-default}``)
     7. Resolve references to child configs (threads, weaves)
     8. Apply inheritance cascade (loom -> weave -> thread)
     9. Validate name against filename stem; set ``qualified_key``

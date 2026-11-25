@@ -576,9 +576,7 @@ def resolve_references(
         reads = BindingReads()
     # Entry pins belong to this config: they resolve in its scope, once.
     parent_context = (
-        None
-        if pins_resolved
-        else build_param_context(runtime_params, config.get("defaults"), entry_params=env.values())
+        None if pins_resolved else build_param_context(runtime_params, entry_params=env.values())
     )
 
     def authored_entry(key: str, index: int) -> dict[str, Any] | None:
@@ -619,6 +617,7 @@ def resolve_references(
                                 warnings,
                                 file=file,
                                 alias_key="name",
+                                defaults=config.get("defaults"),
                             ) as entered,
                             attribute_errors(weave_path),
                         ):
@@ -776,6 +775,7 @@ def resolve_references(
                                 warnings,
                                 file=file,
                                 alias_key="as",
+                                defaults=config.get("defaults"),
                             ) as entered,
                             attribute_errors(thread_path),
                         ):
@@ -791,11 +791,15 @@ def resolve_references(
 
                             thread_scope = entered.open(child_dict, str(thread_path))
                             context = build_param_context(
-                                runtime_params,
-                                child_dict.get("defaults"),
-                                entry_params=thread_scope.values(),
+                                runtime_params, entry_params=thread_scope.values()
                             )
-                            resolved_child = substitute(child_dict, context, thread_scope, reads)
+                            resolved_child = substitute(
+                                child_dict,
+                                context,
+                                thread_scope,
+                                reads,
+                                defaults=child_dict.get("defaults"),
+                            )
 
                         # Track effective name uniqueness
                         effective_name = (

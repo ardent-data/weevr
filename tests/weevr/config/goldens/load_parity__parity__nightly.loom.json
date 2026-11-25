@@ -1,0 +1,220 @@
+{
+  "config_name": "nightly",
+  "config_type": "loom",
+  "model": {
+    "config_version": "2.0",
+    "defaults": {
+      "execution": {
+        "log_level": "debug"
+      }
+    },
+    "name": "nightly",
+    "qualified_key": "nightly.loom",
+    "weaves": [
+      {
+        "ref": "weaves/sales.weave"
+      },
+      {
+        "name": "inline_ops"
+      }
+    ]
+  },
+  "threads": {
+    "inline_ops": {
+      "ops_audit": {
+        "config_version": "2.0",
+        "execution": {
+          "log_level": "debug"
+        },
+        "name": "ops_audit",
+        "qualified_key": "threads/ops_audit.thread",
+        "sources": {
+          "events": {
+            "alias": "raw.events",
+            "type": "delta"
+          }
+        },
+        "target": {
+          "alias": "ops.audit"
+        },
+        "template_ref": "threads/ops_audit.thread"
+      },
+      "ops_summary": {
+        "config_version": "2.0",
+        "execution": {
+          "log_level": "debug"
+        },
+        "name": "ops_summary",
+        "qualified_key": "ops_summary",
+        "sources": {
+          "audit": {
+            "alias": "ops.audit",
+            "type": "delta"
+          }
+        },
+        "target": {
+          "alias": "ops.audit_summary"
+        }
+      }
+    },
+    "sales": {
+      "orders_east": {
+        "config_version": "2.0",
+        "execution": {
+          "log_level": "debug"
+        },
+        "name": "orders_east",
+        "params": {
+          "region": {
+            "name": "region",
+            "type": "string"
+          }
+        },
+        "qualified_key": "threads/regional.thread",
+        "sources": {
+          "orders": {
+            "alias": "stg.orders",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "region = 'east'"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.orders_east"
+        },
+        "template_ref": "threads/regional.thread",
+        "write": {
+          "mode": "append"
+        }
+      },
+      "orders_west": {
+        "config_version": "2.0",
+        "execution": {
+          "log_level": "debug"
+        },
+        "name": "orders_west",
+        "params": {
+          "region": {
+            "name": "region",
+            "type": "string"
+          }
+        },
+        "qualified_key": "threads/regional.thread",
+        "sources": {
+          "orders": {
+            "alias": "stg.orders",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "region = 'west'"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.orders_west"
+        },
+        "template_ref": "threads/regional.thread",
+        "write": {
+          "mode": "append"
+        }
+      },
+      "stg_orders": {
+        "config_version": "2.0",
+        "execution": {
+          "log_level": "minimal"
+        },
+        "name": "stg_orders",
+        "qualified_key": "threads/stg_orders.thread",
+        "sources": {
+          "orders": {
+            "options": {
+              "header": true
+            },
+            "path": "<root>/data/orders.csv",
+            "type": "csv"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "order_id is not null"
+            }
+          },
+          {
+            "filter": {
+              "expr": "customer_id is not null"
+            }
+          }
+        ],
+        "target": {
+          "alias": "stg.orders"
+        },
+        "template_ref": "threads/stg_orders.thread",
+        "write": {
+          "mode": "append"
+        }
+      }
+    }
+  },
+  "weaves": {
+    "inline_ops": {
+      "config_version": "2.0",
+      "defaults": {
+        "audit_table": "ops.audit"
+      },
+      "name": "inline_ops",
+      "qualified_key": "inline_ops",
+      "threads": [
+        {
+          "ref": "threads/ops_audit.thread"
+        },
+        {
+          "dependencies": [
+            "ops_audit"
+          ],
+          "name": "ops_summary"
+        }
+      ]
+    },
+    "sales": {
+      "config_version": "2.0",
+      "defaults": {
+        "write": {
+          "mode": "append"
+        }
+      },
+      "name": "sales",
+      "qualified_key": "weaves/sales.weave",
+      "threads": [
+        {
+          "ref": "threads/stg_orders.thread"
+        },
+        {
+          "as_": "orders_east",
+          "params": {
+            "region": "east"
+          },
+          "ref": "threads/regional.thread"
+        },
+        {
+          "as_": "orders_west",
+          "dependencies": [
+            "stg_orders"
+          ],
+          "params": {
+            "region": "west"
+          },
+          "ref": "threads/regional.thread"
+        }
+      ]
+    }
+  }
+}

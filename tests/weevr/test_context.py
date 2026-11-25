@@ -731,6 +731,10 @@ class TestContextLoadChildForeach:
         assert via_weave.steps == direct.steps
 
 
+# A loom params block declaring ``src``.
+_LOOM_SRC = "params:\n  src: {name: src, type: string, default: raw.events}\n"
+
+
 class TestContextLoadInlineWeave:
     """A loom's inline weave hydrates, cascades, and plans like a weave file."""
 
@@ -802,39 +806,38 @@ target:
         assert loaded.model.weaves[0].condition.when == "true"
 
     @staticmethod
-    def _load_defaults(tmp_path: Path, loom_defaults: str, params: dict | None = None):
+    def _load_declared(tmp_path: Path, loom_params: str, params: dict | None = None):
         loom = (
-            'config_version: "2.0"\n' + loom_defaults + "weaves:\n"
+            'config_version: "2.0"\n' + loom_params + "weaves:\n"
             '  - name: inline_ops\n    config_version: "2.0"\n'
-            "    defaults:\n      tbl: ops.from_weave\n    threads:\n"
+            "    params:\n      tbl: {name: tbl, type: string, default: ops.from_weave}\n"
+            "    threads:\n"
             '      - name: ops_audit\n        config_version: "2.0"\n'
             "        sources:\n          events:\n            type: delta\n"
-            '            alias: "${src}"\n        target:\n'
-            '          alias: "${tbl}"\n'
+            '            alias: "${param.src}"\n        target:\n'
+            '          alias: "${param.tbl}"\n'
         )
         project = write_project(tmp_path / "defaults.weevr")
         write_document(project / "x.loom", loom)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
         return ctx.load("x.loom").document.weave_threads()["inline_ops"]["ops_audit"]
 
-    def test_inline_weave_defaults_resolve_variables(self, tmp_path: Path) -> None:
-        """The inline weave's own defaults resolve ${var}; loom defaults still reach it."""
-        thread = self._load_defaults(tmp_path, "defaults:\n  src: raw.events\n")
+    def test_inline_weave_params_resolve_variables(self, tmp_path: Path) -> None:
+        """The inline weave's own params resolve; loom params still reach it."""
+        thread = self._load_declared(tmp_path, _LOOM_SRC)
         assert thread.target.alias == "ops.from_weave"
         assert thread.sources["events"].alias == "raw.events"
 
     def test_inline_weave_defaults_override_loom_defaults(self, tmp_path: Path) -> None:
-        """A weave default wins over a loom default of the same name."""
-        thread = self._load_defaults(
-            tmp_path, "defaults:\n  src: raw.events\n  tbl: ops.from_loom\n"
+        """A weave param default wins over a loom param default of the same name."""
+        thread = self._load_declared(
+            tmp_path, _LOOM_SRC + "  tbl: {name: tbl, type: string, default: ops.from_loom}\n"
         )
         assert thread.target.alias == "ops.from_weave"
 
     def test_runtime_param_overrides_inline_weave_default(self, tmp_path: Path) -> None:
-        """Runtime params still take priority over the inline weave's defaults."""
-        thread = self._load_defaults(
-            tmp_path, "defaults:\n  src: raw.events\n", params={"tbl": "ops.from_run"}
-        )
+        """Runtime params still take priority over the inline weave's param defaults."""
+        thread = self._load_declared(tmp_path, _LOOM_SRC, params={"tbl": "ops.from_run"})
         assert thread.target.alias == "ops.from_run"
 
     def test_inline_weave_plans(self, tmp_path: Path) -> None:

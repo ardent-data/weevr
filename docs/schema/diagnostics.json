@@ -732,6 +732,26 @@
       "docs_anchor": "p110"
     },
     {
+      "code": "P111",
+      "name": "bare-variable-reference",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${...} reference names no namespace: ${x} instead of ${param.x}.",
+      "docs_anchor": "p111"
+    },
+    {
+      "code": "P112",
+      "name": "unknown-variable-namespace",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave or loom namespace.",
+      "docs_anchor": "p112"
+    },
+    {
       "code": "P123",
       "name": "unconsumed-pin",
       "category": "config",

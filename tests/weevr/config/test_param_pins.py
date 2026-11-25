@@ -256,6 +256,21 @@ class TestUnconsumedPin:
         path = _loom(tmp_path, [{"ref": "w.weave", "params": {"y": "wp"}}])
         assert _codes(_loaded(path), "P123") == []
 
+    def test_pin_read_by_a_nested_entry_condition_is_consumed(self, tmp_path: Path) -> None:
+        _write(tmp_path, "t.thread", _thread_body(alias="out.t"))
+        entry = {"ref": "t.thread", "condition": {"when": "'${param.y}' == 'wp'"}}
+        _write(tmp_path, "w.weave", _weave_body([entry]))
+        path = _loom(tmp_path, [{"ref": "w.weave", "params": {"y": "wp"}}])
+        assert _codes(_loaded(path), "P123") == []
+
+    def test_pin_read_by_traversing_into_its_value_is_consumed(self, tmp_path: Path) -> None:
+        _write(tmp_path, "t.thread", _thread_body(alias="out.${param.y.k}"))
+        _write(tmp_path, "w.weave", _weave_body([{"ref": "t.thread"}]))
+        path = _loom(tmp_path, [{"ref": "w.weave", "params": {"y": {"k": "v"}}}])
+        loaded = _loaded(path)
+        assert _alias(loaded.document.children["w"].children["t"]) == "out.v"
+        assert _codes(loaded, "P123") == []
+
     def test_pin_satisfying_a_declaration_is_consumed(self, tmp_path: Path) -> None:
         _write(tmp_path, "t.thread", _thread_body(alias="out.t", params=_specs(x={})))
         _write(tmp_path, "w.weave", _weave_body([{"ref": "t.thread"}]))

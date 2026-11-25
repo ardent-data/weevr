@@ -17,7 +17,7 @@ from documents import write_document
 from weevr.config import load_resolved
 from weevr.config.document import ResolvedDocument
 from weevr.diagnostics import Diagnostic
-from weevr.errors import ConfigError
+from weevr.errors import ConfigError, VariableResolutionError
 
 THREAD: dict[str, Any] = {
     "config_version": "2.0",
@@ -241,7 +241,7 @@ class TestInlineChildren:
 
 
 class TestUnchangedBehavior:
-    """Entry ``params:`` and bare ``${x}`` keep working until later changes retire them."""
+    """Entry ``params:`` keep working; a bare ``${x}`` fails with its rewrite."""
 
     def test_thread_entry_params_bind_in_thread(self, tmp_path: Path) -> None:
         _thread(tmp_path, "out.${param.x}")
@@ -257,9 +257,12 @@ class TestUnchangedBehavior:
         )
         assert _alias(_load(path).children["t"]) == "out.wv_p"
 
-    def test_bare_runtime_reference_still_resolves_in_ref_thread(self, tmp_path: Path) -> None:
+    def test_bare_runtime_reference_in_ref_thread_fails(self, tmp_path: Path) -> None:
         path = _tree(tmp_path, alias="out.${x}")
-        assert _alias(_leaf(_load(path, {"x": "rt"}))) == "out.rt"
+        with pytest.raises(VariableResolutionError) as exc_info:
+            _load(path, {"x": "rt"})
+        assert [d.code for d in exc_info.value.diagnostics] == ["P111"]
+        assert exc_info.value.diagnostics[0].expected == ("${param.x}",)
 
 
 def _declaring_thread(tmp_path: Path, params: dict[str, Any], **body: Any) -> Path:

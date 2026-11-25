@@ -60,4 +60,4 @@ weaves:
           - rename:
               column_set: loom_map
         target:
-          alias: "${target_schema}.inline_t"
+          alias: "${param.target_schema:-gold}.inline_t"

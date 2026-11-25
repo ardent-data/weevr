@@ -186,7 +186,9 @@ def resolve_config(
             inline_scopes=inline_scopes,
         )
     except VariableResolutionError as exc:
-        if config_type == "thread" and "param." in str(exc):
+        unresolved = [d.code for d in exc.diagnostics] == ["P110"]
+        reference = getattr(exc, "config_key", None) or ""
+        if config_type == "thread" and unresolved and reference.startswith("param."):
             message = (
                 f"{exc}. This thread may be a template designed for "
                 f"use with 'as' and 'params' on a ThreadEntry in a weave."

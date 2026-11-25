@@ -518,7 +518,9 @@ def test_unresolved_variable_under_with_points_at_the_authored_key(tmp_path: Pat
         "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
-        "with": {"orders": {"from": "main", "steps": [{"filter": {"expr": "x = '${nope}'"}}]}},
+        "with": {
+            "orders": {"from": "main", "steps": [{"filter": {"expr": "x = '${param.nope}'"}}]}
+        },
     }
     path = tmp_path / "t.thread"
     write_document(path, yaml.safe_dump(thread, sort_keys=False))
@@ -540,7 +542,7 @@ def test_a_user_key_named_with_underscore_keeps_its_name(tmp_path: Path) -> None
         "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
-        "steps": [{"derive": {"columns": {"with_": "'${nope}'"}}}],
+        "steps": [{"derive": {"columns": {"with_": "'${param.nope}'"}}}],
     }
     path = tmp_path / "t.thread"
     write_document(path, yaml.safe_dump(thread, sort_keys=False))

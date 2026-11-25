@@ -1,0 +1,354 @@
+{
+  "config_name": "forms",
+  "config_type": "loom",
+  "model": {
+    "column_sets": {
+      "loom_map": {
+        "param": "loom_map"
+      },
+      "shared_map": {
+        "param": "loom_shared_map"
+      }
+    },
+    "config_version": "2.0",
+    "defaults": {
+      "target_schema": "gold"
+    },
+    "lookups": {
+      "regions": {
+        "materialize": true,
+        "source": {
+          "alias": "ref.regions",
+          "type": "delta"
+        }
+      },
+      "shared": {
+        "source": {
+          "alias": "ref.shared_loom",
+          "type": "delta"
+        }
+      }
+    },
+    "name": "forms",
+    "params": {
+      "env": {
+        "default": "dev",
+        "name": "env",
+        "type": "string"
+      }
+    },
+    "qualified_key": "forms.loom",
+    "variables": {
+      "loom_var": {
+        "default": "a",
+        "type": "string"
+      },
+      "shared_var": {
+        "default": 1,
+        "type": "int"
+      }
+    },
+    "weaves": [
+      {
+        "condition": {
+          "when": "'dev' == 'dev'"
+        },
+        "ref": "weaves/core.weave"
+      },
+      {
+        "ref": "conv.weave"
+      },
+      {
+        "name": "inline_w"
+      }
+    ]
+  },
+  "threads": {
+    "conv": {
+      "conv": {
+        "config_version": "2.0",
+        "name": "conv",
+        "qualified_key": "threads/conv.thread",
+        "sources": {
+          "data": {
+            "path": "<root>/data/conv.csv",
+            "type": "csv"
+          }
+        },
+        "target": {
+          "alias": "gold.conv"
+        },
+        "template_ref": "threads/conv.thread"
+      }
+    },
+    "core": {
+      "base": {
+        "column_sets": {
+          "thread_map": {
+            "param": "thread_map"
+          }
+        },
+        "config_version": "2.0",
+        "lookups": {
+          "shared": {
+            "source": {
+              "alias": "ref.shared_thread",
+              "type": "delta"
+            }
+          }
+        },
+        "name": "base",
+        "qualified_key": "threads/base.thread",
+        "sources": {
+          "orders": {
+            "alias": "raw.orders",
+            "type": "delta"
+          },
+          "region": {
+            "lookup": "regions"
+          },
+          "shared": {
+            "lookup": "shared"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "order_id is not null"
+            }
+          },
+          {
+            "filter": {
+              "expr": "customer_id is not null"
+            }
+          },
+          {
+            "rename": {
+              "column_set": "thread_map"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.base"
+        },
+        "template_ref": "threads/base.thread",
+        "variables": {
+          "shared_var": {
+            "default": 3,
+            "type": "int"
+          }
+        },
+        "write": {
+          "mode": "append"
+        }
+      },
+      "inline_core": {
+        "config_version": "2.0",
+        "name": "inline_core",
+        "qualified_key": "inline_core",
+        "sources": {
+          "w": {
+            "lookup": "weave_only"
+          },
+          "x": {
+            "alias": "raw.x",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "rename": {
+              "column_set": "shared_map"
+            }
+          }
+        ],
+        "target": {
+          "alias": "out.inline_core"
+        },
+        "write": {
+          "mode": "append"
+        }
+      },
+      "tpl_a": {
+        "config_version": "2.0",
+        "name": "tpl_a",
+        "params": {
+          "suffix": {
+            "name": "suffix",
+            "type": "string"
+          }
+        },
+        "qualified_key": "threads/template.thread",
+        "sources": {
+          "base": {
+            "alias": "gold.base",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "kind = 'a'"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.tpl_a"
+        },
+        "template_ref": "threads/template.thread",
+        "write": {
+          "mode": "append"
+        }
+      },
+      "tpl_b": {
+        "config_version": "2.0",
+        "name": "tpl_b",
+        "params": {
+          "suffix": {
+            "name": "suffix",
+            "type": "string"
+          }
+        },
+        "qualified_key": "threads/template.thread",
+        "sources": {
+          "base": {
+            "alias": "gold.base",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "kind = 'b'"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.tpl_b"
+        },
+        "template_ref": "threads/template.thread",
+        "write": {
+          "mode": "append"
+        }
+      }
+    },
+    "inline_w": {
+      "inline_t": {
+        "config_version": "2.0",
+        "name": "inline_t",
+        "qualified_key": "inline_t",
+        "sources": {
+          "s": {
+            "lookup": "shared"
+          }
+        },
+        "steps": [
+          {
+            "rename": {
+              "column_set": "loom_map"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.inline_t"
+        }
+      }
+    }
+  },
+  "weaves": {
+    "conv": {
+      "config_version": "2.0",
+      "name": "conv",
+      "qualified_key": "conv.weave",
+      "threads": [
+        {
+          "ref": "threads/conv.thread"
+        }
+      ]
+    },
+    "core": {
+      "column_sets": {
+        "shared_map": {
+          "param": "weave_shared_map"
+        }
+      },
+      "config_version": "2.0",
+      "defaults": {
+        "write": {
+          "mode": "append"
+        }
+      },
+      "lookups": {
+        "shared": {
+          "source": {
+            "alias": "ref.shared_weave",
+            "type": "delta"
+          }
+        },
+        "weave_only": {
+          "source": {
+            "alias": "ref.weave_only",
+            "type": "delta"
+          }
+        }
+      },
+      "name": "core",
+      "qualified_key": "weaves/core.weave",
+      "threads": [
+        {
+          "ref": "threads/base.thread"
+        },
+        {
+          "as_": "tpl_a",
+          "dependencies": [
+            "base"
+          ],
+          "params": {
+            "suffix": "a"
+          },
+          "ref": "threads/template.thread"
+        },
+        {
+          "as_": "tpl_b",
+          "condition": {
+            "when": "table_exists('gold.base')"
+          },
+          "params": {
+            "suffix": "b"
+          },
+          "ref": "threads/template.thread"
+        },
+        {
+          "dependencies": [
+            "tpl_a"
+          ],
+          "name": "inline_core"
+        }
+      ],
+      "variables": {
+        "shared_var": {
+          "default": 2,
+          "type": "int"
+        }
+      }
+    },
+    "inline_w": {
+      "config_version": "2.0",
+      "lookups": {
+        "shared": {
+          "source": {
+            "alias": "ref.shared_inline",
+            "type": "delta"
+          }
+        }
+      },
+      "name": "inline_w",
+      "qualified_key": "inline_w",
+      "threads": [
+        {
+          "name": "inline_t"
+        }
+      ]
+    }
+  }
+}

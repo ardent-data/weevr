@@ -12,7 +12,7 @@ from weevr.config.audit_templates import (
     AuditContext,
     resolve_context_variables,
 )
-from weevr.config.interpolation import build_param_context, resolve_variables
+from weevr.config.interpolation import BareNames, build_param_context, resolve_variables
 from weevr.config.resolver import (
     resolve_declared_params,
     validate_params,
@@ -27,35 +27,9 @@ class TestBuildParamContext:
     """Test build_param_context function."""
 
     def test_runtime_params_only(self):
-        """Build context with only runtime params."""
+        """Runtime params are not a namespace: they reach ${param.x} as bindings."""
         runtime = {"env": "prod", "lakehouse": "gold"}
-        context = build_param_context(runtime_params=runtime)
-        assert context["env"] == "prod"
-        assert context["lakehouse"] == "gold"
-
-    def test_config_defaults_only(self):
-        """Build context with only config defaults."""
-        defaults = {"env": "dev", "mode": "test"}
-        context = build_param_context(config_defaults=defaults)
-        assert context["env"] == "dev"
-        assert context["mode"] == "test"
-
-    def test_runtime_overrides_defaults(self):
-        """Runtime params should override config defaults."""
-        runtime = {"env": "prod"}
-        defaults = {"env": "dev", "lakehouse": "bronze"}
-        context = build_param_context(runtime, defaults)
-        assert context["env"] == "prod"  # Runtime wins
-        assert context["lakehouse"] == "bronze"  # From defaults
-
-    def test_full_priority_chain(self):
-        """Test full priority: runtime > defaults."""
-        runtime = {"env": "prod"}
-        defaults = {"env": "dev", "lakehouse": "bronze", "mode": "test"}
-        context = build_param_context(runtime, defaults)
-        assert context["env"] == "prod"  # Runtime wins
-        assert context["lakehouse"] == "bronze"  # Defaults (no override)
-        assert context["mode"] == "test"  # Defaults (no override)
+        assert build_param_context(runtime_params=runtime) == {}
 
     def test_fabric_context_workspace_id(self):
         """Fabric context provides workspace_id as nested dict under 'fabric'."""
@@ -89,29 +63,17 @@ class TestBuildParamContext:
         context = build_param_context(runtime_params=runtime, fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-override"
 
-    def test_config_default_overrides_fabric_context(self):
-        """Config default overrides fabric context value."""
-        fabric = {"fabric.workspace_id": "ws-from-spark"}
-        defaults = {"fabric": {"workspace_id": "ws-from-config"}}
-        context = build_param_context(config_defaults=defaults, fabric_context=fabric)
-        assert context["fabric"]["workspace_id"] == "ws-from-config"
-
     def test_full_priority_chain_with_fabric(self):
-        """Full priority: runtime > config_defaults > fabric_context."""
+        """A runtime ``fabric`` mapping stands in for the Fabric context."""
         fabric = {
             "fabric.workspace_id": "ws-spark",
             "fabric.lakehouse_id": "lh-spark",
             "fabric.workspace_name": "wks-spark",
         }
-        defaults = {"fabric": {"workspace_id": "ws-config"}, "env": "dev"}
         runtime = {"fabric": {"workspace_id": "ws-runtime"}, "env": "prod"}
-        context = build_param_context(
-            runtime_params=runtime,
-            config_defaults=defaults,
-            fabric_context=fabric,
-        )
+        context = build_param_context(runtime_params=runtime, fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-runtime"  # Runtime wins
-        assert context["env"] == "prod"  # Runtime wins
+        assert "env" not in context
 
     def test_fabric_context_none_param_no_error(self):
         """Passing None for fabric_context is valid and produces no fabric key."""
@@ -134,15 +96,14 @@ class TestEntryParams:
         assert result["x"] == "ADR6"
 
     def test_entry_params_no_interference_with_flat(self):
-        """entry_params doesn't interfere with flat runtime_params."""
+        """Runtime params are not merged flat beside the param namespace."""
         context = build_param_context(
             runtime_params={"env": "prod"},
             entry_params={"table": "ADR6"},
         )
-        assert context["env"] == "prod"
-        assert context["param"]["table"] == "ADR6"
-        result = resolve_variables({"a": "${env}", "b": "${param.table}"}, context)
-        assert result == {"a": "prod", "b": "ADR6"}
+        assert context == {"param": {"table": "ADR6"}}
+        result = resolve_variables({"b": "${param.table}"}, context)
+        assert result == {"b": "ADR6"}
 
     def test_entry_params_none_no_effect(self):
         """entry_params=None adds no 'param' key (backwards compat)."""
@@ -150,12 +111,12 @@ class TestEntryParams:
         assert "param" not in context
 
     def test_runtime_overrides_entry_params(self):
-        """runtime_params with 'param' key overrides entry_params."""
+        """A runtime param named 'param' does not replace the param namespace."""
         context = build_param_context(
             runtime_params={"param": {"table": "OVERRIDE"}},
             entry_params={"table": "ADR6"},
         )
-        assert context["param"]["table"] == "OVERRIDE"
+        assert context["param"]["table"] == "ADR6"
 
 
 class TestConsumedKeysTracking:
@@ -185,26 +146,26 @@ class TestConsumedKeysTracking:
 
     def test_no_param_refs_empty_set(self):
         """Config with no param references yields empty consumed_keys."""
-        context = {"env": "prod"}
+        context = {"param": {"env": "prod"}}
         consumed: set[str] = set()
-        resolve_variables({"a": "${env}"}, context, consumed_keys=consumed)
-        assert consumed == {"env"}
+        resolve_variables({"a": "${param.env}"}, context, consumed_keys=consumed)
+        assert consumed == {"param.env"}
 
     def test_var_namespace_not_tracked(self):
         """${var.x} references are runtime-deferred, not tracked."""
-        context = {"env": "prod"}
+        context = {"param": {"env": "prod"}}
         consumed: set[str] = set()
         resolve_variables(
-            {"a": "${env}", "b": "${var.x}"},
+            {"a": "${param.env}", "b": "${var.x}"},
             context,
             consumed_keys=consumed,
         )
-        assert consumed == {"env"}
+        assert consumed == {"param.env"}
 
     def test_consumed_keys_none_no_error(self):
         """consumed_keys=None (default) causes no tracking or error."""
-        context = {"env": "prod"}
-        result = resolve_variables({"a": "${env}"}, context)
+        context = {"param": {"env": "prod"}}
+        result = resolve_variables({"a": "${param.env}"}, context)
         assert result == {"a": "prod"}
 
 
@@ -272,9 +233,8 @@ class TestUnusedParamWarnings:
         write_document(
             thread_file,
             'config_version: "2.0"\n'
-            "defaults:\n  env: dev\n"
             "sources:\n  data:\n    type: delta\n"
-            "    alias: ${env}\n"
+            "    alias: ${param.env:-dev}\n"
             "target: {}\n",
         )
 
@@ -368,61 +328,61 @@ class TestResolveVariables:
 
     def test_simple_variable(self):
         """Resolve simple variable reference."""
-        config = {"path": "${base_path}/data"}
-        context = {"base_path": "/mnt/storage"}
+        config = {"path": "${param.base_path}/data"}
+        context = {"param": {"base_path": "/mnt/storage"}}
         result = resolve_variables(config, context)
         assert result["path"] == "/mnt/storage/data"
 
     def test_variable_with_default_not_used(self):
         """Variable with default should use context value when present."""
-        config = {"env": "${environment:-dev}"}
-        context = {"environment": "prod"}
+        config = {"env": "${param.environment:-dev}"}
+        context = {"param": {"environment": "prod"}}
         result = resolve_variables(config, context)
         assert result["env"] == "prod"  # Context value used
 
     def test_variable_with_default_used(self):
         """Variable with default should use default when not in context."""
-        config = {"env": "${missing_var:-dev}"}
+        config = {"env": "${param.missing_var:-dev}"}
         context = {}
         result = resolve_variables(config, context)
         assert result["env"] == "dev"  # Default used
 
     def test_dotted_key_access(self):
         """Resolve variable with dotted key access."""
-        config = {"host": "${database.host}"}
-        context = {"database": {"host": "localhost", "port": 5432}}
+        config = {"host": "${param.database.host}"}
+        context = {"param": {"database": {"host": "localhost", "port": 5432}}}
         result = resolve_variables(config, context)
         assert result["host"] == "localhost"
 
     def test_nested_dict_resolution(self):
         """Recursively resolve variables in nested dict."""
         config = {
-            "source": {"path": "${base_path}/input"},
-            "target": {"path": "${base_path}/output"},
+            "source": {"path": "${param.base_path}/input"},
+            "target": {"path": "${param.base_path}/output"},
         }
-        context = {"base_path": "/data"}
+        context = {"param": {"base_path": "/data"}}
         result = resolve_variables(config, context)
         assert result["source"]["path"] == "/data/input"
         assert result["target"]["path"] == "/data/output"
 
     def test_list_resolution(self):
         """Recursively resolve variables in list."""
-        config = {"paths": ["${base}/input", "${base}/output"]}
-        context = {"base": "/data"}
+        config = {"paths": ["${param.base}/input", "${param.base}/output"]}
+        context = {"param": {"base": "/data"}}
         result = resolve_variables(config, context)
         assert result["paths"][0] == "/data/input"
         assert result["paths"][1] == "/data/output"
 
     def test_multiple_variables_in_string(self):
         """Resolve multiple variables in one string."""
-        config = {"url": "${protocol}://${host}:${port}"}
-        context = {"protocol": "https", "host": "api.example.com", "port": "443"}
+        config = {"url": "${param.protocol}://${param.host}:${param.port}"}
+        context = {"param": {"protocol": "https", "host": "api.example.com", "port": "443"}}
         result = resolve_variables(config, context)
         assert result["url"] == "https://api.example.com:443"
 
     def test_unresolved_variable_no_default(self):
         """Raise VariableResolutionError for missing variable without default."""
-        config = {"path": "${missing_var}"}
+        config = {"path": "${param.missing_var}"}
         context = {}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
@@ -453,7 +413,7 @@ class TestResolveVariables:
 
     def test_empty_context(self):
         """Variables with defaults should work with empty context."""
-        config = {"env": "${missing:-dev}"}
+        config = {"env": "${param.missing:-dev}"}
         context = {}
         result = resolve_variables(config, context)
         assert result["env"] == "dev"
@@ -719,7 +679,7 @@ class TestResolveDeclaredParams:
             )
 
     def test_defaults_and_declared_params_independent(self):
-        """``defaults`` (top-level) and declared ``params`` resolve through separate paths."""
+        """``defaults`` are not variables: a bare reference to one fails ``P111``."""
         param_specs = {
             "workspace_id": {
                 "name": "workspace_id",
@@ -732,17 +692,14 @@ class TestResolveDeclaredParams:
             param_specs, runtime_params={"workspace_id": "ws-1"}
         )
         context = build_param_context(
-            runtime_params={"workspace_id": "ws-1"},
-            config_defaults=config_defaults,
-            entry_params=resolved_params,
+            runtime_params={"workspace_id": "ws-1"}, entry_params=resolved_params
         )
-        config = {
-            "workspace": "${param.workspace_id}",
-            "lakehouse": "${env}",
-        }
-        result = resolve_variables(config, context)
-        assert result["workspace"] == "ws-1"
-        assert result["lakehouse"] == "dev"
+        assert resolve_variables({"w": "${param.workspace_id}"}, context) == {"w": "ws-1"}
+        names = BareNames(declared=frozenset(param_specs), defaults=config_defaults)
+        with pytest.raises(VariableResolutionError) as exc_info:
+            resolve_variables({"lakehouse": "${env}"}, context, names=names)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P111"]
+        assert exc_info.value.diagnostics[0].expected == ("${param.env}",)
 
 
 class TestUnresolvedParamHints:
@@ -886,8 +843,8 @@ class TestReferenceResolution:
 
     def test_resolve_variables_var_namespace_mixed(self):
         """var.* references coexist with resolved variables."""
-        config = {"path": "${base_path}/${var.filename}"}
-        context = {"base_path": "/data"}
+        config = {"path": "${param.base_path}/${var.filename}"}
+        context = {"param": {"base_path": "/data"}}
         result = resolve_variables(config, context)
         assert result["path"] == "/data/${var.filename}"
 
@@ -1018,12 +975,11 @@ class TestEntryStashPattern:
 
         weave_config = {
             "config_version": "2.0",
-            "defaults": {"env": "prod"},
             "threads": [
                 {
                     "ref": "sap_table.thread",
                     "as": "sap_adr6",
-                    "params": {"target_schema": "${env}_silver"},
+                    "params": {"target_schema": "${param.env}_silver"},
                 },
             ],
         }
@@ -1189,59 +1145,59 @@ class TestEntryStashPattern:
 
 
 class TestWholeValueResolution:
-    """Test that whole-value ${param} references return native Python types."""
+    """Test that whole-value ${param.x} references return native Python types."""
 
     def test_whole_value_list(self):
-        """${param} resolving to list returns list, not string."""
-        config = {"match_keys": "${pk_columns}"}
-        context = {"pk_columns": ["mandt", "color"]}
+        """${param.param} resolving to list returns list, not string."""
+        config = {"match_keys": "${param.pk_columns}"}
+        context = {"param": {"pk_columns": ["mandt", "color"]}}
         result = resolve_variables(config, context)
         assert result["match_keys"] == ["mandt", "color"]
         assert isinstance(result["match_keys"], list)
 
     def test_whole_value_int(self):
-        """${param} resolving to int returns int."""
-        config = {"page_size": "${batch_size}"}
-        context = {"batch_size": 1000}
+        """${param.param} resolving to int returns int."""
+        config = {"page_size": "${param.batch_size}"}
+        context = {"param": {"batch_size": 1000}}
         result = resolve_variables(config, context)
         assert result["page_size"] == 1000
         assert isinstance(result["page_size"], int)
 
     def test_whole_value_bool_true(self):
-        """${param} resolving to bool True returns bool."""
-        config = {"enabled": "${flag_enabled}"}
-        context = {"flag_enabled": True}
+        """${param.param} resolving to bool True returns bool."""
+        config = {"enabled": "${param.flag_enabled}"}
+        context = {"param": {"flag_enabled": True}}
         result = resolve_variables(config, context)
         assert result["enabled"] is True
         assert isinstance(result["enabled"], bool)
 
     def test_whole_value_bool_false(self):
-        """${param} resolving to bool False returns bool."""
-        config = {"debug": "${flag_debug}"}
-        context = {"flag_debug": False}
+        """${param.param} resolving to bool False returns bool."""
+        config = {"debug": "${param.flag_debug}"}
+        context = {"param": {"flag_debug": False}}
         result = resolve_variables(config, context)
         assert result["debug"] is False
         assert isinstance(result["debug"], bool)
 
     def test_whole_value_none(self):
-        """${param} resolving to None returns None, not string 'None'."""
-        config = {"filter": "${optional_filter}"}
-        context = {"optional_filter": None}
+        """${param.param} resolving to None returns None, not string 'None'."""
+        config = {"filter": "${param.optional_filter}"}
+        context = {"param": {"optional_filter": None}}
         result = resolve_variables(config, context)
         assert result["filter"] is None
 
     def test_whole_value_with_default_returns_string(self):
-        """${param:-default} where param missing returns default as string."""
-        config = {"mode": "${missing_param:-batch}"}
+        """${param.param:-default} where param missing returns default as string."""
+        config = {"mode": "${param.missing_param:-batch}"}
         context = {}
         result = resolve_variables(config, context)
         assert result["mode"] == "batch"
         assert isinstance(result["mode"], str)
 
     def test_embedded_ref_still_returns_string(self):
-        """Embedded ${param} in a longer string always returns string."""
-        config = {"alias": "SAP.${table_name}"}
-        context = {"table_name": "MARA"}
+        """Embedded ${param.param} in a longer string always returns string."""
+        config = {"alias": "SAP.${param.table_name}"}
+        context = {"param": {"table_name": "MARA"}}
         result = resolve_variables(config, context)
         assert result["alias"] == "SAP.MARA"
         assert isinstance(result["alias"], str)
@@ -1261,8 +1217,8 @@ class TestWholeValueResolution:
         assert result["ts"] == "${run.timestamp}"
 
     def test_whole_value_missing_no_default_raises(self):
-        """${param} where param missing and no default raises VariableResolutionError."""
-        config = {"keys": "${undefined_param}"}
+        """${param.param} where param missing and no default raises VariableResolutionError."""
+        config = {"keys": "${param.undefined_param}"}
         context = {}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
@@ -1483,17 +1439,17 @@ class TestStandaloneThreadResources:
         assert context["mode"] == "batch"
 
     def test_variable_resolution_within_standalone_thread(self):
-        """${param} references inside a standalone thread config resolve correctly."""
+        """${param.param} references inside a standalone thread config resolve correctly."""
         config = {
             "sources": {
                 "data": {
                     "type": "delta",
-                    "alias": "${lakehouse}.customers",
+                    "alias": "${param.lakehouse}.customers",
                 }
             },
-            "target": {"alias": "${lakehouse}.output"},
+            "target": {"alias": "${param.lakehouse}.output"},
         }
-        context = {"lakehouse": "silver"}
+        context = {"param": {"lakehouse": "silver"}}
         resolved = resolve_variables(config, context)
 
         assert resolved["sources"]["data"]["alias"] == "silver.customers"
@@ -1501,8 +1457,8 @@ class TestStandaloneThreadResources:
 
     def test_whole_value_whitespace_stripped(self):
         """Whole-value match works even when value has surrounding whitespace."""
-        config = {"keys": "  ${pk_columns}  "}
-        context = {"pk_columns": ["id", "code"]}
+        config = {"keys": "  ${param.pk_columns}  "}
+        context = {"param": {"pk_columns": ["id", "code"]}}
         result = resolve_variables(config, context)
         assert result["keys"] == ["id", "code"]
         assert isinstance(result["keys"], list)
@@ -1536,8 +1492,8 @@ class TestRunVariableSkip:
 
     def test_run_and_regular_vars_mixed(self):
         """${run.*} preserved while regular vars are resolved."""
-        config = {"path": "/lakehouse/${env}/${run.timestamp}"}
-        result = resolve_variables(config, {"env": "prod"})
+        config = {"path": "/lakehouse/${param.env}/${run.timestamp}"}
+        result = resolve_variables(config, {"param": {"env": "prod"}})
         assert result["path"] == "/lakehouse/prod/${run.timestamp}"
 
 
@@ -1575,24 +1531,25 @@ class TestHierarchyVariableDeferral:
         assert resolve_variables(config, {}) == config
 
     def test_mixed_with_params_and_run_vars(self) -> None:
-        config = {"path": "/${env}/${loom.name}/${thread.name}/${run.timestamp}"}
-        result = resolve_variables(config, {"env": "prod"})
+        config = {"path": "/${param.env}/${loom.name}/${thread.name}/${run.timestamp}"}
+        result = resolve_variables(config, {"param": {"env": "prod"}})
         assert result["path"] == "/prod/${loom.name}/${thread.name}/${run.timestamp}"
 
     def test_unknown_property_still_raises(self) -> None:
-        with pytest.raises(VariableResolutionError, match="thread.nme"):
+        with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables({"path": "/archive/${thread.nme}"}, {})
+        assert [d.code for d in exc_info.value.diagnostics] == ["P112"]
 
     def test_default_still_resolves_at_load(self) -> None:
         config = {"path": "/archive/${thread.name:-fallback}", "label": "${weave.name:-w}"}
         result = resolve_variables(config, {})
         assert result == {"path": "/archive/fallback", "label": "w"}
 
-    def test_load_context_value_still_wins(self) -> None:
-        """A context that supplies the name resolves it at load, as before."""
+    def test_load_context_never_supplies_it(self) -> None:
+        """A load context never supplies a hierarchy name: it stays for execution."""
         config = {"path": "/archive/${thread.name}", "label": "${thread.name}"}
         result = resolve_variables(config, {"thread": {"name": "from_params"}})
-        assert result == {"path": "/archive/from_params", "label": "from_params"}
+        assert result == config
 
     def test_every_deferred_name_resolves_at_execution(self) -> None:
         """Nothing deferred at load is left unresolved by the execution-time resolver."""
@@ -1694,7 +1651,7 @@ class TestThreadParameterizationE2E:
         assert resolved[2]["sources"]["data"]["alias"] == "stg.C"
 
     def test_nested_param_expression(self, tmp_path):
-        """ThreadEntry param values with ${env} resolve against parent."""
+        """ThreadEntry param values with ${param.env} resolve against parent."""
         from weevr.config.resolver import resolve_references
 
         f = tmp_path / "schema_thread.thread"
@@ -1715,7 +1672,7 @@ class TestThreadParameterizationE2E:
                 {
                     "ref": "schema_thread.thread",
                     "as": "dim_cust",
-                    "params": {"target_schema": "${env}_silver"},
+                    "params": {"target_schema": "${param.env}_silver"},
                 },
             ],
         }

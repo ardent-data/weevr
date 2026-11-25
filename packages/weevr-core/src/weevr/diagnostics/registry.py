@@ -393,6 +393,17 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unresolved-variable",
         "A ${...} variable has no value and no default.",
     ),
+    _config(
+        "P111",
+        "bare-variable-reference",
+        "A ${...} reference names no namespace: ${x} instead of ${param.x}.",
+    ),
+    _config(
+        "P112",
+        "unknown-variable-namespace",
+        "A ${...} reference starts with an unknown namespace, or names an unknown key "
+        "of a thread, weave or loom namespace.",
+    ),
     _config_warning(
         "P123",
         "unconsumed-pin",

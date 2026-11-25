@@ -6,12 +6,12 @@ inline children in scopes of their own. :func:`enter_child` is the one place a
 pins reported, for both ``ref:`` weaves and ``ref:`` threads.
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any
 
 from weevr.config.collect import recorded
-from weevr.config.interpolation import build_param_context, resolve_variables
+from weevr.config.interpolation import BareNames, build_param_context, resolve_variables
 from weevr.config.params import BindingReads, ParamScope, ScopePositions, unconsumed_pins
 from weevr.diagnostics import Diagnostic
 
@@ -53,14 +53,15 @@ def resolve_config_variables(
     own scope from its parent's, so its declared ``params:`` bind for it the
     way a child file's do. The child's entry keys (``name``, ``condition``,
     and a thread's ``as`` and ``dependencies``) belong to the parent and
-    resolve in the parent's scope. Bare names resolve from the runtime params
-    and the config's ``defaults``; an inline weave layers its own ``defaults``
-    over the loom's.
+    resolve in the parent's scope. A bare ``${x}`` fails with its rewrite,
+    classified by the scope's declarations and the config's ``defaults`` (an
+    inline weave's own ``defaults`` layered over the loom's).
 
     Args:
         config: Schema-validated config dict.
         config_type: The config kind (``"thread"``, ``"weave"``, ...).
-        runtime_params: Runtime parameter overrides.
+        runtime_params: Runtime parameter overrides; their ``fabric`` key
+            stands in for the Fabric context.
         fabric_context: Optional Fabric environment values.
         entry_params: Values bound for ``${param.x}`` when no ``scope`` is
             given (over the runtime params).
@@ -74,7 +75,8 @@ def resolve_config_variables(
         The config dict with variables resolved.
 
     Raises:
-        VariableResolutionError: If a variable has no value and no default.
+        VariableResolutionError: A variable has no value and no default, or
+            a reference is bare or in an unknown namespace.
         ConfigSchemaError: A required param declared by an inline child has
             no value.
     """
@@ -102,10 +104,16 @@ def substitute(
     scope: ParamScope,
     reads: BindingReads | None,
     at: tuple[str | int, ...] = (),
+    defaults: Mapping[str, Any] | None = None,
 ) -> Any:
-    """Resolve ``config`` in ``context``, noting each ``scope`` binding it read."""
+    """Resolve ``config`` in ``context``, noting each ``scope`` binding it read.
+
+    A bare reference's rewrite is classified by ``scope``'s declared params
+    and ``defaults``, the ``defaults:`` block in force.
+    """
     consumed: set[str] = set()
-    resolved = resolve_variables(config, context, consumed, at)
+    names = BareNames(declared=frozenset(scope.specs), defaults=defaults or {})
+    resolved = resolve_variables(config, context, consumed, at, names=names)
     if reads is not None:
         for key in consumed:
             namespace, _, rest = key.partition(".")
@@ -133,21 +141,21 @@ def resolve_scoped(
     An inline child's entry keys resolve in ``scope``, its body in the child's.
     """
     context = build_param_context(
-        runtime_params, defaults, fabric_context=fabric_context, entry_params=scope.values()
+        runtime_params, fabric_context=fabric_context, entry_params=scope.values()
     )
     key, child_type = _CHILD_LISTS.get(config_type, ("", ""))
     entries = config.get(key) if key else None
     if not isinstance(entries, list):
-        return substitute(config, context, scope, reads, at)
+        return substitute(config, context, scope, reads, at, defaults)
     is_inline = is_inline_weave if config_type == "loom" else is_inline_thread
     inline = {i: entry for i, entry in enumerate(entries) if is_inline(entry)}
     if not inline:
-        return substitute(config, context, scope, reads, at)
+        return substitute(config, context, scope, reads, at, defaults)
 
     # An inline child's own params: are its declarations, so they stay with the body.
     entry_keys = (WEAVE_ENTRY_KEYS if config_type == "loom" else THREAD_ENTRY_KEYS) - {"params"}
     shell = {**config, key: [None if i in inline else e for i, e in enumerate(entries)]}
-    resolved = substitute(shell, context, scope, reads, at)
+    resolved = substitute(shell, context, scope, reads, at, defaults)
     for i, entry in inline.items():
         where = (*at, key, i)
         child_defaults = defaults
@@ -158,7 +166,12 @@ def resolve_scoped(
         if inline_scopes is not None:
             inline_scopes[where] = child_scope
         placement = substitute(
-            {k: v for k, v in entry.items() if k in entry_keys}, context, scope, reads, where
+            {k: v for k, v in entry.items() if k in entry_keys},
+            context,
+            scope,
+            reads,
+            where,
+            defaults,
         )
         body = resolve_scoped(
             {k: v for k, v in entry.items() if k not in entry_keys},
@@ -182,6 +195,7 @@ def _entry_pins(
     scope: ParamScope,
     reads: BindingReads,
     at: tuple[str | int, ...],
+    defaults: Mapping[str, Any] | None,
 ) -> dict[str, Any] | None:
     """A ``ref:`` entry's pins, resolved in its parent's scope; ``None`` when it pins none.
 
@@ -196,7 +210,7 @@ def _entry_pins(
         return None
     if parent_context is None:
         return pins
-    return substitute(pins, parent_context, scope, reads, (*at, "params"))
+    return substitute(pins, parent_context, scope, reads, (*at, "params"), defaults)
 
 
 def _errors_recorded() -> int:
@@ -253,6 +267,7 @@ def enter_child(
     *,
     file: str | None,
     alias_key: str,
+    defaults: Mapping[str, Any] | None = None,
 ) -> Iterator[ChildEntry]:
     """Enter a ``ref:`` entry: resolve its pins, then report those nothing read.
 
@@ -273,12 +288,15 @@ def enter_child(
         file: The parent's file, which the warnings name.
         alias_key: The entry key that renames the child (``as`` for a thread,
             ``name`` for a weave); the child's own name stands in without it.
+        defaults: The parent's ``defaults:``, which classify a bare reference
+            in a pin.
 
     Yields:
         The entry, to open the child's scope from.
     """
     errors_before = _errors_recorded()
-    child = ChildEntry(_entry_pins(entry, parent_context, scope, reads, at), scope, reads)
+    pins = _entry_pins(entry, parent_context, scope, reads, at, defaults)
+    child = ChildEntry(pins, scope, reads)
     yield child
     if _errors_recorded() == errors_before:
         warnings.extend(
