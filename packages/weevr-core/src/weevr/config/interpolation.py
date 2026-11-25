@@ -34,6 +34,23 @@ FABRIC_KEYS: frozenset[str] = frozenset({"workspace_id", "lakehouse_id", "worksp
 """The keys of the ``fabric`` namespace."""
 
 
+def param_name(reference: str) -> str | None:
+    """The param a ``${...}`` reference's name reads; ``None`` outside the ``param`` namespace.
+
+    A dotted reference reads its first key: ``param.ws.x`` reads ``ws``.
+
+    Args:
+        reference: The reference's name, without ``${`` or any ``:-`` default.
+
+    Returns:
+        The param name, or ``None``.
+    """
+    namespace, _, rest = reference.strip().partition(".")
+    if namespace != "param" or not rest:
+        return None
+    return rest.split(".", 1)[0]
+
+
 @dataclass(frozen=True)
 class BareNames:
     """What a bare ``${x}`` reference is classified by, to give its rewrite.

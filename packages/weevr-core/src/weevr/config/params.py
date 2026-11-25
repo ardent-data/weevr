@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from types import MappingProxyType
@@ -710,7 +710,7 @@ def missing_parameter(
     )
 
 
-def unconsumed_pins(
+def pin_warnings(
     pins: Mapping[str, Any] | None,
     scope: ParamScope,
     reads: BindingReads,
@@ -718,12 +718,20 @@ def unconsumed_pins(
     entry_name: str,
     file: str | None,
     at: tuple[str | int, ...],
+    upstream_readers: Mapping[str, Sequence[str]] | None = None,
 ) -> list[Diagnostic]:
-    """``P123`` for each pin of the entry at ``at`` that nothing beneath it read.
+    """The warnings for the entry's pins: each pin gets at most one of P122 or P123, never both.
 
-    A pin is consumed when its binding is read by a ``${param.x}`` reference
-    in the entry's subtree (a nested entry's pin value included) or satisfies
-    a ``params:`` declaration there. A nearer pin for the same name makes its
+    A pin that a registry asset declared above the entry reads warns ``P122``
+    naming those assets, whether or not the subtree also reads the pin: the
+    asset resolved before the pin existed, so the pin does not retarget it,
+    and the subtree's own fields would then disagree with the asset. The
+    warning may fire on a deliberate pin; it is never an error.
+
+    Any other pin warns ``P123`` when nothing beneath the entry read it. A pin
+    is consumed when its binding is read by a ``${param.x}`` reference in the
+    entry's subtree (a nested entry's pin value included) or satisfies a
+    ``params:`` declaration there. A nearer pin for the same name makes its
     own binding, so a pin every reader shadows is unconsumed.
 
     Args:
@@ -733,19 +741,41 @@ def unconsumed_pins(
         entry_name: The entry's name, for the message.
         file: The file holding the entry.
         at: Where the entry sits in ``file``.
+        upstream_readers: By pin name, the upstream assets visible beneath
+            the entry that read it, each described for ``expected``.
 
     Returns:
-        One warning per unconsumed pin, in pin order.
+        The warnings, in pin order.
     """
-    return [
-        diagnostic(
-            "P123",
-            f"Entry '{entry_name}' pins parameter '{name}', which nothing beneath it reads "
-            "or declares",
-            file=file,
-            pointer=json_pointer((*at, "params", name)),
-            hint=f"Remove the pin, or reference it as ${{param.{name}}} below the entry.",
+    found: list[Diagnostic] = []
+    for name in pins or {}:
+        pointer = json_pointer((*at, "params", name))
+        assets = (upstream_readers or {}).get(name)
+        if assets:
+            found.append(
+                diagnostic(
+                    "P122",
+                    f"Entry '{entry_name}' pins parameter '{name}', which registry assets "
+                    "declared above the entry also read; they resolved where they are "
+                    "declared, so the pin does not retarget them",
+                    file=file,
+                    pointer=pointer,
+                    expected=list(assets),
+                    hint="To specialize an asset for this entry, re-declare it under the "
+                    "same name below the entry.",
+                )
+            )
+            continue
+        if reads.was_read(scope.bindings[name]):
+            continue
+        found.append(
+            diagnostic(
+                "P123",
+                f"Entry '{entry_name}' pins parameter '{name}', which nothing beneath it reads "
+                "or declares",
+                file=file,
+                pointer=pointer,
+                hint=f"Remove the pin, or reference it as ${{param.{name}}} below the entry.",
+            )
         )
-        for name in pins or {}
-        if not reads.was_read(scope.bindings[name])
-    ]
+    return found

@@ -515,6 +515,14 @@ under strict_params.
 A runtime parameter is supplied that nothing in the loaded tree declares or references. An error
 under strict_params.
 
+### P122
+
+`pin-ignored-by-upstream-asset` · warning · stable
+
+A weave or thread entry pins a parameter that a registry asset declared above the entry reads; the
+asset resolved in its own scope, so the pin does not retarget it. Never an error, even under
+strict_params.
+
 ### P123
 
 `unconsumed-pin` · warning · stable

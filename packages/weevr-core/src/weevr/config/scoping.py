@@ -3,9 +3,10 @@
 A load walks its config tree carrying a :class:`WalkState`: the param scope
 in force, the file being resolved, whether that scope is strict, and the
 records the whole walk shares (bindings read, undeclared references, load
-warnings). :func:`resolve_config_variables` resolves a config's ``${...}``
+warnings), and the registry assets the config sees (:mod:`weevr.config.assets`).
+:func:`resolve_config_variables` resolves a config's ``${...}``
 references with inline children in scopes of their own. :func:`enter_child`
-is the one place a ``ref:`` entry's child scope is opened and its unconsumed
+is the one place a ``ref:`` entry's child scope is opened and its misfiring
 pins reported, for both ``ref:`` weaves and ``ref:`` threads.
 """
 
@@ -15,11 +16,13 @@ from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Any
 
+from weevr.config.assets import AssetKey, DeclaredAsset, upstream_readers, visible_assets
 from weevr.config.collect import errors_recorded, raise_or_record
 from weevr.config.interpolation import (
     BareNames,
     fabric_namespace,
     load_context,
+    param_name,
     resolve_variables,
 )
 from weevr.config.params import (
@@ -27,7 +30,7 @@ from weevr.config.params import (
     ParamScope,
     ScopePositions,
     UndeclaredParams,
-    unconsumed_pins,
+    pin_warnings,
     unused_runtime_params,
 )
 from weevr.diagnostics import Diagnostic
@@ -97,6 +100,9 @@ class WalkState:
         reads: The bindings the load read, shared by the whole walk.
         undeclared: Undeclared references found, shared by the whole walk.
         warnings: Load warnings found, shared by the whole walk.
+        assets: The registry assets this config sees, by kind and name: its
+            own declarations over every enclosing config's (a lower
+            declaration shadows a higher one of the same kind and name).
     """
 
     scope: ParamScope
@@ -108,6 +114,7 @@ class WalkState:
     reads: BindingReads = field(default_factory=BindingReads)
     undeclared: UndeclaredParams = field(default_factory=UndeclaredParams)
     warnings: list[Diagnostic] = field(default_factory=list)
+    assets: Mapping[AssetKey, DeclaredAsset] = field(default_factory=dict)
 
     @classmethod
     def start(
@@ -147,6 +154,7 @@ class WalkState:
             runtime_params=runtime_params,
             fabric_context=fabric_context,
             reads=reads,
+            assets=visible_assets({}, document, file),
         )
 
     @cached_property
@@ -156,18 +164,32 @@ class WalkState:
             self.scope, runtime_params=self.runtime_params, fabric_context=self.fabric_context
         )
 
-    def inline(self, scope: ParamScope, body: Mapping[str, Any]) -> "WalkState":
+    def inline(
+        self,
+        scope: ParamScope,
+        body: Mapping[str, Any],
+        *,
+        at: tuple[str | int, ...] = (),
+        authored: Mapping[str, Any] | None = None,
+    ) -> "WalkState":
         """The state of an inline child of this config, in the same file.
 
         Args:
             scope: The child's param scope.
             body: The child's body, whose ``strict_params`` applies.
+            at: Where the child sits in the file.
+            authored: The body before variable substitution, when ``body``
+                has been substituted; its registry assets are read from it.
 
         Returns:
             The child's state.
         """
+        written = body if authored is None else authored
         return replace(
-            self, scope=scope, strict=strictness(body, self.strict, self.strict_override)
+            self,
+            scope=scope,
+            strict=strictness(body, self.strict, self.strict_override),
+            assets=visible_assets(self.assets, written, self.file, at),
         )
 
     def in_file(self, scope: ParamScope, document: Mapping[str, Any], file: str) -> "WalkState":
@@ -186,6 +208,7 @@ class WalkState:
             scope=scope,
             file=file,
             strict=strictness(document, self.strict, self.strict_override),
+            assets=visible_assets(self.assets, document, file),
         )
 
 
@@ -270,10 +293,9 @@ def substitute(
     names = BareNames(declared=frozenset(scope.specs), defaults=defaults or {})
     resolved = resolve_variables(config, walk.context, at=at, names=names, read_at=read_at)
     for key, pointer in read_at.items():
-        namespace, _, rest = key.partition(".")
-        if namespace != "param":
+        name = param_name(key)
+        if name is None:
             continue
-        name = rest.split(".", 1)[0]
         binding = scope.bindings.get(name)
         if binding is None:
             continue
@@ -328,7 +350,7 @@ def resolve_scoped(
         body = resolve_scoped(
             {k: v for k, v in entry.items() if k not in entry_keys},
             child_type,
-            walk.inline(child_scope, entry),
+            walk.inline(child_scope, entry, at=where),
             child_defaults,
             at=where,
             inline_scopes=inline_scopes,
@@ -412,13 +434,20 @@ def enter_child(
     *,
     alias_key: str,
 ) -> Iterator[ChildEntry]:
-    """Enter a ``ref:`` entry with its resolved ``pins``, then report those nothing read.
+    """Enter a ``ref:`` entry with its resolved ``pins``, then report the pins that misfire.
 
     The caller loads the child and calls :meth:`ChildEntry.open` inside the
     block, resolves the child's subtree there, and leaves the block normally.
-    Then each pin nothing beneath the entry read warns ``P123``, unless the
-    subtree recorded an error, which hides whether its pins were read. If the
-    block raises, nothing is reported.
+    Then the pins are checked, unless the subtree recorded an error, which
+    hides whether its pins were read. If the block raises, nothing is
+    reported. Each pin warns at most once (:func:`pin_warnings`):
+
+    - ``P122`` when a registry asset upstream of the entry reads the pinned
+      name, whether or not the subtree reads it too. The asset is declared in
+      ``walk``'s config or one enclosing it, so it resolved before the pin
+      existed, and the child does not shadow it (the child sees the very
+      asset ``walk`` sees).
+    - Else ``P123`` when nothing beneath the entry read the pin.
 
     Args:
         entry: The ``ref:`` entry.
@@ -441,13 +470,14 @@ def enter_child(
     opened = child.opened
     if errors_recorded() == errors_before:
         walk.warnings.extend(
-            unconsumed_pins(
+            pin_warnings(
                 child.pins,
                 opened.scope,
                 walk.reads,
                 entry_name=entry.get(alias_key) or child.name,
                 file=walk.file,
                 at=at,
+                upstream_readers=upstream_readers(child.pins, walk.assets, opened.assets),
             )
         )
 

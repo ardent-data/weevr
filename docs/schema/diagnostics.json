@@ -772,6 +772,16 @@
       "docs_anchor": "p121"
     },
     {
+      "code": "P122",
+      "name": "pin-ignored-by-upstream-asset",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A weave or thread entry pins a parameter that a registry asset declared above the entry reads; the asset resolved in its own scope, so the pin does not retarget it. Never an error, even under strict_params.",
+      "docs_anchor": "p122"
+    },
+    {
       "code": "P123",
       "name": "unconsumed-pin",
       "category": "config",

@@ -436,7 +436,9 @@ def resolve_references(
                                 inline,
                                 "weave",
                                 project_root,
-                                walk.inline(weave_scope, inline),
+                                walk.inline(
+                                    weave_scope, inline, at=inline_at, authored=inline_authored
+                                ),
                                 visited.copy(),
                                 authored=inline_authored,
                                 at=inline_at,

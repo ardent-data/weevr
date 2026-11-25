@@ -417,6 +417,13 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "references. An error under strict_params.",
     ),
     _config_warning(
+        "P122",
+        "pin-ignored-by-upstream-asset",
+        "A weave or thread entry pins a parameter that a registry asset declared above "
+        "the entry reads; the asset resolved in its own scope, so the pin does not "
+        "retarget it. Never an error, even under strict_params.",
+    ),
+    _config_warning(
         "P123",
         "unconsumed-pin",
         "A weave or thread entry pins a parameter that nothing beneath the entry reads "
