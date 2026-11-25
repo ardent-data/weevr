@@ -47,6 +47,7 @@ def load_config(
     project_root: Path | ConfigLocation | None = None,
     *,
     strict_params: bool | None = None,
+    fabric_context: dict[str, Any] | None = None,
 ) -> Thread | Weave | Loom | dict[str, Any]:
     """Load and validate a weevr configuration file.
 
@@ -58,7 +59,8 @@ def load_config(
        extension), else from the extension or content
     4. Validate schema with Pydantic
     5. Bind params per scope (pin > runtime > declared default)
-    6. Resolve variable references (``${namespace.name}`` and ``${namespace.name:-default}``)
+    6. Resolve variable references (``${namespace.name}`` and ``${namespace.name:-default}``);
+       ``${fabric.x}`` without a Fabric context is left in place (``P113``)
     7. Resolve references to child configs (threads, weaves)
     8. Apply inheritance cascade (loom -> weave -> thread)
     9. Validate name against filename stem; set ``qualified_key``
@@ -87,6 +89,14 @@ def load_config(
             document sets ``strict_params: true``. ``None`` (the default)
             leaves each document's setting, most specific wins, absent is
             lenient.
+        fabric_context: The Fabric values ``${fabric.x}`` resolves from, keyed
+            ``workspace_id``, ``lakehouse_id`` and ``workspace_name`` (a
+            ``fabric.`` prefix is accepted). ``None`` (the default) means no
+            Fabric context: each ``${fabric.x}`` without a ``:-`` default is
+            left in place and warns ``P113``, an error under strict params. A
+            mapping, even an empty one, is the context: a key it lacks or
+            maps to ``None`` fails ``P110``. ``Context`` always passes the
+            values of its Spark session. Runtime params never supply them.
 
     Returns:
         A frozen, typed domain model instance (Thread, Weave, or Loom) for
@@ -98,7 +108,8 @@ def load_config(
         ConfigSchemaError: Schema validation failures
         ConfigError: Extension or name validation failures
         VariableResolutionError: Unresolved variables without defaults, and
-            undeclared or unused params under strict params
+            undeclared or unused params or deferred ``${fabric.x}`` references
+            under strict params
         ReferenceResolutionError: Missing referenced files, circular dependencies
         ModelValidationError: Semantic validation failures during model hydration
     """
@@ -112,6 +123,7 @@ def load_config(
             file_path,
             runtime_params=runtime_params,
             project_root=root,
+            fabric_context=fabric_context,
             strict_params=strict_params,
         )
         if resolved.config_type not in _COMPONENT_TYPES:

@@ -193,9 +193,9 @@ class TestUnusedSuppliedParameter:
         path = _write(tmp_path, "w.weave", _weave([{**_thread(), "name": "i"}]))
         assert _with_code(_load(path, {"x": "a"}).diagnostics, "P121") == []
 
-    def test_fabric_and_none_keys_are_quiet(self, tmp_path: Path) -> None:
+    def test_none_keys_are_quiet(self, tmp_path: Path) -> None:
         path = _write(tmp_path, "t.thread", _thread(params=_spec("x")))
-        runtime = {"x": "a", "fabric": {"workspace_id": "w"}, "unset": None}
+        runtime = {"x": "a", "unset": None}
         assert _with_code(_load(path, runtime).diagnostics, "P121") == []
 
     def test_strict_root_fails_the_load(self, tmp_path: Path) -> None:

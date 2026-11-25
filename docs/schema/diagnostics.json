@@ -748,8 +748,18 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave or loom namespace.",
+      "summary": "A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave, loom or fabric namespace.",
       "docs_anchor": "p112"
+    },
+    {
+      "code": "P113",
+      "name": "fabric-reference-deferred",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${fabric.x} reference is left unresolved because the load has no Fabric context: a core loader given no fabric_context. An error under strict_params.",
+      "docs_anchor": "p113"
     },
     {
       "code": "P120",

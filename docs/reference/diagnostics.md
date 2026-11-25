@@ -498,8 +498,15 @@ A ${...} reference names no namespace: ${x} instead of ${param.x}.
 
 `unknown-variable-namespace` · error · stable
 
-A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave or
-loom namespace.
+A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave,
+loom or fabric namespace.
+
+### P113
+
+`fabric-reference-deferred` · warning · stable
+
+A ${fabric.x} reference is left unresolved because the load has no Fabric context: a core loader
+given no fabric_context. An error under strict_params.
 
 ### P120
 

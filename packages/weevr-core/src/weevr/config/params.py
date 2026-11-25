@@ -499,8 +499,8 @@ def unused_runtime_params(
 ) -> list[Diagnostic]:
     """``P121`` for each runtime key nothing in the load declared or referenced.
 
-    A ``None`` value is treated as absent, as when it binds, and the
-    ``fabric`` key stands in for the Fabric context rather than a param.
+    A ``None`` value is treated as absent, as when it binds. A ``fabric`` key
+    is a param like any other: runtime params never supply ``${fabric.x}``.
 
     Args:
         runtime_params: The invoker's runtime params.
@@ -521,7 +521,7 @@ def unused_runtime_params(
             hint=f"Stop passing '{name}', or reference it as ${{param.{name}}}.",
         )
         for name, value in (runtime_params or {}).items()
-        if value is not None and name != "fabric" and not reads.name_used(name)
+        if value is not None and not reads.name_used(name)
     ]
 
 

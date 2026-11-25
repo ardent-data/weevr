@@ -12,7 +12,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from weevr.config.interpolation import VARIABLE_PATTERN, param_name
+from weevr.config.interpolation import VARIABLE_PATTERN
+from weevr.config.interpolation_errors import param_name
 
 # The registry blocks a config can declare; every one is substituted with the rest of
 # its declaring config, so its ${param.x} references resolve in that config's scope.

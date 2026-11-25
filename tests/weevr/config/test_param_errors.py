@@ -17,7 +17,8 @@ import pytest
 
 from documents import write_document
 from weevr.config import load_resolved
-from weevr.config.interpolation import ReferenceScope, resolve_variables
+from weevr.config.interpolation import resolve_variables
+from weevr.config.interpolation_errors import ReferenceScope
 from weevr.config.params import declaration_block
 from weevr.diagnostics import Diagnostic
 from weevr.errors import VariableResolutionError

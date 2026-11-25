@@ -23,7 +23,8 @@ import pytest
 
 from documents import write_document
 from weevr.config import load_resolved
-from weevr.config.interpolation import NAMESPACES, resolve_variables
+from weevr.config.interpolation import resolve_variables
+from weevr.config.interpolation_errors import NAMESPACES
 from weevr.config.loader import resolve_config
 from weevr.config.locations import LocalConfigLocation
 from weevr.diagnostics import Diagnostic

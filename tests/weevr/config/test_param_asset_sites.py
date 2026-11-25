@@ -369,7 +369,7 @@ class TestPinIgnoredByUpstreamAsset:
     ("workspace", "runtime", "warns"),
     [
         ("${param.ws.x}", {"ws": {"x": "a"}}, True),
-        ("${fabric.workspace_id}", {"ws": "rt", "fabric": {"workspace_id": "f"}}, False),
+        ("${fabric.workspace_id}", {"ws": "rt"}, False),
         ("${var.ws}", {"ws": "rt"}, False),
         ("a-${param.ws}-b", {"ws": "rt"}, True),
         ("${param.ws}", {"ws": "rt"}, True),

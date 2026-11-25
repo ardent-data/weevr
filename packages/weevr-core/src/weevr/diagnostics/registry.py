@@ -402,7 +402,13 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "P112",
         "unknown-variable-namespace",
         "A ${...} reference starts with an unknown namespace, or names an unknown key "
-        "of a thread, weave or loom namespace.",
+        "of a thread, weave, loom or fabric namespace.",
+    ),
+    _config_warning(
+        "P113",
+        "fabric-reference-deferred",
+        "A ${fabric.x} reference is left unresolved because the load has no Fabric "
+        "context: a core loader given no fabric_context. An error under strict_params.",
     ),
     _config_warning(
         "P120",

@@ -309,7 +309,7 @@ class TestLoadResolvedRejects:
         with pytest.raises(ConfigError, match="does not match filename stem"):
             load_resolved(cfg)
 
-    def test_fabric_reference_without_default_raises(self, tmp_path: Path) -> None:
+    def test_fabric_reference_the_context_lacks_raises(self, tmp_path: Path) -> None:
         cfg = tmp_path / "t.thread"
         write_document(
             cfg,
@@ -317,7 +317,7 @@ class TestLoadResolvedRejects:
             '    alias: "${fabric.workspace_id}"\ntarget:\n  alias: out\n',
         )
         with pytest.raises(VariableResolutionError, match="fabric.workspace_id"):
-            load_resolved(cfg)
+            load_resolved(cfg, fabric_context={})
 
 
 _DUP_THREAD = """\

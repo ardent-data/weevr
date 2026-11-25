@@ -12,9 +12,11 @@ from weevr.config.audit_templates import (
     AuditContext,
     resolve_context_variables,
 )
-from weevr.config.interpolation import ReferenceScope, resolve_variables
+from weevr.config.interpolation import resolve_variables
+from weevr.config.interpolation_errors import ReferenceScope
 from weevr.config.params import ParamScope
 from weevr.config.scoping import scope_context
+from weevr.diagnostics import Diagnostic
 from weevr.errors import ConfigSchemaError, VariableResolutionError
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -26,7 +28,7 @@ class TestScopeContext:
     def test_runtime_params_bind_under_param(self):
         """Runtime params reach ``${param.x}`` as the root scope's bindings, not flat."""
         runtime = {"env": "prod", "lakehouse": "gold"}
-        context = scope_context(ParamScope.root(runtime), runtime_params=runtime)
+        context = scope_context(ParamScope.root(runtime))
         assert context == {"param": runtime}
 
     def test_fabric_context_workspace_id(self):
@@ -48,30 +50,19 @@ class TestScopeContext:
         assert context["fabric"]["workspace_id"] == "ws-abc-123"
         assert "lakehouse_id" not in context["fabric"]
 
-    def test_fabric_context_all_none_excluded(self):
-        """Fabric context with all None values produces no 'fabric' key."""
+    def test_fabric_context_all_none_is_an_empty_namespace(self):
+        """A context with only None values is still a context, with no values."""
         fabric = {"fabric.workspace_id": None, "fabric.lakehouse_id": None}
         context = scope_context(ParamScope.root(), fabric_context=fabric)
-        assert "fabric" not in context
+        assert context["fabric"] == {}
 
-    def test_runtime_param_overrides_fabric_context(self):
-        """Explicit runtime param overrides fabric context value."""
+    def test_runtime_fabric_key_binds_as_a_param(self):
+        """A runtime ``fabric`` key is a param binding, never the fabric namespace."""
         fabric = {"fabric.workspace_id": "ws-from-spark"}
         runtime = {"fabric": {"workspace_id": "ws-override"}}
-        context = scope_context(ParamScope.root(), runtime_params=runtime, fabric_context=fabric)
-        assert context["fabric"]["workspace_id"] == "ws-override"
-
-    def test_full_priority_chain_with_fabric(self):
-        """A runtime ``fabric`` mapping stands in for the Fabric context."""
-        fabric = {
-            "fabric.workspace_id": "ws-spark",
-            "fabric.lakehouse_id": "lh-spark",
-            "fabric.workspace_name": "wks-spark",
-        }
-        runtime = {"fabric": {"workspace_id": "ws-runtime"}, "env": "prod"}
-        context = scope_context(ParamScope.root(), runtime_params=runtime, fabric_context=fabric)
-        assert context["fabric"]["workspace_id"] == "ws-runtime"  # Runtime wins
-        assert "env" not in context
+        context = scope_context(ParamScope.root(runtime), fabric_context=fabric)
+        assert context["fabric"] == {"workspace_id": "ws-from-spark"}
+        assert context["param"] == runtime
 
     def test_fabric_context_none_param_no_error(self):
         """Passing None for fabric_context is valid and produces no fabric key."""
@@ -93,7 +84,7 @@ class TestScopeContext:
         """A runtime param named 'param' is one binding, not the namespace."""
         runtime = {"param": {"table": "OVERRIDE"}}
         scope = ParamScope.root(runtime).child(None, pins={"table": "ADR6"})
-        context = scope_context(scope, runtime_params=runtime)
+        context = scope_context(scope)
         assert context["param"]["table"] == "ADR6"
 
 
@@ -278,12 +269,19 @@ class TestFabricVariableResolution:
         assert result["lakehouse"] == "lh-xyz-456"
 
     def test_fabric_workspace_id_missing_raises(self):
-        """${fabric.workspace_id} with no fabric context raises VariableResolutionError."""
-        context = {}
+        """${fabric.workspace_id} a supplied fabric context lacks raises ``P110``."""
+        context = {"fabric": {}}
         config = {"workspace": "${fabric.workspace_id}"}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
-        assert "fabric.workspace_id" in str(exc_info.value)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P110"]
+
+    def test_fabric_reference_without_context_is_deferred(self):
+        """With no fabric namespace the reference stays in place, noted as ``P113``."""
+        deferred: list[Diagnostic] = []
+        config = {"workspace": "${fabric.workspace_id}"}
+        assert resolve_variables(config, {}, deferred=deferred) == config
+        assert [(d.code, d.pointer) for d in deferred] == [("P113", "/workspace")]
 
     def test_fabric_workspace_id_with_default_fallback(self):
         """${fabric.workspace_id:-fallback} uses default when fabric context absent."""
@@ -412,7 +410,7 @@ class TestDeclaredParamsAndDefaults:
         config_defaults = {"env": "dev"}
         runtime = {"workspace_id": "ws-1"}
         scope = ParamScope.root(runtime).child(param_specs)
-        context = scope_context(scope, runtime_params=runtime)
+        context = scope_context(scope)
         assert resolve_variables({"w": "${param.workspace_id}"}, context) == {"w": "ws-1"}
         ref_scope = ReferenceScope(declared=dict.fromkeys(scope.specs), defaults=config_defaults)
         with pytest.raises(VariableResolutionError) as exc_info:

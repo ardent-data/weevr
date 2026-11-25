@@ -26,6 +26,7 @@ from weevr.config.hydration import (
     hydrate_model,
 )
 from weevr.config.inheritance import apply_inheritance, check_defaults_shape
+from weevr.config.interpolation import check_fabric_context
 from weevr.config.locations import (
     ConfigLocation,
     LocalConfigLocation,
@@ -150,7 +151,9 @@ def resolve_config(
         project_root: Root for child references and Source paths. Defaults to
             the nearest folder above the file holding ``weevr.yaml``, else
             the file's directory.
-        fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+        fabric_context: The Fabric values for ``${fabric.x}``; ``None`` when
+            the load has none (each reference is then left in place, ``P113``).
+            See :func:`load_resolved`.
         require_typed_extension: Reject files without a ``.thread``, ``.weave``,
             or ``.loom`` extension instead of reading the kind from the envelope.
         project: The ``project_root``'s project document, when the caller
@@ -163,6 +166,8 @@ def resolve_config(
 
     Raises:
         ConfigError: Unsupported extension or a name/filename mismatch.
+        VariableResolutionError: A ``fabric_context`` key names no Fabric
+            value (``P112``).
         ConfigSchemaError: A declared param has no value (``P101``) or a value
             its type rejects (``P102``, ``P103``).
         VariableResolutionError: A variable has no value and no default, or
@@ -170,6 +175,7 @@ def resolve_config(
             param (``P120``) or the strict root is given an unused runtime
             param (``P121``).
     """
+    check_fabric_context(fabric_context)
     root, project = resolve_project_root(location, project_root, project)
     config_type, validated = load_document(
         location, require_typed_extension=require_typed_extension
@@ -206,12 +212,12 @@ def resolve_config(
         raise
 
     data = resolved
-    # Child files resolve without the Fabric context.
+    # Child files resolve with the root's Fabric context: one load, one session.
     children = resolve_references(
         resolved,
         config_type,
         root,
-        replace(walk, fabric_context=None),
+        walk,
         authored=config_dict,
         inline_scopes=inline_scopes,
     )
@@ -522,7 +528,9 @@ def load_resolved_config(
         project_root: Root for child references and Source paths. Defaults to
             the nearest folder above the file holding ``weevr.yaml``, else
             the file's directory.
-        fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+        fabric_context: The Fabric values for ``${fabric.x}``; ``None`` when
+            the load has none (each reference is then left in place, ``P113``).
+            See :func:`load_resolved`.
         project: The ``project_root``'s project document, when the caller
             already loaded it.
         strict_params: Overrides every document's ``strict_params:``; see
@@ -566,7 +574,9 @@ def collect_resolved_config(
         project_root: Root for child references and Source paths. Defaults to
             the nearest folder above the file holding ``weevr.yaml``, else
             the file's directory.
-        fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+        fabric_context: The Fabric values for ``${fabric.x}``; ``None`` when
+            the load has none (each reference is then left in place, ``P113``).
+            See :func:`load_resolved`.
         project: The ``project_root``'s project document, when the caller
             already loaded it.
         strict_params: Overrides every document's ``strict_params:``; see
@@ -603,6 +613,7 @@ def load_resolved(
     project_root: Path | ConfigLocation | None = None,
     *,
     strict_params: bool | None = None,
+    fabric_context: dict[str, Any] | None = None,
 ) -> Any:  # weevr.result.LoadedConfig; importing it here would close an import cycle
     """Load a thread, weave, or loom with its resolved child threads and weaves.
 
@@ -613,8 +624,6 @@ def load_resolved(
     threads, the load warnings, and the execution plan.
 
     Only ``.thread``, ``.weave``, and ``.loom`` files are accepted.
-    ``${fabric.x}`` references need a default here, since no Fabric context
-    is available.
 
     Args:
         path: The config file. Local paths are wrapped automatically; remote
@@ -632,6 +641,14 @@ def load_resolved(
             document sets ``strict_params: true``. ``None`` (the default)
             leaves each document's setting, most specific wins, absent is
             lenient.
+        fabric_context: The Fabric values ``${fabric.x}`` resolves from, keyed
+            ``workspace_id``, ``lakehouse_id`` and ``workspace_name`` (a
+            ``fabric.`` prefix is accepted). ``None`` (the default) means no
+            Fabric context: each ``${fabric.x}`` without a ``:-`` default is
+            left in place and warns ``P113``, an error under strict params. A
+            mapping, even an empty one, is the context: a key it lacks or
+            maps to ``None`` fails ``P110``. ``Context`` always passes the
+            values of its Spark session. Runtime params never supply them.
 
     Returns:
         A :class:`~weevr.result.LoadedConfig` with ``model``, ``document``
@@ -655,6 +672,7 @@ def load_resolved(
         make_location(path),
         runtime_params=runtime_params,
         project_root=root,
+        fabric_context=fabric_context,
         strict_params=strict_params,
     )
     for warning in render_diagnostics(warnings):

@@ -18,13 +18,8 @@ from typing import Any
 
 from weevr.config.assets import AssetKey, DeclaredAsset, upstream_readers, visible_assets
 from weevr.config.collect import errors_recorded, raise_or_record
-from weevr.config.interpolation import (
-    ReferenceScope,
-    fabric_namespace,
-    load_context,
-    param_name,
-    resolve_variables,
-)
+from weevr.config.interpolation import fabric_namespace, load_context, resolve_variables
+from weevr.config.interpolation_errors import ReferenceScope, param_name
 from weevr.config.params import (
     BindingReads,
     ParamScope,
@@ -94,9 +89,10 @@ class WalkState:
             warnings.
         strict_override: The load's ``strict_params`` argument, which beats
             every document; ``None`` when not given.
-        runtime_params: The invoker's runtime params; their ``fabric`` key
-            stands in for the Fabric context.
-        fabric_context: Fabric environment values for ``${fabric.x}``.
+        runtime_params: The invoker's runtime params.
+        fabric_context: The load's Fabric values for ``${fabric.x}``;
+            ``None`` when it has none (:func:`fabric_namespace`). The same for
+            every config of the load.
         reads: The bindings the load read, shared by the whole walk.
         undeclared: Undeclared references found, shared by the whole walk.
         warnings: Load warnings found, shared by the whole walk.
@@ -167,9 +163,7 @@ class WalkState:
     @cached_property
     def context(self) -> dict[str, Any]:
         """The load-time namespaces a reference in this scope reads."""
-        return scope_context(
-            self.scope, runtime_params=self.runtime_params, fabric_context=self.fabric_context
-        )
+        return scope_context(self.scope, fabric_context=self.fabric_context)
 
     def inline(
         self,
@@ -267,23 +261,22 @@ def resolve_config_variables(
 
 
 def scope_context(
-    scope: ParamScope,
-    *,
-    runtime_params: Mapping[str, Any] | None = None,
-    fabric_context: Mapping[str, Any] | None = None,
+    scope: ParamScope, *, fabric_context: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
     """The load-time namespaces a reference in ``scope`` reads.
 
+    Runtime params reach it only through the scope's bindings; they never
+    supply the ``fabric`` namespace.
+
     Args:
         scope: The param scope; its bound values are the ``param`` namespace.
-        runtime_params: Runtime parameters; their ``fabric`` key stands in for
-            the Fabric context.
-        fabric_context: Optional Fabric environment values.
+        fabric_context: The load's Fabric values; ``None`` when it has none
+            (:func:`fabric_namespace`).
 
     Returns:
         The context for :func:`resolve_variables`.
     """
-    return load_context(scope.values(), fabric_namespace(runtime_params, fabric_context))
+    return load_context(scope.values(), fabric_namespace(fabric_context))
 
 
 # The list each kind holds its children in, and the kind of those children.
@@ -297,17 +290,25 @@ def substitute(config: Any, walk: WalkState, at: tuple[str | int, ...] = ()) -> 
     and the walk's ``defaults:`` in force (:attr:`WalkState.defaults`). An
     unresolved reference's error names what the scope declares and the walk's
     trail of files. A bound reference to a name no declaration in the scope
-    chain covers is noted as undeclared.
+    chain covers is noted as undeclared. A ``${fabric.x}`` left in place for
+    a load with no Fabric context warns ``P113`` among the walk's warnings,
+    or, where the scope is strict, is an error raised or recorded
+    (:func:`raise_or_record`).
     """
     scope = walk.scope
     read_at: dict[str, str] = {}
+    deferred: list[Diagnostic] = []
     reference_scope = ReferenceScope(
         declared={name: spec.file for name, spec in scope.specs.items()},
         defaults=walk.defaults,
         trail=walk.trail,
+        strict=walk.strict,
     )
     resolved = resolve_variables(
-        config, walk.context, at=at, scope=reference_scope, read_at=read_at
+        config, walk.context, at=at, scope=reference_scope, read_at=read_at, deferred=deferred
+    )
+    walk.warnings.extend(
+        raise_or_record(deferred, file=walk.file, error_type=VariableResolutionError)
     )
     for key, pointer in read_at.items():
         name = param_name(key)
