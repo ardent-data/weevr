@@ -13,6 +13,7 @@ from weevr.engine.formatting import format_project as _format_project
 
 if TYPE_CHECKING:
     from weevr.config.document import ResolvedDocument
+    from weevr.config.manifest_types import ParamManifest
     from weevr.diagnostics import Diagnostic
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
@@ -101,6 +102,11 @@ class RunResult:
             ``None`` without one.
         project_root: The project root the run resolved against; ``None``
             when not populated.
+        param_manifest: The params the run's config takes, read from its
+            documents without binding values (validate mode only). Set
+            even when the load fails, as on a missing required param;
+            ``None`` outside validate mode or when a document cannot be
+            read.
     """
 
     __slots__ = (
@@ -120,6 +126,7 @@ class RunResult:
         "preview_metadata",
         "project",
         "project_root",
+        "param_manifest",
     )
 
     def __init__(
@@ -141,6 +148,7 @@ class RunResult:
         diagnostics: Sequence[Diagnostic] | None = None,
         project: Project | None = None,
         project_root: str | None = None,
+        param_manifest: ParamManifest | None = None,
     ) -> None:
         """Initialize a RunResult with execution outcome and telemetry."""
         self.status = status
@@ -161,6 +169,7 @@ class RunResult:
         self.preview_metadata = preview_metadata
         self.project = project
         self.project_root = project_root
+        self.param_manifest = param_manifest
 
     @property
     def validation_errors(self) -> list[str] | None:
