@@ -18,6 +18,10 @@ concrete.
   in YAML values are replaced with concrete values from params and the Fabric
   context. Default values use the `${param.x:-default}` syntax. Every
   reference names its namespace; a bare `${x}` fails at load.
+- **Param scopes** — Each loom, weave, and thread opens a param scope from
+  its parent's. Runtime params bind at the config you load and flow down;
+  an entry's `params:` pins values for the config it pulls in; a declared
+  `default` fills a name nobody supplied. See the [Params guide](params.md).
 - **Reference resolution** — `ref:` entries in weave and loom configs load
   child configuration files recursively. Circular references are detected
   and rejected.
@@ -48,7 +52,7 @@ structure: "Phase 1: Structure" {
 
 resolve: "Phase 2: Resolve" {
   style.fill: "#E8F5E9"
-  param_ctx: "5. Build param context"
+  param_ctx: "5. Open param scope"
   resolve_vars: "6. Resolve variables"
   resolve_refs: "7. Resolve references"
   param_ctx -> resolve_vars -> resolve_refs
@@ -82,24 +86,25 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 
 ### Stage 5–6: Resolve values
 
-- **Stage 5 — Build parameter context.** Each namespace resolves on its
-   own: `param.*` holds the scope's bound params (runtime parameters, entry
-   pins, declared defaults) and `fabric.*` the Fabric context; `defaults:`
-   values are not variables. The `param.*` namespace is populated from
-   either the loom/weave's own declared `params:` block (for
-   top-level loads only; child configs loaded via `ref:` do not
-   resolve their own `params:` block at this stage) or from a
-   `ThreadEntry`'s `params:` (for thread templates) — see
-   [Declared `params:` and the `${param.x}` namespace](#declared-params-and-the-paramx-namespace)
-   below and [Thread Templates](thread-templates.md). The
-   `${fabric.*}` namespace comes from the fabric layer. Dotted
-   keys like `${param.env.lakehouse}` support nested access.
+- **Stage 5 — Open the param scope.** Each config gets the values its
+   `${param.x}` references read. The config you load is the run root: its
+   scope binds the runtime parameters, then fills each name it declares in
+   `params:` and nobody supplied from the declared `default`. A required
+   declared param with no value fails with `P101`. Values bound for a
+   declared name are checked and coerced against its `type` (`P102`,
+   `P103`). The `${fabric.*}` namespace comes from the Fabric context, when
+   the load has one. `defaults:` values are not variables. The binding rules
+   are in the [Params guide](params.md#binding-precedence).
 - **Stage 6 — Resolve variables.** Recursively walk all values in the config and
    resolve `${param.x}` and `${fabric.x}` references. Whole-value
-   references return the native type; embedded references coerce to
-   string (see [Parameter resolution](#parameter-resolution) below).
+   references return the native type; embedded references render the
+   value's text (see [Parameter resolution](#parameter-resolution) below).
+   Dotted keys like `${param.env.lakehouse}` read into a mapping value.
    Unresolved variables without defaults raise
-   `VariableResolutionError`.
+   `VariableResolutionError` (`P110`). `${var.*}`, `${run.*}`, and the
+   hierarchy variables are left in place for execution (see
+   [Deferred variable namespaces](#deferred-variable-namespaces)). An inline
+   weave or thread resolves in a scope of its own, opened as in Stage 7.
 
 ### Stage 7: Load child configs
 
@@ -108,11 +113,18 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 - Loom → loads referenced weaves
 - Weave → loads referenced threads
 
-Each child is itself run through the full pipeline (recursion). A `visited`
+Each child is itself run through the full pipeline (recursion), in a param
+scope opened from its parent's. Values supplied above (runtime params, and
+pins on entries higher up) flow into the child unchanged; the entry's own
+`params:` pins beat them for the child's subtree; and the child's
+`params:` declarations add defaults, a child's re-declaration shadowing
+the parent's. The entry's pin values and its `condition` resolve in the
+parent's scope, where the entry is written. A `visited`
 set tracks loaded paths to detect circular references. Each child travels
 with the entry that pulled it in (`ref`, `as`, `params`, `dependencies`,
-`condition`), the file it is written in, and its config as written before
-variable substitution. Nothing is added to the config itself.
+`condition`), the file it is written in, its config as written before
+variable substitution, and where each of its param values came from (its
+provenance). Nothing is added to the config itself.
 
 ### Stage 8–9: Inherit and expand
 
@@ -200,15 +212,16 @@ A key the removed-key table lists fails with `C111` (removed) or `C112`
 `Context` executes; `load_config()` and `load_resolved()` inspect. All three
 run the same pipeline for `.thread`, `.weave`, and `.loom` files, so a typed
 config loads the same way through each. Two differences: only `load_config()`
-also accepts `.yaml` and params files, and only `Context` has a Fabric context,
-so the other two need a default for every `${fabric.*}` reference. Beyond that,
-the difference is what comes back and what's needed:
+also accepts `.yaml` and params files, and `Context` always has a Fabric
+context, read from the Spark session, while the other two have one only when
+you pass `fabric_context=`. Beyond that, the difference is what comes back and
+what's needed:
 
 | Entry point | Needs Spark | Returns |
 |---|---|---|
 | `Context.load()` | Yes | `LoadedConfig`, with `${fabric.*}` resolved |
-| `load_config()` | No | The `Thread`, `Weave`, or `Loom` model (or a params dict) |
-| `load_resolved()` | No | `LoadedConfig`, with the resolved config tree |
+| `load_config()` | No | The `Thread`, `Weave`, or `Loom` model (or a params dict); `${fabric.*}` resolved from `fabric_context=`, else left in place |
+| `load_resolved()` | No | `LoadedConfig`, with the resolved config tree; `${fabric.*}` as for `load_config()` |
 
 `load_resolved()` suits tools that check or plan configs outside the engine,
 such as a CLI or a CI step. When you load a bare file without `project_root`,
@@ -250,10 +263,13 @@ see those parents, so a name it doesn't define itself adds a warning to
 the lookup, but running it alone fails. A `resolve` step's `lookup` is stricter:
 it fails the load even when the thread is loaded on its own.
 
-Without Spark there is no Fabric context, so a `${fabric.*}` reference needs
-a default (`${fabric.workspace_id:-local}`) to load through `load_config()` or
-`load_resolved()`. Checks that read data, such as whether a source table
-exists, run only in `Context.run(mode="validate")`.
+Without Spark there is no Fabric context unless you pass one. With no
+`fabric_context=`, `load_config()` and `load_resolved()` leave each
+`${fabric.*}` reference that has no `:-` default in place and warn `P113`
+(an error under `strict_params`); pass `fabric_context={"workspace_id": ...}`
+to resolve them. See [Fabric values](params.md#fabric-values). Checks that
+read data, such as whether a source table exists, run only in
+`Context.run(mode="validate")`.
 
 !!! note
     `LoadedConfig.threads` and `.weaves` return the model's own entries
@@ -271,6 +287,7 @@ everything it pulls in, as a frozen tree. Each node has:
 | `kind` | `"thread"`, `"weave"`, or `"loom"` |
 | `name` | The effective name (`as`, else `name`, else the file stem) |
 | `entry` | An `EntryMeta` for the entry that pulled it in: `ref`, `alias` (`as`), `params`, `dependencies`, `condition`. `None` for the loaded file |
+| `provenance` | Where its values came from: `provenance.params` maps each param to its source (`runtime`, `pin`, `inherited`, `default`, or `fallback`), the winning declaration, and the pinning entry. Names and locations only, never values |
 | `children` | A loom's weaves or a weave's threads, by effective name, in entry order |
 | `source_ref` | The file it is written in: its own, or the file holding it inline |
 | `effective` | The `lookups`, `column_sets`, and `variables` it sees, merged over every enclosing scope |
@@ -297,7 +314,15 @@ weave models by name.
 | Module | Responsibility |
 |--------|----------------|
 | `config/parser.py` | YAML parsing, version extraction, typed extension detection |
-| `config/resolver.py` | Variable interpolation, reference loading, circular dependency detection |
+| `config/resolver.py` | Reference loading, circular dependency detection |
+| `config/scoping.py` | Scoped variable resolution: opens each config's param scope and each `ref:` entry's child scope; strictness |
+| `config/params.py` | Param scopes and binding precedence, type coercion, and the param warnings (`P120`–`P123`) |
+| `config/param_provenance.py` | The provenance records: where each param's value came from, without values |
+| `config/interpolation.py` | `${...}` namespaces and substitution; the Fabric context |
+| `config/interpolation_errors.py` | The diagnostics a reference fails or is deferred with (`P110`–`P113`), with their hints |
+| `config/assets.py` | Registry assets as declared, for the pin check (`P122`) |
+| `config/manifest.py` | `param_manifest()`: the params a config takes, read without values |
+| `config/manifest_types.py` | `ParamManifest` and `ManifestParam` |
 | `config/inheritance.py` | Three-level cascade: loom → weave → thread, including the named registry merge (`cascade_registry`) |
 | `config/validation.py` | Pre-resolution schema validation; dimension override checks (run during load, before the cascade); lookup and column set reference checks (run during hydration); incremental cross-field checks (run at the end of the load, on every thread) |
 | `config/document.py` | The resolved config tree: `ResolvedDocument`, `EntryMeta`, and each node's registries |
@@ -332,9 +357,10 @@ ISO 8601 UTC timestamp and `${run.id}` is a UUID4, both generated once per
 `execute_thread()` call. They are available in audit column expressions and
 export path templates.
 
-The hierarchy variables are deferred only when the parameter context doesn't supply
-them and no `:-default` is given; an unknown property such as `${thread.nme}` still
-fails at load.
+The hierarchy variables are deferred only when no `:-default` is given; with
+one, the default is used at load. An unknown property such as `${thread.nme}`
+still fails at load (`P112`). `${var.*}` and `${run.*}` references are left in
+place whole, unchecked at load.
 
 ## Design decisions
 
@@ -381,8 +407,10 @@ optional_param: ${param.value}
 
 ### Embedded resolution
 
-When `${param.x}` appears inside a larger string, standard string interpolation
-applies. The resolved value is coerced to string and substituted in place.
+When `${param.x}` appears inside a larger string, the value's text is
+substituted in place. A string keeps the text as supplied, whatever its
+declared type: `"007"` declared `int` embeds as `007`. A boolean embeds as
+`true` or `false`, and any other value as its string form.
 
 ```yaml
 alias: "SAP.${param.table_name}"
@@ -400,14 +428,15 @@ Use whole-value references when you need null pass-through.
 The `${param.x:-default}` fallback syntax always returns the default as
 a **string**, even in a whole-value position. For example,
 `limit: ${param.max_rows:-100}` returns the string `"100"` when `max_rows`
-is missing — not the integer `100`. To use a typed default, supply
-the parameter value explicitly at runtime rather than relying on the
-inline `:-` fallback.
+is missing — not the integer `100`. To use a typed default, declare the
+param with a `type` and a `default` rather than relying on the inline `:-`
+fallback.
 
 ### Declared `params:` and the `${param.x}` namespace
 
-A loom or weave that declares a `params:` block exposes each declared
-name under the `${param.x}` namespace, scoped to that file:
+A loom, weave, or thread that declares a `params:` block exposes each
+declared name under the `${param.x}` namespace, in that config and every
+config below it:
 
 ```yaml
 # silver.loom
@@ -433,38 +462,19 @@ connections:
     lakehouse: "lh-${param.region}"      # default → "lh-eastus"
 ```
 
-Per-param resolution precedence:
+Declared params cascade: a declaration covers the config it is in and every
+weave and thread below it, so a `${param.workspace_id}` in any of the loom's
+weaves or threads reads the loom's declaration. A child that declares the same name again
+shadows the parent's declaration, and its own `default` wins over the
+parent's. Runtime values supplied via `Context(params=...)` or
+`load_config(runtime_params=...)` beat every default; a `ref:` entry's
+`params:` pins beat runtime values for that entry's subtree.
 
-1. Runtime value supplied via `Context(params=...)` or
-   `load_config(runtime_params=...)`.
-2. The `default` declared on the `ParamSpec`.
-3. `ConfigSchemaError` if the param is `required: true`.
-
-Declared params in a loom or weave are reachable as `${param.x}` only
-**within the same file's scope**, and only when the file is loaded at
-the top level (via `load_config(...)`, `ctx.load(...)`, or `ctx.run(...)`). Two
-related limitations follow from this:
-
-1. **Cross-scope inheritance** — child weaves and threads do not
-   automatically inherit a parent loom's declared params; a reference
-   to `${param.x}` in a child without a local declaration raises a
-   `VariableResolutionError`.
-2. **Child-config own-scope** — a weave that declares its own
-   `params:` and is loaded as a child via a parent loom's `ref:` does
-   not have that `params:` block wired into `${param.x}` either. The
-   fix that wires declared `params:` into the `${param.x}` namespace
-   applies only to top-level loads, not to child configs resolved
-   during reference-loading.
-
-Cross-scope cascade and child-config own-scope wiring are planned
-follow-ups; until then, declare the param in each top-level scope that
-references it, or use `${var.x}` for cascading values (`defaults:`
-values are not variables).
-
-`${param.x}` references inside a thread template instantiated via
-`ThreadEntry.params` (the `as:` + `params:` form on a weave's `threads:`
-list) are unaffected by this rule — they resolve from the entry's
-params block as before.
+Per name, a scope's value is the first of: the entry's pin, a value supplied
+above, the nearest declared default, the reference's `:-` fallback. A required
+param left with none fails with `P101`. The full rules, with the type
+coercion table, `strict_params`, and the warnings for undeclared and unused
+params, are in the [Params guide](params.md).
 
 ---
 
@@ -474,3 +484,5 @@ params block as before.
   reference for all config models
 - [Thread, Weave, Loom](../concepts/thread-weave-loom.md) — The three-level
   hierarchy and inheritance model
+- [Params](params.md) — How params bind, pins, declarations, and the
+  namespaces

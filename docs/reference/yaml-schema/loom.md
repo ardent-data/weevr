@@ -16,7 +16,8 @@ runtime settings that cascade down through weaves to threads.
 | `qualified_key` | `string` | -- | set by loader | Read-only. The loom file's path relative to the project root (for example `looms/nightly.loom`). Populated at load; not set in YAML. |
 | `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave entries: `ref` for an external file, or `name` plus a weave body for an inline weave. A bare `name` with no body fails with `C313`. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
-| `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
+| `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations for this loom and every weave and thread in it. See the [Params guide](../../guides/params.md). |
+| `strict_params` | `bool` | no | `null` | `true` makes `P120` and `P113` errors for references in this loom and everything below it; each reference follows the nearest setting, and unset inherits. `P121` is judged once per load: this setting makes it an error only when this loom is the config you load. See [Params guide: Strict params](../../guides/params.md#strict-params). |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`, `capture_samples`. Merges field-level with weave blocks (weave-set fields win). See the [Execution Settings guide](../../guides/execution-settings.md). |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to weaves and threads |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. Column sets can read their mapping table via a loom-level `connections:` entry — see [Connections guide: Column sets via connections](../../guides/connections.md#column-sets-via-connections). See [Weave schema: column_sets](weave.md#column_sets) for field details. |
@@ -59,7 +60,8 @@ weaves:
 |-----|------|----------|---------|-------------|
 | `ref` | `string` | no | `null` | Path to an external `.weave` file, relative to the project root. Mutually exclusive with an inline weave body. |
 | `name` | `string` | no | `""` | Weave name, unique within the loom. Without `ref`, names the inline weave. With `ref`, overrides the name taken from the filename stem. |
-| `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
+| `params` | `dict[string, any]` | no | `null` | With `ref`, values pinned for the weave and every thread under it: resolved in the loom's scope, they beat runtime params. On an inline weave, the weave's own `ParamSpec` declarations. See [Params guide: Pins](../../guides/params.md#pins). |
+| `condition` | `ConditionSpec` | no | `null` | Conditional execution gate. Its `${param.x}` references resolve in the loom's scope. |
 
 ### weaves.condition (ConditionSpec)
 

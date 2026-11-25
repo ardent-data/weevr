@@ -97,6 +97,7 @@ nav:
       - Execution Settings: guides/execution-settings.md
       - Engine Internals: guides/engine-internals.md
       - Config Resolution: guides/config-resolution.md
+      - Params: guides/params.md
       - Telemetry Architecture: guides/telemetry-architecture.md
       - Exports: guides/exports.md
       - Audit Templates: guides/audit-templates.md

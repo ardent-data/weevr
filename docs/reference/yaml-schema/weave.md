@@ -21,7 +21,8 @@ runtime settings.
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps executed before any thread runs |
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps executed after all threads complete |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
-| `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
+| `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations for this weave and every thread in it. A declaration here shadows the loom's declaration of the same name. See the [Params guide](../../guides/params.md). |
+| `strict_params` | `bool` | no | `null` | `true` makes `P120` and `P113` errors for references in this weave and everything below it; each reference follows the nearest setting, and unset inherits. `P121` is judged once per load: this setting makes it an error only when this weave is the config you load. See [Params guide: Strict params](../../guides/params.md#strict-params). |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`, `capture_samples`. Explicitly set fields override the loom's. See the [Execution Settings guide](../../guides/execution-settings.md). |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to threads |
 | `audit_templates` | `dict[string, AuditTemplate]` | no | `null` | Named audit column templates cascaded to all threads in this weave. Thread-level definitions override weave-level definitions with the same name. A flat `dict[string, string]` shorthand is also accepted. See [Audit Templates guide](../../guides/audit-templates.md). |
@@ -44,9 +45,9 @@ no `ref` and no thread body (only `name`, `as`, `params`, `dependencies`, or
 | `ref` | `string` | no | `null` | Path to an external `.thread` file, relative to the project root. Mutually exclusive with inline `name`. |
 | `name` | `string` | no | `""` | Thread name. Required for inline definitions; derived from filename stem when using `ref`. |
 | `as` | `string` | no | `null` | Alias overriding the thread's effective name. Required when the same `ref` appears multiple times. See [Thread Templates guide](../../guides/thread-templates.md). |
-| `params` | `dict[string, any]` | no | `null` | Key-value pairs injected into the thread's `${param.x}` namespace for this entry. See [Thread Templates guide](../../guides/thread-templates.md). |
+| `params` | `dict[string, any]` | no | `null` | With `ref`, values pinned for the thread under `${param.x}`: resolved in the weave's scope, they beat runtime params. On an inline thread, the thread's own `ParamSpec` declarations. See [Thread Templates guide](../../guides/thread-templates.md) and [Params guide: Pins](../../guides/params.md#pins). |
 | `dependencies` | `list[string]` | no | `null` | Explicit upstream thread names. Merged with auto-inferred dependencies from source/target path matching. |
-| `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
+| `condition` | `ConditionSpec` | no | `null` | Conditional execution gate. Its `${param.x}` references resolve in the weave's scope. |
 
 ### threads.condition (ConditionSpec)
 

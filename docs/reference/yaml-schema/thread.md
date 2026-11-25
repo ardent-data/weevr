@@ -29,7 +29,8 @@ Threads can be used as **parameterized templates** via `as` and `params` on
 | `assertions` | `list[Assertion]` | no | `null` | Post-execution assertions on the target |
 | `load` | `LoadConfig` | no | `null` | Incremental load and watermark settings |
 | `tags` | `list[string]` | no | `null` | Free-form tags for filtering and organization |
-| `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations |
+| `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations. See [params](#params). |
+| `strict_params` | `bool` | no | `null` | `true` makes `P120` and `P113` errors for references in this thread; each reference follows the nearest setting, and unset inherits. `P121` is judged once per load: this setting makes it an error only when this thread is the config you load. See [Params guide: Strict params](../../guides/params.md#strict-params). |
 | `defaults` | `dict[string, any]` | no | `null` | Default values inherited by nested structures |
 | `failure` | `FailureConfig` | no | `null` | Per-thread failure handling policy |
 | `execution` | `ExecutionConfig` | no | `null` | Declared but **not applied** at thread scope (a run-start warning names the unapplied fields). Declare execution settings on the loom or weave top level instead. |
@@ -1463,7 +1464,12 @@ execution:
 ## params
 
 Typed parameter declarations. Parameters can be referenced in expressions using
-`${param.name}` syntax.
+`${param.name}` syntax. Declaring is optional: an undeclared reference still
+binds from a runtime param or an entry pin, but warns `P120`. A declaration
+type-checks and coerces the value, supplies a default, and fails the load with
+`P101` when a required param has no value. A thread's declaration shadows the
+same name declared on its weave or loom. How values bind, and the coercion
+table, are in the [Params guide](../../guides/params.md).
 
 Each entry maps a parameter name to a `ParamSpec`:
 
@@ -1471,8 +1477,8 @@ Each entry maps a parameter name to a `ParamSpec`:
 |-----|------|----------|---------|-------------|
 | `name` | `string` | yes | -- | Parameter name |
 | `type` | `string` | yes | -- | Data type: `"string"`, `"int"`, `"float"`, `"bool"`, `"date"`, `"timestamp"`, `"list[string]"` |
-| `required` | `bool` | no | `true` | Whether the parameter must be supplied at runtime |
-| `default` | `any` | no | `null` | Default value when not supplied |
+| `required` | `bool` | no | `true` | Whether the parameter must have a value. A required param with no `default` must be supplied, by runtime params or an entry pin |
+| `default` | `any` | no | `null` | Default value when nothing supplies one, coerced to `type` |
 | `description` | `string` | no | `""` | Human-readable description |
 
 ```yaml
@@ -1589,9 +1595,15 @@ at multiple levels, the most-specific level wins.
 | `default_schema` | `string` | no | `null` | Default schema for tables in this connection. Can be overridden per-source or per-target with `schema:`. |
 
 `${fabric.workspace_id}`, `${fabric.lakehouse_id}`, and
-`${fabric.workspace_name}` are injected at runtime from the
+`${fabric.workspace_name}` are read at load from the
 active Fabric session. Using these variables makes a connection
-portable across environments without changing GUIDs.
+portable across environments without changing GUIDs. Runtime params
+never supply them; see [Params guide: Fabric values](../../guides/params.md#fabric-values).
+
+A connection resolves its `${param.x}` references in the scope of the
+config that declares it. A pin on a weave's thread entry does not change a
+connection the weave declares; declare the connection again in the thread
+to use the pinned value.
 
 See the [Connections guide](../../guides/connections.md) for cross-lakehouse
 examples, schema overrides, and migration patterns.

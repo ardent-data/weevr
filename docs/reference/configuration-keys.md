@@ -149,6 +149,7 @@ The top-level configuration unit for a single data pipeline.
 | `load` | `LoadConfig` | `None` | Incremental load settings |
 | `tags` | `list[str]` | `None` | Free-form tags |
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
+| `strict_params` | `bool` | `None` | Make `P120` and `P113` errors for references in this config and below (nearest setting wins, unset inherits). `P121` follows only the loaded config's setting. See [Params](../guides/params.md#strict-params). |
 | `defaults` | `dict[str, Any]` | `None` | Inherited defaults |
 | `failure` | `FailureConfig` | `None` | Failure handling policy |
 | `execution` | `ExecutionConfig` | `None` | Declared but not applied at thread scope (warned) |
@@ -468,14 +469,15 @@ Per-thread failure handling policy.
 
 ## ParamSpec
 
-Typed parameter declaration.
+Typed parameter declaration. How values bind and how each `type` coerces
+them is in the [Params guide](../guides/params.md#type-coercion).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `name` | `str` | *required* | Parameter name |
 | `type` | `str` | *required* | Data type: `string`, `int`, `float`, `bool`, `date`, `timestamp`, `list[string]` |
-| `required` | `bool` | `True` | Whether the parameter must be supplied |
-| `default` | `Any` | `None` | Default value |
+| `required` | `bool` | `True` | Whether the parameter must have a value; with no `default` and nothing supplied, the load fails with `P101` |
+| `default` | `Any` | `None` | Default value, coerced to `type`; the nearest declaration's default wins |
 | `description` | `str` | `""` | Human-readable description |
 
 ---
@@ -606,6 +608,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 | `post_steps` | `list[HookStep]` | `None` | Hook steps run after threads |
 | `defaults` | `dict[str, Any]` | `None` | Default values cascaded to threads |
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
+| `strict_params` | `bool` | `None` | Make `P120` and `P113` errors for references in this config and below (nearest setting wins, unset inherits). `P121` follows only the loaded config's setting. See [Params](../guides/params.md#strict-params). |
 | `execution` | `ExecutionConfig` | `None` | Runtime settings; field-level merge with the loom block |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded to threads |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets for bulk rename |
@@ -619,7 +622,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 | `name` | `str` | `""` | Thread name (required for inline definitions) |
 | `ref` | `str` | `None` | Path to an external `.thread` file |
 | `as` | `str` | `None` | Alias overriding the thread's effective name. Required when the same `ref` appears more than once. |
-| `params` | `dict[str, Any]` | `None` | Values injected into the thread's `${param.x}` namespace for this entry |
+| `params` | `dict[str, Any]` | `None` | On a `ref:` entry, values pinned for the thread under `${param.x}`; resolved in the weave's scope, they beat runtime params. On an inline thread, its own `ParamSpec` declarations. See [Params](../guides/params.md#pins). |
 | `dependencies` | `list[str]` | `None` | Explicit upstream thread names |
 | `condition` | `ConditionSpec` | `None` | Conditional execution gate |
 
@@ -643,6 +646,7 @@ Deployment unit grouping one or more weaves.
 | `weaves` | `list[WeaveEntry]` | *required* | Weave references |
 | `defaults` | `dict[str, Any]` | `None` | Default values cascaded to weaves and threads |
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
+| `strict_params` | `bool` | `None` | Make `P120` and `P113` errors for references in this config and below (nearest setting wins, unset inherits). `P121` follows only the loaded config's setting. See [Params](../guides/params.md#strict-params). |
 | `execution` | `ExecutionConfig` | `None` | Runtime settings; weave blocks override field-level |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded down |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets cascaded to weaves |
@@ -659,6 +663,7 @@ Deployment unit grouping one or more weaves.
 |-------|------|---------|-------------|
 | `name` | `str` | `""` | Weave name (required for inline definitions) |
 | `ref` | `str` | `None` | Path to an external `.weave` file |
+| `params` | `dict[str, Any]` | `None` | On a `ref:` entry, values pinned for the weave and every thread under it; resolved in the loom's scope, they beat runtime params. On an inline weave, its own `ParamSpec` declarations. See [Params](../guides/params.md#pins). |
 | `condition` | `ConditionSpec` | `None` | Conditional execution gate |
 
 ---

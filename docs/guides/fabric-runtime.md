@@ -174,7 +174,31 @@ result = ctx.run("nightly.loom")
 ```
 
 This pattern lets the same YAML configs run in any environment by swapping
-the runtime parameters.
+the runtime parameters. Declare the names in a `params:` block on the loom or
+weave to type-check them and fail early when one is missing; an undeclared
+reference still binds but warns `P120`. The binding rules are in the
+[Params guide](params.md).
+
+### Workspace and lakehouse of the session
+
+`${fabric.workspace_id}`, `${fabric.lakehouse_id}`, and
+`${fabric.workspace_name}` read where the notebook is running. `Context`
+takes them from the Spark session, so a connection written with them follows
+the workspace it runs in:
+
+```yaml
+connections:
+  local:
+    type: onelake
+    workspace: ${fabric.workspace_id}
+    lakehouse: ${fabric.lakehouse_id}
+```
+
+These values come only from the session; runtime params never supply them.
+When the session lacks one, a reference without a `:-` fallback fails with
+`P110`. Loading a config outside Fabric with `load_config()` or
+`load_resolved()` leaves the references in place and warns `P113`, unless you
+pass `fabric_context=`; see [Fabric values](params.md#fabric-values).
 
 ## Workspace and capacity considerations
 

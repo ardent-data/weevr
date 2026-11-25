@@ -277,6 +277,10 @@ block as a `ParamSpec`, with the key's value as its `default`:
   `1e3` (not a float in YAML 1.1), gives `string`. A date or timestamp written
   without quotes (`2024-01-01`) is quoted in the `default` and typed `string`, as
   v1 substituted its text.
+- An embedded reference to a boolean renders as written, `true` or `false`.
+  v1 rendered `True` or `False`, so text built from a v1 boolean default
+  changes case: with `dry_run: false`, `dry-${dry_run}` gave `dry-False` in v1,
+  and its migrated `dry-${param.dry_run}` gives `dry-false`.
 - Only a one-line scalar, or a one-line list of strings, in a block `defaults:` is
   converted, and only when the document's root `params:` is absent or a block
   mapping. Any other key, such as a flow mapping, a block list or a null, is not

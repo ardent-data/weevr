@@ -12,8 +12,8 @@ A **template** is a regular `.thread` file that uses
 `${param.x}` references instead of hard-coded values.
 
 A **ThreadEntry** in a weave references the template with
-`ref`, assigns a unique alias with `as`, and passes
-values via `params`:
+`ref`, assigns a unique alias with `as`, and pins
+values for it via `params`:
 
 ```yaml
 # silver.weave
@@ -68,13 +68,21 @@ and display output.
 
 ## Parameter resolution
 
-Parameters are resolved in two phases:
+An entry's `params:` are **pins**: values bound for the
+referenced thread that beat runtime params and declared
+defaults within it. A name the entry doesn't pin falls
+through to the usual order: a value supplied above
+(runtime params), then the nearest declared default. See
+[Binding precedence](params.md#binding-precedence).
+
+Pins are resolved in two phases:
 
 1. **Expression resolution** -- `${param.x}` expressions
-   in ThreadEntry `params` values are resolved against
-   the parent context (weave defaults, runtime params).
-2. **Injection** -- Resolved values are injected into the
-   thread's parameter context under the `param` namespace.
+   in ThreadEntry `params` values are resolved in the
+   weave's scope: the weave's runtime params, pins from
+   the loom entry above it, and declared defaults.
+2. **Binding** -- Resolved values are bound in the
+   thread's param scope under the `param` namespace.
 
 This means you can compose parameters:
 
@@ -88,7 +96,43 @@ threads:
 ```
 
 Here `${param.env}` resolves from runtime params or the weave's declared
-params before `target_schema` is injected into the thread.
+params before `target_schema` is bound in the thread. An entry's
+`condition` resolves in the weave's scope too.
+
+Pins apply to `ref:` entries. On an inline thread, `params:`
+holds the thread's own declarations (`ParamSpec`s), not
+pins.
+
+### Pinning a weave from a loom
+
+A loom's weave entries take `params:` too. A pin there
+binds the value for the weave and every thread under it:
+
+```yaml
+# nightly.loom
+weaves:
+  - ref: silver.weave
+    name: silver_emea
+    params:
+      region: emea
+  - ref: silver.weave
+    name: silver_apac
+    params:
+      region: apac
+```
+
+A pin on a thread entry inside the weave beats the loom's
+pin for that thread.
+
+### Registry assets are not retargeted
+
+A connection, lookup, column set, audit template, or
+variable declared in the weave resolves its `${param.x}`
+references in the weave's scope. A pin on a thread entry
+does not change it, and the load warns `P122`. To use the
+pinned value, declare the asset again under the same name
+in the template thread. See
+[Registry assets](params.md#registry-assets-resolve-where-they-are-declared).
 
 ## Validation
 
@@ -96,8 +140,9 @@ params before `target_schema` is injected into the thread.
   appears twice without `as`, a `ConfigError` is raised.
 - **Duplicate effective name** -- Two entries that resolve
   to the same effective name raise a `ConfigError`.
-- **Unused params** -- Entry params not consumed by the
-  thread config emit a warning with source attribution.
+- **Unused pins** -- A pin nothing in the thread reads
+  or declares warns `P123`, naming the entry and file.
+  Both pin warnings stay warnings under `strict_params`.
 
 ## Telemetry
 
@@ -115,7 +160,11 @@ appears in:
   too -- it simply overrides the thread name.
 - Thread-level `params:` declarations (typed parameters)
   are not required for templates, but they document the
-  expected interface and enable IDE validation.
-- Running a template standalone (without a weave) raises
-  a `VariableResolutionError` for unresolved `${param.x}`
-  references, helping identify misconfigured templates.
+  expected interface, type-check and coerce each pinned
+  value, and list the template's params in the param
+  manifest. A pin on an undeclared name binds; when the
+  thread reads it, the reference warns `P120`, and when
+  nothing reads it, the pin warns `P123`.
+- Running a template standalone (without a weave) fails
+  for each `${param.x}` nothing supplies: `P101` for a
+  required declared param, `P110` for an undeclared one.
