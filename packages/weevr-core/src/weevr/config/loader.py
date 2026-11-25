@@ -34,16 +34,15 @@ from weevr.config.locations import (
     make_location,
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
-from weevr.config.params import ParamScope
+from weevr.config.params import ParamScope, ScopePositions
 from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
     ResolvedChild,
-    ScopePositions,
-    resolve_config_variables,
     resolve_references,
     validate_params,
 )
 from weevr.config.root import find_project_root, read_project
+from weevr.config.scoping import resolve_config_variables
 from weevr.config.validation import (
     dimension_override_diagnostics,
     execution_scope_diagnostics,

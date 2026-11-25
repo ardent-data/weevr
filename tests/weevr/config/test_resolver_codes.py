@@ -13,6 +13,7 @@ from weevr.config import load_config
 from weevr.config.attribution import attribute_errors
 from weevr.config.audit_templates import resolve_template_columns
 from weevr.config.inheritance import check_defaults_shape
+from weevr.config.interpolation import resolve_variables
 from weevr.config.loader import resolve_config
 from weevr.config.locations import LocalConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
@@ -20,7 +21,6 @@ from weevr.config.resolver import (
     resolve_declared_params,
     resolve_ref_path,
     resolve_references,
-    resolve_variables,
     validate_params,
 )
 from weevr.diagnostics import Diagnostic, Severity

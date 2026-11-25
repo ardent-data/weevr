@@ -175,9 +175,49 @@ class ParamScope:
                 )
         return ParamScope(bindings=bindings, specs=effective)
 
+    def open_child(
+        self,
+        specs: Mapping[str, Any] | None,
+        *,
+        file: str | None,
+        at: tuple[str | int, ...] = (),
+        pins: Mapping[str, Any] | None = None,
+        reads: BindingReads | None = None,
+    ) -> ParamScope:
+        """Open the child scope declaring ``specs``, with ``pins`` already resolved.
+
+        Like :meth:`child`, and each declared name's binding counts as read in
+        ``reads``: a pin that satisfies a declaration is consumed. Declared
+        defaults bind exactly as written.
+
+        Args:
+            specs: The document's own ``params:``; ``None`` when it declares none.
+            file: The document's file, named by any error at a declaration.
+            at: Where the document sits in ``file``.
+            pins: Values the referencing entry binds, already resolved in this scope.
+            reads: Receives the declared bindings; ``None`` to record nothing.
+
+        Returns:
+            The child scope.
+
+        Raises:
+            ConfigSchemaError: See :meth:`child`.
+        """
+        opened = self.child(specs, file=file, at=at, pins=pins)
+        if reads is not None:
+            for name in specs or {}:
+                binding = opened.bindings.get(name)
+                if binding is not None:
+                    reads.note(binding)
+        return opened
+
     def values(self) -> dict[str, Any]:
         """The bound values by name, for the ``param`` namespace."""
         return {name: binding.value for name, binding in self.bindings.items()}
+
+
+ScopePositions = dict[tuple[str | int, ...], ParamScope]
+"""The param scope opened for each inline child, by where the child sits in its file."""
 
 
 class BindingReads:
@@ -275,3 +315,44 @@ def missing_parameter(
         pointer=json_pointer((*at, "params", name)),
         hint=f"Pass a value for '{name}' at run time, or give it a default.",
     )
+
+
+def unconsumed_pins(
+    pins: Mapping[str, Any] | None,
+    scope: ParamScope,
+    reads: BindingReads,
+    *,
+    entry_name: str,
+    file: str | None,
+    at: tuple[str | int, ...],
+) -> list[Diagnostic]:
+    """``P123`` for each pin of the entry at ``at`` that nothing beneath it read.
+
+    A pin is consumed when its binding is read by a ``${param.x}`` reference
+    in the entry's subtree (a nested entry's pin value included) or satisfies
+    a ``params:`` declaration there. A nearer pin for the same name makes its
+    own binding, so a pin every reader shadows is unconsumed.
+
+    Args:
+        pins: The entry's resolved pins.
+        scope: The child scope the entry opened, holding the pins' bindings.
+        reads: The bindings read beneath the entry.
+        entry_name: The entry's name, for the message.
+        file: The file holding the entry.
+        at: Where the entry sits in ``file``.
+
+    Returns:
+        One warning per unconsumed pin, in pin order.
+    """
+    return [
+        diagnostic(
+            "P123",
+            f"Entry '{entry_name}' pins parameter '{name}', which nothing beneath it reads "
+            "or declares",
+            file=file,
+            pointer=json_pointer((*at, "params", name)),
+            hint=f"Remove the pin, or reference it as ${{param.{name}}} below the entry.",
+        )
+        for name in pins or {}
+        if not reads.was_read(scope.bindings[name])
+    ]

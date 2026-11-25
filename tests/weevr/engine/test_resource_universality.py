@@ -6,7 +6,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from spark_helpers import create_delta_table
-from weevr.config.resolver import resolve_variables
+from weevr.config.interpolation import resolve_variables
 from weevr.engine import build_plan, execute_loom, execute_weave
 from weevr.engine.executor import execute_thread
 from weevr.model.lookup import Lookup

@@ -2,24 +2,35 @@
 
 import re
 from collections import Counter
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from weevr.config.audit_templates import HIERARCHY_CONTEXT_KEYS
-from weevr.config.collect import recorded, skip_on_error
+from weevr.config.collect import skip_on_error
+from weevr.config.interpolation import build_param_context
 from weevr.config.locations import ConfigLocation
-from weevr.config.params import BindingReads, ParamScope, missing_parameter, spec_field
+from weevr.config.params import (
+    BindingReads,
+    ParamScope,
+    ScopePositions,
+    missing_parameter,
+    spec_field,
+)
 from weevr.config.parser import TYPED_EXTENSIONS
+from weevr.config.scoping import (
+    enter_child,
+    is_inline_thread,
+    is_inline_weave,
+    resolve_scoped,
+    substitute,
+)
 from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import (
     ConfigError,
     ConfigSchemaError,
     ReferenceResolutionError,
-    VariableResolutionError,
 )
 
 
@@ -49,59 +60,6 @@ class ResolvedChild:
     authored: dict[str, Any] | None = None
     children: list["ResolvedChild"] = field(default_factory=list)
     at: tuple[str | int, ...] = ()
-
-
-def build_param_context(
-    runtime_params: dict[str, Any] | None = None,
-    config_defaults: dict[str, Any] | None = None,
-    fabric_context: dict[str, Any] | None = None,
-    entry_params: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Build parameter context with proper priority layering.
-
-    Priority order (highest to lowest):
-    1. runtime_params
-    2. entry_params (nested under ``param`` key for ``${param.x}`` access)
-    3. config_defaults
-    4. fabric_context
-
-    Args:
-        runtime_params: Runtime parameter overrides.
-        config_defaults: Default parameters from config.
-        fabric_context: Fabric environment values keyed as ``fabric.<field>``
-            (e.g. ``fabric.workspace_id``). None values are omitted. Lowest
-            priority — overridden by config_defaults and runtime_params.
-        entry_params: ThreadEntry-level parameters injected under the
-            ``param`` namespace for ``${param.x}`` dotted-key resolution.
-
-    Returns:
-        Merged parameter context dictionary with dotted key access support.
-    """
-    context: dict[str, Any] = {}
-
-    # Layer 4: Fabric context (lowest priority)
-    if fabric_context:
-        fabric_dict = {
-            k.split(".", 1)[1]: v
-            for k, v in fabric_context.items()
-            if v is not None and k.startswith("fabric.")
-        }
-        if fabric_dict:
-            context["fabric"] = fabric_dict
-
-    # Layer 3: Config defaults
-    if config_defaults:
-        context.update(config_defaults)
-
-    # Layer 2: Entry params (under "param" namespace)
-    if entry_params:
-        context["param"] = entry_params
-
-    # Layer 1: Runtime params (highest priority)
-    if runtime_params:
-        context.update(runtime_params)
-
-    return context
 
 
 def resolve_declared_params(
@@ -191,194 +149,6 @@ def resolve_declared_params(
     return resolved
 
 
-def _get_dotted_value(context: dict[str, Any], key: str) -> Any:
-    """Get value from context using dotted key notation.
-
-    Args:
-        context: Parameter context dictionary
-        key: Dotted key path (e.g., 'env.lakehouse')
-
-    Returns:
-        Value at the dotted path
-
-    Raises:
-        KeyError: If the dotted path doesn't exist
-    """
-    parts = key.split(".")
-    value = context
-
-    for part in parts:
-        if isinstance(value, dict) and part in value:
-            value = value[part]
-        else:
-            raise KeyError(key)
-
-    return value
-
-
-def _unresolved_variable_message(var_name: str, context: dict[str, Any]) -> str:
-    """Compose an unresolved-variable error message with sibling-name hints.
-
-    For ``${param.x}`` references, list the declared param names currently in
-    scope so a typo is obvious. For all other references, fall back to the
-    plain message.
-    """
-    base = f"Unresolved variable '${{{var_name}}}' with no default value"
-    if var_name.startswith("param."):
-        param_scope = context.get("param")
-        if isinstance(param_scope, dict) and param_scope:
-            available = ", ".join(sorted(param_scope.keys()))
-            return f"{base}. Available declared params: [{available}]"
-        return f"{base}. No declared params are in scope at this resolution site"
-    return base
-
-
-# Regex pattern for ${var} and ${var:-default}
-VARIABLE_PATTERN = re.compile(r"\$\{([^}:]+?)(?::-(.*?))?\}")
-
-# Matches a string that is entirely a single ${var} or ${var:-default} reference
-WHOLE_VALUE_PATTERN = re.compile(r"^\$\{([^}:]+?)(?::-(.*?))?\}$")
-
-
-def _resolved_at_execution(var_name: str) -> bool:
-    """Whether an unresolved ``${var_name}`` is left in place for execution time.
-
-    True for the hierarchy variables the execution-time resolver supplies
-    (``HIERARCHY_CONTEXT_KEYS``). Callers apply it only after the load-context
-    lookup and any ``:-default`` have missed, so configs that resolve at load
-    are unaffected.
-    """
-    return var_name in HIERARCHY_CONTEXT_KEYS
-
-
-def _unresolved(
-    var_name: str, context: dict[str, Any], at: tuple[str | int, ...]
-) -> VariableResolutionError:
-    """The error for a ``${var}`` with no value, pointing at the string that holds it."""
-    from weevr.config.validation import authored_path
-
-    message = _unresolved_variable_message(var_name, context)
-    return VariableResolutionError(
-        message,
-        config_key=var_name,
-        diagnostics=[diagnostic("P110", message, pointer=json_pointer(authored_path(at)))],
-    )
-
-
-def resolve_variables(
-    config: dict[str, Any] | list[Any] | str | Any,
-    context: dict[str, Any],
-    consumed_keys: set[str] | None = None,
-    at: tuple[str | int, ...] = (),
-) -> Any:
-    """Recursively resolve variable references in config.
-
-    Supports:
-    - ${var} - simple variable reference (error if not found)
-    - ${var:-default} - variable with fallback default
-
-    Left in place for execution time: ``${var.*}`` and ``${run.*}``, and the known
-    hierarchy variables (``${thread.name}``, ``${weave.name}``, ``${loom.name}``, and
-    the rest of ``HIERARCHY_CONTEXT_KEYS``) when the context doesn't supply them and no
-    default is given.
-
-    Args:
-        config: Config structure to resolve (dict, list, str, or primitive)
-        context: Parameter context for variable lookup
-        consumed_keys: Optional set to track which context keys were consumed
-            during resolution. When provided, each resolved dotted key is
-            added to the set for post-resolution unused-param analysis.
-        at: Where ``config`` sits in its file, so an unresolved variable can
-            point at the value that holds it.
-
-    Returns:
-        Config with all variables resolved
-
-    Raises:
-        VariableResolutionError: If variable not found and no default provided
-    """
-    if isinstance(config, dict):
-        return {
-            k: resolve_variables(v, context, consumed_keys, (*at, k)) for k, v in config.items()
-        }
-
-    elif isinstance(config, list):
-        return [
-            resolve_variables(item, context, consumed_keys, (*at, i))
-            for i, item in enumerate(config)
-        ]
-
-    elif isinstance(config, str):
-        # Whole-value check: if the entire string is a single ${param} reference,
-        # return the native Python type rather than stringifying it.
-        whole_match = WHOLE_VALUE_PATTERN.match(config.strip())
-        if whole_match:
-            var_name = whole_match.group(1).strip()
-            default_value = whole_match.group(2)
-
-            if not var_name.startswith(("var.", "run.")):
-                try:
-                    value = _get_dotted_value(context, var_name)
-                    if consumed_keys is not None:
-                        consumed_keys.add(var_name)
-                    return value
-                except KeyError as exc:
-                    if default_value is not None:
-                        return default_value
-                    if _resolved_at_execution(var_name):
-                        return config
-                    raise _unresolved(var_name, context, at) from exc
-            # var.* / run.* fall through to the existing sub() path below
-
-        # Find all variable references in the string
-        def replace_var(match: re.Match[str]) -> str:
-            var_name = match.group(1).strip()
-            default_value = match.group(2)
-
-            # Skip runtime variable namespaces — resolved later at execution time
-            if var_name.startswith(("var.", "run.")):
-                return match.group(0)
-
-            try:
-                # Try dotted key access first
-                value = _get_dotted_value(context, var_name)
-                if consumed_keys is not None:
-                    consumed_keys.add(var_name)
-                return str(value)
-            except KeyError as exc:
-                if default_value is not None:
-                    return default_value
-                if _resolved_at_execution(var_name):
-                    return match.group(0)
-                raise _unresolved(var_name, context, at) from exc
-
-        return VARIABLE_PATTERN.sub(replace_var, config)
-
-    else:
-        # Primitives (int, bool, None, etc.) pass through unchanged
-        return config
-
-
-# Keys an entry carries about its place in the parent, not about the child's body.
-_WEAVE_ENTRY_KEYS = frozenset({"name", "params", "condition"})
-_THREAD_ENTRY_KEYS = frozenset({"name", "as", "params", "dependencies", "condition"})
-
-
-def _has_inline_body(entry: Any, entry_keys: frozenset[str]) -> bool:
-    """Whether a child entry carries an inline body: no ``ref`` and a key beyond ``entry_keys``."""
-    return isinstance(entry, dict) and "ref" not in entry and bool(set(entry) - entry_keys)
-
-
-def _is_inline_weave(entry: Any) -> bool:
-    """Whether a loom weave entry carries an inline weave body."""
-    return _has_inline_body(entry, _WEAVE_ENTRY_KEYS)
-
-
-def _is_inline_thread(entry: Any) -> bool:
-    """Whether a weave thread entry carries an inline thread body."""
-    return _has_inline_body(entry, _THREAD_ENTRY_KEYS)
-
-
 def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionError:
     """A weave or thread entry that names a child but has neither ``ref`` nor a body."""
     return _reference_error(
@@ -387,204 +157,6 @@ def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionE
         pointer=pointer,
         hint=f"ref: {name}.{kind}",
     )
-
-
-ScopePositions = dict[tuple[str | int, ...], ParamScope]
-"""The param scope opened for each inline child, by where the child sits in its file."""
-
-
-def resolve_config_variables(
-    config: dict[str, Any],
-    config_type: str,
-    runtime_params: dict[str, Any] | None = None,
-    fabric_context: dict[str, Any] | None = None,
-    entry_params: dict[str, Any] | None = None,
-    *,
-    scope: ParamScope | None = None,
-    file: str | None = None,
-    inline_scopes: ScopePositions | None = None,
-) -> dict[str, Any]:
-    """Resolve variable references in a top-level config.
-
-    ``${param.x}`` resolves from ``scope``, the config's own param scope. An
-    inline child (a loom's inline weave, a weave's inline thread) opens its
-    own scope from its parent's, so its declared ``params:`` bind for it the
-    way a child file's do. The child's entry keys (``name``, ``condition``,
-    and a thread's ``as`` and ``dependencies``) belong to the parent and
-    resolve in the parent's scope. Bare names resolve from the runtime params
-    and the config's ``defaults``; an inline weave layers its own ``defaults``
-    over the loom's.
-
-    Args:
-        config: Schema-validated config dict.
-        config_type: The config kind (``"thread"``, ``"weave"``, ...).
-        runtime_params: Runtime parameter overrides.
-        fabric_context: Optional Fabric environment values.
-        entry_params: Values bound for ``${param.x}`` when no ``scope`` is
-            given (over the runtime params).
-        scope: The config's param scope. Defaults to the runtime params'
-            root scope with ``entry_params`` bound over it.
-        file: The config's file, named by errors at inline declarations.
-        inline_scopes: Filled with the scope opened for each inline child, so
-            :func:`resolve_references` reuses it rather than opening another.
-
-    Returns:
-        The config dict with variables resolved.
-
-    Raises:
-        VariableResolutionError: If a variable has no value and no default.
-        ConfigSchemaError: A required param declared by an inline child has
-            no value.
-    """
-    if scope is None:
-        scope = ParamScope.root(runtime_params).child(None, pins=entry_params)
-    return _resolve_scoped(
-        config,
-        config_type,
-        scope,
-        config.get("defaults"),
-        runtime_params=runtime_params,
-        fabric_context=fabric_context,
-        file=file,
-        inline_scopes=inline_scopes,
-    )
-
-
-# The list each kind holds its children in, and the kind of those children.
-_CHILD_LISTS = {"loom": ("weaves", "weave"), "weave": ("threads", "thread")}
-
-
-def _substitute(
-    config: Any,
-    context: dict[str, Any],
-    scope: ParamScope,
-    reads: BindingReads | None,
-    at: tuple[str | int, ...] = (),
-) -> Any:
-    """Resolve ``config`` in ``context``, noting each ``scope`` binding it read."""
-    consumed: set[str] = set()
-    resolved = resolve_variables(config, context, consumed, at)
-    if reads is not None:
-        for key in consumed:
-            namespace, _, rest = key.partition(".")
-            binding = scope.bindings.get(rest.split(".", 1)[0]) if namespace == "param" else None
-            if binding is not None:
-                reads.note(binding)
-    return resolved
-
-
-def _open_scope(
-    parent: ParamScope,
-    specs: Mapping[str, Any] | None,
-    *,
-    file: str | None,
-    at: tuple[str | int, ...] = (),
-    pins: Mapping[str, Any] | None = None,
-    reads: BindingReads | None = None,
-) -> ParamScope:
-    """Open ``parent``'s child scope declaring ``specs``, with ``pins`` already resolved.
-
-    Declared defaults bind exactly as written. Each declared name's binding
-    counts as read: a pin that satisfies a declaration is consumed.
-    """
-    child = parent.child(specs, file=file, at=at, pins=pins)
-    if reads is not None:
-        for name in specs or {}:
-            binding = child.bindings.get(name)
-            if binding is not None:
-                reads.note(binding)
-    return child
-
-
-def _resolve_scoped(
-    config: dict[str, Any],
-    config_type: str,
-    scope: ParamScope,
-    defaults: dict[str, Any] | None,
-    *,
-    runtime_params: dict[str, Any] | None,
-    fabric_context: dict[str, Any] | None,
-    file: str | None,
-    at: tuple[str | int, ...] = (),
-    reads: BindingReads | None = None,
-    inline_scopes: ScopePositions | None = None,
-) -> dict[str, Any]:
-    """Resolve ``config`` in ``scope``, each inline child in its own scope opened from it.
-
-    An inline child's entry keys resolve in ``scope``, its body in the child's.
-    """
-    context = build_param_context(
-        runtime_params, defaults, fabric_context=fabric_context, entry_params=scope.values()
-    )
-    key, child_type = _CHILD_LISTS.get(config_type, ("", ""))
-    entries = config.get(key) if key else None
-    if not isinstance(entries, list):
-        return _substitute(config, context, scope, reads, at)
-    is_inline = _is_inline_weave if config_type == "loom" else _is_inline_thread
-    inline = {i: entry for i, entry in enumerate(entries) if is_inline(entry)}
-    if not inline:
-        return _substitute(config, context, scope, reads, at)
-
-    # An inline child's own params: are its declarations, so they stay with the body.
-    entry_keys = (_WEAVE_ENTRY_KEYS if config_type == "loom" else _THREAD_ENTRY_KEYS) - {"params"}
-    shell = {**config, key: [None if i in inline else e for i, e in enumerate(entries)]}
-    resolved = _substitute(shell, context, scope, reads, at)
-    for i, entry in inline.items():
-        where = (*at, key, i)
-        child_defaults = defaults
-        if config_type == "loom":
-            own = entry.get("defaults")
-            child_defaults = {**(defaults or {}), **(own if isinstance(own, dict) else {})}
-        child_scope = _open_scope(scope, entry.get("params"), file=file, at=where, reads=reads)
-        if inline_scopes is not None:
-            inline_scopes[where] = child_scope
-        placement = _substitute(
-            {k: v for k, v in entry.items() if k in entry_keys}, context, scope, reads, where
-        )
-        body = _resolve_scoped(
-            {k: v for k, v in entry.items() if k not in entry_keys},
-            child_type,
-            child_scope,
-            child_defaults,
-            runtime_params=runtime_params,
-            fabric_context=fabric_context,
-            file=file,
-            at=where,
-            reads=reads,
-            inline_scopes=inline_scopes,
-        )
-        resolved[key][i] = {k: placement[k] if k in placement else body[k] for k in entry}
-    return resolved
-
-
-def _unconsumed_pins(
-    pins: Mapping[str, Any] | None,
-    scope: ParamScope,
-    reads: BindingReads,
-    *,
-    entry_name: str,
-    file: str | None,
-    at: tuple[str | int, ...],
-) -> list[Diagnostic]:
-    """``P123`` for each pin of the entry at ``at`` that nothing beneath it read.
-
-    A pin is consumed when its binding is read by a ``${param.x}`` reference
-    in the entry's subtree (a nested entry's pin value included) or satisfies
-    a ``params:`` declaration there. A nearer pin for the same name makes its
-    own binding, so a pin every reader shadows is unconsumed.
-    """
-    return [
-        diagnostic(
-            "P123",
-            f"Entry '{entry_name}' pins parameter '{name}', which nothing beneath it reads "
-            "or declares",
-            file=file,
-            pointer=json_pointer((*at, "params", name)),
-            hint=f"Remove the pin, or reference it as ${{param.{name}}} below the entry.",
-        )
-        for name in pins or {}
-        if not reads.was_read(scope.bindings[name])
-    ]
 
 
 def validate_params(
@@ -927,35 +499,6 @@ def resolve_ref_path(
     return resolved
 
 
-def _entry_pins(
-    entry: dict[str, Any],
-    parent_context: dict[str, Any] | None,
-    scope: ParamScope,
-    reads: BindingReads,
-    at: tuple[str | int, ...],
-) -> dict[str, Any] | None:
-    """A ``ref:`` entry's pins, resolved in its parent's scope; ``None`` when it pins none.
-
-    With no ``parent_context`` the pins were already resolved, with the rest of
-    the parent, by the variable pass, and are returned as they are.
-
-    Entries reach here unvalidated: a ``params:`` that is not a mapping is left
-    for the entry model to reject when the parent hydrates.
-    """
-    pins = entry.get("params")
-    if not pins or not isinstance(pins, dict):
-        return None
-    if parent_context is None:
-        return pins
-    return _substitute(pins, parent_context, scope, reads, (*at, "params"))
-
-
-def _errors_recorded() -> int:
-    """How many errors the active collecting load has recorded; 0 outside one."""
-    errors = recorded()
-    return len(errors) if errors is not None else 0
-
-
 def resolve_references(
     config: dict[str, Any],
     config_type: str,
@@ -1066,10 +609,19 @@ def resolve_references(
                     weave_path = resolve_ref_path(ref, project_root, ref_pointer)
                     visited[ref] = None
                     try:
-                        entry_at = (*at, "weaves", index)
-                        errors_before = _errors_recorded()
-                        pins = _entry_pins(entry, parent_context, env, reads, entry_at)
-                        with attribute_errors(weave_path):
+                        with (
+                            enter_child(
+                                entry,
+                                parent_context,
+                                env,
+                                reads,
+                                (*at, "weaves", index),
+                                warnings,
+                                file=file,
+                                alias_key="name",
+                            ) as entered,
+                            attribute_errors(weave_path),
+                        ):
                             child_type, validated = load_document(weave_path)
                             child_dict = validated.model_dump(exclude_unset=True)
 
@@ -1080,14 +632,8 @@ def resolve_references(
                             # Set qualified key
                             child_dict["qualified_key"] = ref
 
-                            weave_scope = _open_scope(
-                                env,
-                                child_dict.get("params"),
-                                file=str(weave_path),
-                                pins=pins,
-                                reads=reads,
-                            )
-                            resolved_child = _resolve_scoped(
+                            weave_scope = entered.open(child_dict, str(weave_path))
+                            resolved_child = resolve_scoped(
                                 child_dict,
                                 child_type,
                                 weave_scope,
@@ -1111,18 +657,6 @@ def resolve_references(
                                 reads=reads,
                                 pins_resolved=True,
                             )
-                        # A failure below the entry hides whether its pins were read.
-                        if _errors_recorded() == errors_before:
-                            warnings.extend(
-                                _unconsumed_pins(
-                                    pins,
-                                    weave_scope,
-                                    reads,
-                                    entry_name=entry.get("name") or child_dict["name"],
-                                    file=file,
-                                    at=entry_at,
-                                )
-                            )
                         children.append(
                             ResolvedChild(
                                 entry=entry,
@@ -1143,7 +677,7 @@ def resolve_references(
                         "Inline weave definition requires a 'name' field",
                         json_pointer((*at, "weaves", index)),
                     )
-                elif not _is_inline_weave(entry):
+                elif not is_inline_weave(entry):
                     # A bare name is not a reference: no file is loaded by name.
                     raise _name_only_entry(
                         "weave", entry["name"], json_pointer((*at, "weaves", index))
@@ -1165,9 +699,7 @@ def resolve_references(
                     # that skipped it gets the scope opened here instead.
                     weave_scope = (inline_scopes or {}).get(inline_at)
                     if weave_scope is None:
-                        weave_scope = _open_scope(
-                            env, inline.get("params"), file=file, at=inline_at
-                        )
+                        weave_scope = env.open_child(inline.get("params"), file=file, at=inline_at)
                     children.append(
                         ResolvedChild(
                             entry=entry,
@@ -1234,10 +766,19 @@ def resolve_references(
                     try:
                         # Entry params belong to this weave, so they resolve
                         # outside the referenced thread's attribution scope.
-                        entry_at = (*at, "threads", index)
-                        pins = _entry_pins(entry, parent_context, env, reads, entry_at)
-
-                        with attribute_errors(thread_path):
+                        with (
+                            enter_child(
+                                entry,
+                                parent_context,
+                                env,
+                                reads,
+                                (*at, "threads", index),
+                                warnings,
+                                file=file,
+                                alias_key="as",
+                            ) as entered,
+                            attribute_errors(thread_path),
+                        ):
                             child_type, validated = load_document(thread_path)
                             child_dict = validated.model_dump(exclude_unset=True)
 
@@ -1248,30 +789,13 @@ def resolve_references(
                             # Set qualified key
                             child_dict["qualified_key"] = ref
 
-                            thread_scope = _open_scope(
-                                env,
-                                child_dict.get("params"),
-                                file=str(thread_path),
-                                pins=pins,
-                                reads=reads,
-                            )
+                            thread_scope = entered.open(child_dict, str(thread_path))
                             context = build_param_context(
                                 runtime_params,
                                 child_dict.get("defaults"),
                                 entry_params=thread_scope.values(),
                             )
-                            resolved_child = _substitute(child_dict, context, thread_scope, reads)
-
-                        warnings.extend(
-                            _unconsumed_pins(
-                                pins,
-                                thread_scope,
-                                reads,
-                                entry_name=entry.get("as") or child_dict["name"],
-                                file=file,
-                                at=entry_at,
-                            )
-                        )
+                            resolved_child = substitute(child_dict, context, thread_scope, reads)
 
                         # Track effective name uniqueness
                         effective_name = (
@@ -1306,7 +830,7 @@ def resolve_references(
                         "Inline thread definition requires a 'name' field",
                         json_pointer((*at, "threads", index)),
                     )
-                elif not _is_inline_thread(entry):
+                elif not is_inline_thread(entry):
                     # A bare name is not a reference: no file is loaded by name.
                     raise _name_only_entry(
                         "thread", entry["name"], json_pointer((*at, "threads", index))

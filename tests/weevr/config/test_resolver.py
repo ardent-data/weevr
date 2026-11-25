@@ -12,10 +12,9 @@ from weevr.config.audit_templates import (
     AuditContext,
     resolve_context_variables,
 )
+from weevr.config.interpolation import build_param_context, resolve_variables
 from weevr.config.resolver import (
-    build_param_context,
     resolve_declared_params,
-    resolve_variables,
     validate_params,
 )
 from weevr.errors import ConfigSchemaError, VariableResolutionError
