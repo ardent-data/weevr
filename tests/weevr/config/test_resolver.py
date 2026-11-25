@@ -12,7 +12,7 @@ from weevr.config.audit_templates import (
     AuditContext,
     resolve_context_variables,
 )
-from weevr.config.interpolation import BareNames, resolve_variables
+from weevr.config.interpolation import ReferenceScope, resolve_variables
 from weevr.config.params import ParamScope
 from weevr.config.scoping import scope_context
 from weevr.errors import ConfigSchemaError, VariableResolutionError
@@ -414,9 +414,9 @@ class TestDeclaredParamsAndDefaults:
         scope = ParamScope.root(runtime).child(param_specs)
         context = scope_context(scope, runtime_params=runtime)
         assert resolve_variables({"w": "${param.workspace_id}"}, context) == {"w": "ws-1"}
-        names = BareNames(declared=frozenset(scope.specs), defaults=config_defaults)
+        ref_scope = ReferenceScope(declared=dict.fromkeys(scope.specs), defaults=config_defaults)
         with pytest.raises(VariableResolutionError) as exc_info:
-            resolve_variables({"lakehouse": "${env}"}, context, names=names)
+            resolve_variables({"lakehouse": "${env}"}, context, scope=ref_scope)
         assert [d.code for d in exc_info.value.diagnostics] == ["P111"]
         assert exc_info.value.diagnostics[0].expected == ("${param.env}",)
 

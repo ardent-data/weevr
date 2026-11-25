@@ -11,12 +11,15 @@ namespace, and an unknown namespace fails ``P112``.
 :func:`resolve_variables` substitutes ``${...}`` references against them.
 """
 
+import difflib
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from pathlib import PurePath
 from typing import Any
 
 from weevr.config.audit_templates import HIERARCHY_CONTEXT_KEYS
+from weevr.config.params import declaration_block
 from weevr.diagnostics import diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import VariableResolutionError
@@ -52,16 +55,41 @@ def param_name(reference: str) -> str | None:
 
 
 @dataclass(frozen=True)
-class BareNames:
-    """What a bare ``${x}`` reference is classified by, to give its rewrite.
+class ReferenceScope:
+    """The scope a reference resolves in, as its errors describe it.
+
+    A bare ``${x}`` is classified by it for its rewrite (``P111``), and an
+    unresolved ``${param.x}`` names what it declares and where (``P110``).
 
     Attributes:
-        declared: Param names declared in the reference's scope chain.
-        defaults: The ``defaults:`` block in force where the reference sits.
+        declared: Param names declared in the reference's scope chain, each
+            with its declaring file (``None`` when unknown).
+        defaults: The ``defaults:`` blocks in force where the reference sits,
+            the enclosing configs' included, the nearest's keys winning.
+        trail: The files from the load's root down to the referencing file.
     """
 
-    declared: frozenset[str] = frozenset()
+    declared: Mapping[str, str | None] = field(default_factory=dict)
     defaults: Mapping[str, Any] = field(default_factory=dict)
+    trail: tuple[str, ...] = ()
+
+    @property
+    def file(self) -> str | None:
+        """The referencing file: the last of :attr:`trail`; ``None`` when unknown."""
+        return self.trail[-1] if self.trail else None
+
+    def trail_from(self, file: str | None) -> tuple[str, ...]:
+        """The trail from ``file`` to the referencing file; empty when ``file`` is off it."""
+        if file in self.trail:
+            return self.trail[self.trail.index(file) :]
+        return ()
+
+    def shown(self, file: str) -> str:
+        """``file`` relative to the root file's folder when it sits under it, else as given."""
+        if not self.trail:
+            return file
+        path, root = PurePath(file), PurePath(self.trail[0]).parent
+        return str(path.relative_to(root)) if path.is_relative_to(root) else file
 
 
 def fabric_namespace(
@@ -164,12 +192,28 @@ def _pointer(at: tuple[str | int, ...]) -> str:
     return json_pointer(authored_path(at))
 
 
+# How close a name must be to one in scope to be suggested (difflib's ratio).
+_SUGGESTION_CUTOFF = 0.8
+
+
+def _nearest(name: str, candidates: Iterable[str]) -> str | None:
+    """The candidate closest to ``name``, when one is close enough to suggest."""
+    found = difflib.get_close_matches(name, sorted(candidates), n=1, cutoff=_SUGGESTION_CUTOFF)
+    return found[0] if found else None
+
+
+def _did_you_mean(suggestion: str | None) -> str:
+    """The hint's opening suggestion; empty without one."""
+    return "" if suggestion is None else f"Did you mean {suggestion}? "
+
+
 def _error(
     code: str,
     message: str,
     var_name: str,
     at: tuple[str | int, ...],
     *,
+    file: str | None = None,
     expected: list[str] | None = None,
     hint: str | None = None,
 ) -> VariableResolutionError:
@@ -177,15 +221,49 @@ def _error(
     return VariableResolutionError(
         message,
         config_key=var_name,
-        diagnostics=[diagnostic(code, message, pointer=_pointer(at), expected=expected, hint=hint)],
+        diagnostics=[
+            diagnostic(code, message, file=file, pointer=_pointer(at), expected=expected, hint=hint)
+        ],
     )
 
 
 def _unresolved(
-    var_name: str, context: dict[str, Any], at: tuple[str | int, ...]
+    var_name: str, context: dict[str, Any], scope: ReferenceScope, at: tuple[str | int, ...]
 ) -> VariableResolutionError:
-    """The ``P110`` error for a reference with no value, at the string that holds it."""
-    return _error("P110", _unresolved_variable_message(var_name, context), var_name, at)
+    """The ``P110`` error for a reference with no value, at the string that holds it.
+
+    A ``${param.x}`` error lists the names its scope binds and declares in
+    ``expected``, and its hint says how to bind ``x``: with a ``params:``
+    block to paste and a runtime value when nothing declares it, or with the
+    trail of files from its declaration down to the reference when something
+    does (none when the declaring file is unknown or off the walk's trail). A
+    name in scope close to ``x`` is suggested first.
+    """
+    message = _unresolved_variable_message(var_name, context)
+    name = param_name(var_name)
+    if name is None:
+        return _error("P110", message, var_name, at, file=scope.file)
+    params = context.get("param")
+    bound = set(params) if isinstance(params, dict) else set()
+    in_scope = bound | set(scope.declared)
+    expected = [f"${{param.{n}}}" for n in sorted(in_scope)] or None
+    hint = None
+    if name not in bound:
+        close = _nearest(name, in_scope - {name})
+        suggestion = _did_you_mean(None if close is None else f"${{param.{close}}}")
+        if name in scope.declared:
+            trail = " -> ".join(scope.shown(f) for f in scope.trail_from(scope.declared[name]))
+            where = f" (scope: {trail})" if trail else ""
+            hint = (
+                f"{suggestion}'{name}' is declared with no default and nothing supplies it"
+                f"{where}: supply a value at run time or give it a default."
+            )
+        else:
+            hint = (
+                f"{suggestion}Declare it:\n{declaration_block({name: None})}\n"
+                f'or supply it at run time: Context(spark, project, params={{"{name}": ...}}).'
+            )
+    return _error("P110", message, var_name, at, file=scope.file, expected=expected, hint=hint)
 
 
 def _with_fallback(reference: str, default_value: str | None) -> str:
@@ -198,7 +276,7 @@ def _bare(
     var_name: str,
     default_value: str | None,
     context: dict[str, Any],
-    names: BareNames,
+    scope: ReferenceScope,
     at: tuple[str | int, ...],
 ) -> VariableResolutionError:
     """The error for a reference whose first segment is not a namespace.
@@ -213,13 +291,13 @@ def _bare(
     supplied = isinstance(params, dict) and head in params
     original = _with_fallback(var_name, default_value)
     hint_extra = ""
-    if head in names.declared or supplied:
+    if head in scope.declared or supplied:
         namespace = "param"
-    elif head in names.defaults:
+    elif head in scope.defaults:
         namespace = "param"
         hint_extra = (
             f" '{head}' is a defaults: key, and defaults are not variables: declare it as a "
-            f"param with default {names.defaults[head]!r}."
+            f"param with default {scope.defaults[head]!r}."
         )
     elif dotted:
         return _unknown_namespace(var_name, original, at)
@@ -233,6 +311,7 @@ def _bare(
         f"Reference '{original}' names no namespace; write '{rewrite}'",
         var_name,
         at,
+        file=scope.file,
         expected=[rewrite],
         hint=f"Write {rewrite}.{hint_extra}",
     )
@@ -241,31 +320,48 @@ def _bare(
 def _unknown_namespace(
     var_name: str, original: str, at: tuple[str | int, ...]
 ) -> VariableResolutionError:
-    """The error for a reference in a namespace that does not exist."""
+    """The error for a reference in a namespace that does not exist.
+
+    The nearest namespace, when one is close, is suggested in the hint as the
+    rewritten reference (``${params.x}`` suggests ``${param.x}``).
+    """
     namespace = var_name.partition(".")[0]
+    close = _nearest(namespace, NAMESPACES)
+    rewrite = None if close is None else "${" + close + original[2 + len(namespace) :]
     return _error(
         "P112",
         f"Reference '{original}' uses unknown namespace '{namespace}'",
         var_name,
         at,
         expected=list(NAMESPACES),
-        hint="Start the reference with one of: " + ", ".join(NAMESPACES) + ".",
+        hint=_did_you_mean(rewrite)
+        + "Start the reference with one of: "
+        + ", ".join(NAMESPACES)
+        + ".",
     )
 
 
 def _unknown_hierarchy_key(
     var_name: str, original: str, at: tuple[str | int, ...]
 ) -> VariableResolutionError:
-    """The error for an unknown key in a hierarchy namespace (``${thread.nme}``)."""
+    """The error for an unknown key in a hierarchy namespace (``${thread.nme}``).
+
+    ``expected`` lists the namespace's known keys, the nearest first when one is close.
+    """
     namespace = var_name.partition(".")[0]
-    known = sorted(f"${{{k}}}" for k in HIERARCHY_CONTEXT_KEYS if k.startswith(f"{namespace}."))
+    keys = [k for k in HIERARCHY_CONTEXT_KEYS if k.startswith(f"{namespace}.")]
+    close = _nearest(var_name, keys)
+    known = sorted(f"${{{k}}}" for k in keys)
+    suggestion = None if close is None else f"${{{close}}}"
+    if suggestion is not None:
+        known = [suggestion, *(k for k in known if k != suggestion)]
     return _error(
         "P112",
         f"Reference '{original}' names no {namespace} variable",
         var_name,
         at,
         expected=known,
-        hint="Use one of: " + ", ".join(known) + ".",
+        hint=_did_you_mean(suggestion) + "Use one of: " + ", ".join(known) + ".",
     )
 
 
@@ -294,7 +390,7 @@ def _lookup(
     var_name: str,
     default_value: str | None,
     context: dict[str, Any],
-    names: BareNames,
+    scope: ReferenceScope,
     consumed_keys: set[str] | None,
     at: tuple[str | int, ...],
     read_at: dict[str, str] | None = None,
@@ -304,7 +400,7 @@ def _lookup(
     if not dotted and namespace in NAMESPACES:
         raise _namespace_without_key(var_name, _with_fallback(var_name, default_value), at)
     if not dotted or namespace not in NAMESPACES:
-        raise _bare(var_name, default_value, context, names, at)
+        raise _bare(var_name, default_value, context, scope, at)
     if namespace in _DEFERRED_NAMESPACES:
         return _KEEP
     if namespace in _HIERARCHY_NAMESPACES:
@@ -316,7 +412,7 @@ def _lookup(
     except KeyError as exc:
         if default_value is not None:
             return default_value
-        raise _unresolved(var_name, context, at) from exc
+        raise _unresolved(var_name, context, scope, at) from exc
     if consumed_keys is not None:
         consumed_keys.add(var_name)
     if read_at is not None and var_name not in read_at:
@@ -330,7 +426,7 @@ def resolve_variables(
     consumed_keys: set[str] | None = None,
     at: tuple[str | int, ...] = (),
     *,
-    names: BareNames | None = None,
+    scope: ReferenceScope | None = None,
     read_at: dict[str, str] | None = None,
 ) -> Any:
     """Recursively resolve variable references in config.
@@ -349,7 +445,8 @@ def resolve_variables(
             added to the set for post-resolution unused-param analysis.
         at: Where ``config`` sits in its file, so an unresolved variable can
             point at the value that holds it.
-        names: What a bare reference is classified by for its rewrite.
+        scope: The scope the references resolve in, which a bare
+            reference's rewrite and an unresolved reference's hint describe.
         read_at: Optional mapping filled with each resolved dotted key and
             the JSON pointer of the first string that read it.
 
@@ -361,17 +458,17 @@ def resolve_variables(
             value and no default (``P110``), a reference names no namespace
             (``P111``), or its namespace or hierarchy key is unknown (``P112``).
     """
-    if names is None:
-        names = BareNames()
+    if scope is None:
+        scope = ReferenceScope()
     if isinstance(config, dict):
         return {
-            k: resolve_variables(v, context, consumed_keys, (*at, k), names=names, read_at=read_at)
+            k: resolve_variables(v, context, consumed_keys, (*at, k), scope=scope, read_at=read_at)
             for k, v in config.items()
         }
 
     elif isinstance(config, list):
         return [
-            resolve_variables(item, context, consumed_keys, (*at, i), names=names, read_at=read_at)
+            resolve_variables(item, context, consumed_keys, (*at, i), scope=scope, read_at=read_at)
             for i, item in enumerate(config)
         ]
 
@@ -382,13 +479,13 @@ def resolve_variables(
         if whole_match:
             var_name = whole_match.group(1).strip()
             value = _lookup(
-                var_name, whole_match.group(2), context, names, consumed_keys, at, read_at
+                var_name, whole_match.group(2), context, scope, consumed_keys, at, read_at
             )
             return config if value is _KEEP else value
 
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1).strip()
-            value = _lookup(var_name, match.group(2), context, names, consumed_keys, at, read_at)
+            value = _lookup(var_name, match.group(2), context, scope, consumed_keys, at, read_at)
             return match.group(0) if value is _KEEP else str(value)
 
         return VARIABLE_PATTERN.sub(replace_var, config)

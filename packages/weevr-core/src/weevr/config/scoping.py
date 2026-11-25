@@ -19,7 +19,7 @@ from typing import Any
 from weevr.config.assets import AssetKey, DeclaredAsset, upstream_readers, visible_assets
 from weevr.config.collect import errors_recorded, raise_or_record
 from weevr.config.interpolation import (
-    BareNames,
+    ReferenceScope,
     fabric_namespace,
     load_context,
     param_name,
@@ -103,6 +103,9 @@ class WalkState:
         assets: The registry assets this config sees, by kind and name: its
             own declarations over every enclosing config's (a lower
             declaration shadows a higher one of the same kind and name).
+        trail: The files from the load's root down to :attr:`file`.
+        defaults: The ``defaults:`` blocks of this config and every enclosing
+            one, the nearest's keys winning.
     """
 
     scope: ParamScope
@@ -115,6 +118,8 @@ class WalkState:
     undeclared: UndeclaredParams = field(default_factory=UndeclaredParams)
     warnings: list[Diagnostic] = field(default_factory=list)
     assets: Mapping[AssetKey, DeclaredAsset] = field(default_factory=dict)
+    trail: tuple[str, ...] = ()
+    defaults: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
     def start(
@@ -155,6 +160,8 @@ class WalkState:
             fabric_context=fabric_context,
             reads=reads,
             assets=visible_assets({}, document, file),
+            trail=() if file is None else (file,),
+            defaults=_layered_defaults({}, document),
         )
 
     @cached_property
@@ -190,6 +197,7 @@ class WalkState:
             scope=scope,
             strict=strictness(body, self.strict, self.strict_override),
             assets=visible_assets(self.assets, written, self.file, at),
+            defaults=_layered_defaults(self.defaults, written),
         )
 
     def in_file(self, scope: ParamScope, document: Mapping[str, Any], file: str) -> "WalkState":
@@ -209,7 +217,15 @@ class WalkState:
             file=file,
             strict=strictness(document, self.strict, self.strict_override),
             assets=visible_assets(self.assets, document, file),
+            trail=(*self.trail, file),
+            defaults=_layered_defaults(self.defaults, document),
         )
+
+
+def _layered_defaults(above: Mapping[str, Any], document: Mapping[str, Any]) -> dict[str, Any]:
+    """``above`` with ``document``'s own ``defaults:`` over it; a non-mapping counts as none."""
+    own = document.get("defaults")
+    return {**above, **(own if isinstance(own, dict) else {})}
 
 
 def resolve_config_variables(
@@ -228,8 +244,8 @@ def resolve_config_variables(
     and a thread's ``as`` and ``dependencies``) belong to the parent and
     resolve in the parent's scope, as do a ``ref:`` entry's pins. A bare
     ``${x}`` fails with its rewrite, classified by the scope's declarations
-    and the config's ``defaults`` (an inline weave's own ``defaults``
-    layered over the loom's).
+    and the ``defaults`` in force (each config's own ``defaults`` layered over
+    its enclosing configs').
 
     Args:
         config: Schema-validated config dict.
@@ -247,9 +263,7 @@ def resolve_config_variables(
         ConfigSchemaError: A required param declared by an inline child has
             no value.
     """
-    return resolve_scoped(
-        config, config_type, walk, config.get("defaults"), inline_scopes=inline_scopes
-    )
+    return resolve_scoped(config, config_type, walk, inline_scopes=inline_scopes)
 
 
 def scope_context(
@@ -276,22 +290,25 @@ def scope_context(
 _CHILD_LISTS = {"loom": ("weaves", "weave"), "weave": ("threads", "thread")}
 
 
-def substitute(
-    config: Any,
-    walk: WalkState,
-    at: tuple[str | int, ...] = (),
-    defaults: Mapping[str, Any] | None = None,
-) -> Any:
+def substitute(config: Any, walk: WalkState, at: tuple[str | int, ...] = ()) -> Any:
     """Resolve ``config`` in ``walk``'s scope, noting each binding it read.
 
     A bare reference's rewrite is classified by the scope's declared params
-    and ``defaults``, the ``defaults:`` block in force. A bound reference to a
-    name no declaration in the scope chain covers is noted as undeclared.
+    and the walk's ``defaults:`` in force (:attr:`WalkState.defaults`). An
+    unresolved reference's error names what the scope declares and the walk's
+    trail of files. A bound reference to a name no declaration in the scope
+    chain covers is noted as undeclared.
     """
     scope = walk.scope
     read_at: dict[str, str] = {}
-    names = BareNames(declared=frozenset(scope.specs), defaults=defaults or {})
-    resolved = resolve_variables(config, walk.context, at=at, names=names, read_at=read_at)
+    reference_scope = ReferenceScope(
+        declared={name: spec.file for name, spec in scope.specs.items()},
+        defaults=walk.defaults,
+        trail=walk.trail,
+    )
+    resolved = resolve_variables(
+        config, walk.context, at=at, scope=reference_scope, read_at=read_at
+    )
     for key, pointer in read_at.items():
         name = param_name(key)
         if name is None:
@@ -311,7 +328,6 @@ def resolve_scoped(
     config: dict[str, Any],
     config_type: str,
     walk: WalkState,
-    defaults: dict[str, Any] | None,
     *,
     at: tuple[str | int, ...] = (),
     inline_scopes: ScopePositions | None = None,
@@ -323,35 +339,28 @@ def resolve_scoped(
     key, child_type = _CHILD_LISTS.get(config_type, ("", ""))
     entries = config.get(key) if key else None
     if not isinstance(entries, list):
-        return substitute(config, walk, at, defaults)
+        return substitute(config, walk, at)
     is_inline = is_inline_weave if config_type == "loom" else is_inline_thread
     inline = {i: entry for i, entry in enumerate(entries) if is_inline(entry)}
     if not inline:
-        return substitute(config, walk, at, defaults)
+        return substitute(config, walk, at)
 
     # An inline child's own params: are its declarations, so they stay with the body.
     entry_keys = (WEAVE_ENTRY_KEYS if config_type == "loom" else THREAD_ENTRY_KEYS) - {"params"}
     shell = {**config, key: [None if i in inline else e for i, e in enumerate(entries)]}
-    resolved = substitute(shell, walk, at, defaults)
+    resolved = substitute(shell, walk, at)
     for i, entry in inline.items():
         where = (*at, key, i)
-        child_defaults = defaults
-        if config_type == "loom":
-            own = entry.get("defaults")
-            child_defaults = {**(defaults or {}), **(own if isinstance(own, dict) else {})}
         child_scope = walk.scope.open_child(
             entry.get("params"), file=walk.file, at=where, reads=walk.reads
         )
         if inline_scopes is not None:
             inline_scopes[where] = child_scope
-        placement = substitute(
-            {k: v for k, v in entry.items() if k in entry_keys}, walk, where, defaults
-        )
+        placement = substitute({k: v for k, v in entry.items() if k in entry_keys}, walk, where)
         body = resolve_scoped(
             {k: v for k, v in entry.items() if k not in entry_keys},
             child_type,
             walk.inline(child_scope, entry, at=where),
-            child_defaults,
             at=where,
             inline_scopes=inline_scopes,
         )

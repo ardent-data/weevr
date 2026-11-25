@@ -370,9 +370,7 @@ def resolve_references(
                             child_dict["qualified_key"] = ref
 
                             weave_walk = entered.open(child_dict, str(weave_path))
-                            resolved_child = resolve_scoped(
-                                child_dict, child_type, weave_walk, child_dict.get("defaults")
-                            )
+                            resolved_child = resolve_scoped(child_dict, child_type, weave_walk)
 
                             grandchildren = resolve_references(
                                 resolved_child,
@@ -508,9 +506,7 @@ def resolve_references(
                             child_dict["qualified_key"] = ref
 
                             thread_walk = entered.open(child_dict, str(thread_path))
-                            resolved_child = substitute(
-                                child_dict, thread_walk, defaults=child_dict.get("defaults")
-                            )
+                            resolved_child = substitute(child_dict, thread_walk)
 
                         # Track effective name uniqueness
                         effective_name = (
