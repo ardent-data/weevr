@@ -558,6 +558,54 @@ class TestContextStrictParams:
         assert "P120" in {d.code for d in result.diagnostics}
 
 
+_MANIFEST_THREAD = """\
+config_version: "2.0"
+params:
+  x: {name: x, type: string}
+sources:
+  s: {type: delta, alias: raw.t}
+target:
+  alias: "out.${param.x}"
+"""
+
+
+class TestValidateParamManifest:
+    """Validate mode attaches the param manifest whether or not the load succeeds."""
+
+    @staticmethod
+    def _context(tmp_path: Path, params: dict[str, Any] | None = None) -> Context:
+        project = write_project(tmp_path / "manifest.weevr")
+        write_document(project / "t.thread", _MANIFEST_THREAD)
+        write_document(project / "w.weave", {"config_version": "2.0", "threads": [{"ref": "x"}]})
+        return Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
+
+    def test_set_when_the_load_succeeds(self, tmp_path: Path) -> None:
+        result = self._context(tmp_path, {"x": "a"}).run("t.thread", mode="validate")
+        assert "P101" not in {d.code for d in result.diagnostics}
+        assert result.param_manifest is not None
+        assert result.param_manifest.executable == "t"
+        assert result.param_manifest.invoker_required == ("x",)
+
+    def test_set_when_a_required_param_is_missing(self, tmp_path: Path) -> None:
+        result = self._context(tmp_path).run("t.thread", mode="validate")
+        assert result.status == "failure"
+        assert "P101" in {d.code for d in result.diagnostics}
+        assert result.param_manifest is not None
+        assert [p.name for p in result.param_manifest.declared] == ["x"]
+        assert result.param_manifest.invoker_required == ("x",)
+
+    def test_none_when_the_documents_cannot_be_read(self, tmp_path: Path) -> None:
+        result = self._context(tmp_path).run("w.weave", mode="validate")
+        assert result.status == "failure"
+        assert result.param_manifest is None
+
+    def test_not_set_outside_validate(self, tmp_path: Path) -> None:
+        result = RunResult(
+            status="success", mode=ExecutionMode.PLAN, config_type="t", config_name="t"
+        )
+        assert result.param_manifest is None
+
+
 _ATTR_THREAD = """\
 config_version: "2.0"
 sources:

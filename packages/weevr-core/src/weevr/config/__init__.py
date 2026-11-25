@@ -13,6 +13,8 @@ from weevr.config.loader import hydrate_resolved as _hydrate_resolved
 from weevr.config.loader import load_resolved
 from weevr.config.loader import resolve_config as _resolve_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
+from weevr.config.manifest import param_manifest
+from weevr.config.manifest_types import ManifestParam, ParamManifest
 from weevr.config.root import find_project_root
 from weevr.config.run_store import (
     RUN_STORE_TABLES,
@@ -29,6 +31,8 @@ __all__ = [
     "RUN_STORE_TABLES",
     "DiscoveredDocument",
     "EntryMeta",
+    "ManifestParam",
+    "ParamManifest",
     "ResolvedDocument",
     "RunStoreLocation",
     "ScopeRegistries",
@@ -37,6 +41,7 @@ __all__ = [
     "find_project_root",
     "load_config",
     "load_resolved",
+    "param_manifest",
     "resolve_run_store",
 ]
 

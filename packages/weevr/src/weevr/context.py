@@ -16,6 +16,8 @@ from weevr.config.collect import diagnostics_of
 from weevr.config.document import ScopeRegistries, registry_as_dict
 from weevr.config.loader import collect_resolved_config, load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
+from weevr.config.manifest import param_manifest
+from weevr.config.manifest_types import ParamManifest
 from weevr.config.onelake import resolve_connection_path
 from weevr.config.parser import TYPED_EXTENSIONS, declared_kind
 from weevr.config.root import PROJECT_FILE, project_root_not_found, read_project
@@ -339,7 +341,9 @@ class Context:
         Returns:
             A :class:`RunResult` describing the outcome. In ``"validate"``
             mode, every config problem — load, plan and source existence — is
-            in ``RunResult.diagnostics`` and nothing is raised for them.
+            in ``RunResult.diagnostics`` and nothing is raised for them, and
+            ``RunResult.param_manifest`` lists the params the config takes,
+            even when the load fails.
 
         Raises:
             ValueError: If *mode* is invalid or both *tags* and *threads*
@@ -359,6 +363,7 @@ class Context:
         start_ns = time.monotonic_ns()
         if resolved_mode is ExecutionMode.VALIDATE:
             result = self._with_project(self._validate(path))
+            result.param_manifest = self._param_manifest(path)
             result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
             return result
 
@@ -711,6 +716,17 @@ class Context:
                 warnings=[str(exc)],
                 diagnostics=[*errors, *loaded.diagnostics],
             )
+
+    def _param_manifest(self, path: str | Path) -> ParamManifest | None:
+        """The params *path* takes, read apart from the load so a failed load still has it.
+
+        Returns ``None`` when a document cannot be read; the load reports why.
+        """
+        try:
+            return param_manifest(self._resolve_config_path(path), project_root=self._project_root)
+        except ConfigError as exc:
+            logger.debug("No param manifest for %s: %s", path, exc)
+            return None
 
     def _run_validate(self, loaded: LoadedConfig, load_errors: list[Diagnostic]) -> RunResult:
         """Check the DAG and source existence of a loaded config, beside its load problems."""
