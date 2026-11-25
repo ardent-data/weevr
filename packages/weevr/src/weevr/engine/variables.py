@@ -10,6 +10,24 @@ from weevr.model.variable import VariableSpec
 
 _VAR_PATTERN = re.compile(r"\$\{var\.([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
+
+def param_text(value: Any) -> str:
+    """The text a ``${param.x}`` reference substituted at execution renders.
+
+    As at load: a bool renders as ``true`` or ``false``, as YAML writes it;
+    any other value, a supplied string included, by ``str()``.
+
+    Args:
+        value: The param's value.
+
+    Returns:
+        The text to substitute.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 # Maps VariableSpec type names to Python types for validation
 _TYPE_CASTERS: dict[str, type] = {
     "string": str,

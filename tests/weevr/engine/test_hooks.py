@@ -59,6 +59,16 @@ class TestResolveParams:
         result = _resolve_params("${param.a} and ${param.b}", {"a": "x", "b": "y"})
         assert result == "x and y"
 
+    def test_native_bool_renders_as_yaml_writes_it(self):
+        """A native bool renders true/false, as an embedded load-time reference does."""
+        result = _resolve_params("${param.a}/${param.b}", {"a": True, "b": False})
+        assert result == "true/false"
+
+    def test_supplied_text_is_kept(self):
+        """A supplied string renders exactly as supplied."""
+        result = _resolve_params("${param.a}/${param.b}", {"a": "TRUE", "b": "007"})
+        assert result == "TRUE/007"
+
 
 class TestResolveText:
     """Test combined var + param resolution."""

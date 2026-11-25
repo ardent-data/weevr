@@ -16,10 +16,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from documents import write_document
 from weevr.config import load_config, load_resolved
-from weevr.config.interpolation import resolve_variables
+from weevr.config.interpolation import _Rendered, resolve_variables
 from weevr.config.params import ParamScope
 from weevr.config.scoping import scope_context
 from weevr.diagnostics import Diagnostic
@@ -428,3 +429,52 @@ class TestEmbeddedText:
         resolved = load_resolved(path, runtime_params={"flag": "true"}, project_root=tmp_path)
         loom: Any = resolved.document.model
         assert loom.weaves[0].condition.when == "true == 'true'"
+
+
+def _wrapped(value: Any) -> list[Any]:
+    """Every rendered-text wrapper reachable from a hydrated model value."""
+    if isinstance(value, _Rendered):
+        return [value]
+    if isinstance(value, BaseModel):
+        return [w for name in type(value).model_fields for w in _wrapped(getattr(value, name))]
+    if isinstance(value, dict):
+        return [w for item in value.values() for w in _wrapped(item)]
+    if isinstance(value, (list, tuple)):
+        return [w for item in value for w in _wrapped(item)]
+    return []
+
+
+class TestPinsReadTheSuppliedText:
+    """A pin built from a reference reads the text embedded and the native value whole."""
+
+    def test_embedded_pin_gets_text_and_whole_pin_gets_value(self, tmp_path: Path) -> None:
+        thread_params = {
+            "a": {"name": "a", "type": "string"},
+            "b": {"name": "b", "type": "bool"},
+        }
+        body = {
+            **THREAD,
+            "params": thread_params,
+            "sources": {
+                "s": {"type": "delta", "alias": "raw.t", "options": {"flag": "${param.b}"}}
+            },
+            "target": {"alias": "out.${param.a}"},
+        }
+        write_document(tmp_path / "t.thread", body)
+        write_document(
+            tmp_path / "w.weave", {"config_version": "2.0", "threads": [{"ref": "t.thread"}]}
+        )
+        path = write_document(
+            tmp_path / "l.loom",
+            {
+                "config_version": "2.0",
+                "params": _spec("bool"),
+                "weaves": [{"ref": "w.weave", "params": {"a": "x_${param.p}", "b": "${param.p}"}}],
+            },
+        )
+        doc = load_resolved(path, runtime_params={"p": "TRUE"}, project_root=tmp_path).document
+        thread: Any = doc.children["w"].children["t"].model
+        assert thread.target.alias == "out.x_TRUE"
+        assert thread.sources["s"].options["flag"] is True
+        assert _wrapped(thread) == []
+        assert _wrapped(doc.model) == []

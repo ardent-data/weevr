@@ -30,11 +30,6 @@ class TestParamConditions:
         cond = ConditionSpec(when="${param.mode} != 'full'")
         assert evaluate_condition(cond, params={"mode": "full"}) is False
 
-    def test_condition_loaded_with_supplied_bool_text_is_true(self):
-        """A bool param's supplied text, substituted at load, compares as written."""
-        cond = ConditionSpec(when="true == 'true'")
-        assert evaluate_condition(cond) is True
-
     def test_native_bool_param_renders_as_yaml_writes_it(self):
         """A native bool param renders true/false, as an embedded load-time reference does."""
         cond = ConditionSpec(when="${param.flag} == 'true'")
