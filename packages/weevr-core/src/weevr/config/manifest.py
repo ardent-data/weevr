@@ -32,8 +32,7 @@ from weevr.config.manifest_types import ManifestParam, ParamManifest
 from weevr.config.params import DeclaredSpec
 from weevr.config.resolver import resolve_ref_path
 from weevr.config.scoping import (
-    THREAD_ENTRY_KEYS,
-    WEAVE_ENTRY_KEYS,
+    CHILD_LISTS,
     entry_pins,
     is_inline_thread,
     is_inline_weave,
@@ -41,14 +40,6 @@ from weevr.config.scoping import (
 from weevr.diagnostics.positions import json_pointer
 
 __all__ = ["param_manifest"]
-
-
-# The list each kind holds its children in, the children's kind, and the entry
-# keys that belong to the parent rather than to an inline child's body.
-_CHILD_LISTS = {
-    "loom": ("weaves", "weave", WEAVE_ENTRY_KEYS),
-    "weave": ("threads", "thread", THREAD_ENTRY_KEYS),
-}
 
 
 @dataclass(frozen=True)
@@ -81,7 +72,7 @@ class _Walk:
     ) -> None:
         """Walk one document (in its own file or inline) and its children."""
         scope = self._open(document.get("params"), parent, file, at)
-        key, child_kind, entry_keys = _CHILD_LISTS.get(kind, ("", "", frozenset()))
+        key, child_kind, entry_keys = CHILD_LISTS.get(kind, ("", "", frozenset()))
         entries = document.get(key) if key else None
         if not isinstance(entries, list):
             self._scan(document, scope)
@@ -141,7 +132,7 @@ class _Walk:
             self._declare(name, spec, declared[name], file, at)
         effective = {**parent.specs, **declared}
         for name, spec in effective.items():
-            if name not in parent.pinned and spec.required and spec.default is None:
+            if name not in parent.pinned and spec.needs_supply:
                 self.required.setdefault(name, None)
         return _Scope(effective, parent.pinned)
 

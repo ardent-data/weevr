@@ -338,8 +338,12 @@ def scope_context(
     return load_context(scope.values(), fabric_namespace(fabric_context))
 
 
-# The list each kind holds its children in, and the kind of those children.
-_CHILD_LISTS = {"loom": ("weaves", "weave"), "weave": ("threads", "thread")}
+# Per parent kind: the list holding its children, the children's kind, and the entry
+# keys that belong to the entry itself rather than to an inline child's body.
+CHILD_LISTS: dict[str, tuple[str, str, frozenset[str]]] = {
+    "loom": ("weaves", "weave", WEAVE_ENTRY_KEYS),
+    "weave": ("threads", "thread", THREAD_ENTRY_KEYS),
+}
 
 
 def substitute(config: Any, walk: WalkState, at: tuple[str | int, ...] = ()) -> Any:
@@ -406,7 +410,7 @@ def resolve_scoped(
 
     An inline child's entry keys resolve in ``walk``'s scope, its body in the child's.
     """
-    key, child_type = _CHILD_LISTS.get(config_type, ("", ""))
+    key, child_type, child_entry_keys = CHILD_LISTS.get(config_type, ("", "", frozenset()))
     entries = config.get(key) if key else None
     if not isinstance(entries, list):
         return substitute(config, walk, at)
@@ -416,7 +420,7 @@ def resolve_scoped(
         return substitute(config, walk, at)
 
     # An inline child's own params: are its declarations, so they stay with the body.
-    entry_keys = (WEAVE_ENTRY_KEYS if config_type == "loom" else THREAD_ENTRY_KEYS) - {"params"}
+    entry_keys = child_entry_keys - {"params"}
     shell = {**config, key: [None if i in inline else e for i, e in enumerate(entries)]}
     resolved = substitute(shell, walk, at)
     for i, entry in inline.items():

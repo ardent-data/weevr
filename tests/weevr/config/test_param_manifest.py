@@ -16,6 +16,8 @@ import pytest
 
 from documents import write_document
 from weevr.config import ManifestParam, ParamManifest, param_manifest
+from weevr.config.loader import collect_resolved_config
+from weevr.config.locations import LocalConfigLocation
 from weevr.errors import ConfigError
 
 THREAD: dict[str, Any] = {
@@ -327,3 +329,63 @@ class TestStructuralErrors:
         manifest = _manifest(path)
         assert [p.name for p in manifest.declared] == ["x"]
         assert manifest.invoker_required == ("x",)
+
+
+def _p101_names(path: Path) -> set[str]:
+    """The names a load with no runtime params reports ``P101`` for."""
+    _, errors, warnings = collect_resolved_config(
+        LocalConfigLocation(path), project_root=LocalConfigLocation(path.parent)
+    )
+    return {str(d.pointer).rsplit("/", 1)[-1] for d in [*errors, *warnings] if d.code == "P101"}
+
+
+class TestParityWithLoad:
+    """What the manifest asks the invoker for is what a bare load reports ``P101`` on."""
+
+    @pytest.mark.parametrize("open_tier", ["loom", "weave", "thread"])
+    def test_loom_tree_with_pin_default_and_one_unsatisfied(
+        self, tmp_path: Path, open_tier: str
+    ) -> None:
+        # A failed document ends the load's descent, so one tier is left open per run.
+        def open_spec(tier: str) -> dict[str, Any]:
+            return _specs(_spec(f"{tier}_open")) if tier == open_tier else {}
+
+        _write(
+            tmp_path,
+            "t.thread",
+            _thread(
+                params={
+                    **_specs(_spec("pinned"), _spec("defaulted", required=False, default="d")),
+                    **open_spec("thread"),
+                }
+            ),
+        )
+        _write(
+            tmp_path,
+            "w.weave",
+            _weave([{"ref": "t.thread", "params": {"pinned": "x"}}], params=open_spec("weave")),
+        )
+        path = _write(tmp_path, "l.loom", _loom([{"ref": "w.weave"}], params=open_spec("loom")))
+        expected = {f"{open_tier}_open"}
+        assert set(_manifest(path).invoker_required) == expected
+        assert _p101_names(path) == expected
+
+    def test_weave_entry_pin_satisfies_the_child(self, tmp_path: Path) -> None:
+        _write(tmp_path, "t.thread", _thread(params=_specs(_spec("a"), _spec("b"))))
+        path = _write(
+            tmp_path,
+            "w.weave",
+            _weave([{"ref": "t.thread", "params": {"a": "1"}}]),
+        )
+        assert set(_manifest(path).invoker_required) == {"b"}
+        assert _p101_names(path) == {"b"}
+
+    def test_defaults_satisfy_everywhere(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path,
+            "t.thread",
+            _thread(params=_specs(_spec("a", required=False, default="1"))),
+        )
+        path = _write(tmp_path, "w.weave", _weave([{"ref": "t.thread"}]))
+        assert _manifest(path).invoker_required == ()
+        assert _p101_names(path) == set()

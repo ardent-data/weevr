@@ -104,6 +104,11 @@ class DeclaredSpec:
     at: tuple[str | int, ...] = ()
     tier: ParamTier | None = None
 
+    @property
+    def needs_supply(self) -> bool:
+        """Whether a value must be supplied: the spec is required and has no default."""
+        return self.required and self.default is None
+
     @classmethod
     def read(
         cls,
