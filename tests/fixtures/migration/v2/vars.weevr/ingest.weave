@@ -1,0 +1,11 @@
+kind: weave
+config_version: "2.0"
+
+params:
+  region:
+    name: region
+    type: string
+    default: eastus
+
+threads:
+  - ref: threads/orders.thread

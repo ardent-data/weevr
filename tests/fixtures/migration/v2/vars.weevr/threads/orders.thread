@@ -1,0 +1,25 @@
+kind: thread
+config_version: "2.0"
+
+sources:
+  orders:
+    type: delta
+    # Comments are left alone.
+    alias: "${param.env}.orders_${param.region}"
+  landing:
+    type: csv
+    path: "Files/${param.storage.container}/${param.run_date}/orders_${param.batch_size}.csv"
+
+target:
+  alias: "gold.${fabric.workspace_name}_orders"
+  partition_by: "${param.partitions}"
+  audit_columns:
+    _loaded_by: "'${thread.name}'"
+
+tags:
+  - "${param.tier:-bronze}"
+  - "env-${param.env:-dev}"
+  - "since-${param.cutoff}"
+  - "lake-${fabric.lakehouse_id}"
+  - "${param.storage.region:-east}"
+  - "dry-${param.dry_run}"

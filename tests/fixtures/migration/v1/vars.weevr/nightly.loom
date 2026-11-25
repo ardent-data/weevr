@@ -1,0 +1,13 @@
+# Variable references: a loom whose defaults act as variables in v1.
+config_version: "1.0"
+
+defaults:
+  env: prod  # the environment the threads read
+  batch_size: 500
+  cutoff: 2024-01-01
+  partitions: [region, day]
+  retention_days: 30
+  dry_run: false
+
+weaves:
+  - ingest
