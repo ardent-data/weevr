@@ -35,7 +35,7 @@ def resolve_tree(
     Returns:
         The resolved children.
     """
-    walk = WalkState.start(config, file=None, runtime_params=runtime_params)
+    walk = WalkState.start(config, file=None, kind=config_type, runtime_params=runtime_params)
     if warnings is not None:
         walk = replace(walk, warnings=warnings)
     scopes: ScopePositions = {}

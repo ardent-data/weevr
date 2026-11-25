@@ -13,6 +13,7 @@ from pathlib import PurePath
 from typing import Any
 
 from weevr.config.audit_templates import HIERARCHY_CONTEXT_KEYS
+from weevr.config.param_provenance import ParamDeclaration
 from weevr.config.params import declaration_block
 from weevr.diagnostics import Diagnostic, Severity, diagnostic
 from weevr.diagnostics.positions import json_pointer
@@ -53,8 +54,8 @@ class ReferenceScope:
     unresolved ``${param.x}`` names what it declares and where (``P110``).
 
     Attributes:
-        declared: Param names declared in the reference's scope chain, each
-            with its declaring file (``None`` when unknown).
+        declared: The params declared in the reference's scope chain, by
+            name, each with where its effective spec is declared.
         defaults: The ``defaults:`` blocks in force where the reference sits,
             the enclosing configs' included, the nearest's keys winning.
         trail: The files from the load's root down to the referencing file.
@@ -62,7 +63,7 @@ class ReferenceScope:
             deferred ``${fabric.x}`` an error.
     """
 
-    declared: Mapping[str, str | None] = field(default_factory=dict)
+    declared: Mapping[str, ParamDeclaration] = field(default_factory=dict)
     defaults: Mapping[str, Any] = field(default_factory=dict)
     trail: tuple[str, ...] = ()
     strict: bool = False
@@ -185,7 +186,7 @@ def unresolved(
         close = _nearest(name, in_scope - {name})
         suggestion = _did_you_mean(None if close is None else f"${{param.{close}}}")
         if name in scope.declared:
-            trail = " -> ".join(scope.shown(f) for f in scope.trail_from(scope.declared[name]))
+            trail = " -> ".join(scope.shown(f) for f in scope.trail_from(scope.declared[name].file))
             where = f" (scope: {trail})" if trail else ""
             hint = (
                 f"{suggestion}'{name}' is declared with no default and nothing supplies it"

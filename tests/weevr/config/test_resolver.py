@@ -412,7 +412,10 @@ class TestDeclaredParamsAndDefaults:
         scope = ParamScope.root(runtime).child(param_specs)
         context = scope_context(scope)
         assert resolve_variables({"w": "${param.workspace_id}"}, context) == {"w": "ws-1"}
-        ref_scope = ReferenceScope(declared=dict.fromkeys(scope.specs), defaults=config_defaults)
+        ref_scope = ReferenceScope(
+            declared={n: s.declaration(n) for n, s in scope.specs.items()},
+            defaults=config_defaults,
+        )
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables({"lakehouse": "${env}"}, context, scope=ref_scope)
         assert [d.code for d in exc_info.value.diagnostics] == ["P111"]

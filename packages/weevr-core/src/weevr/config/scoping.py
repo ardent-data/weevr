@@ -20,6 +20,7 @@ from weevr.config.assets import AssetKey, DeclaredAsset, upstream_readers, visib
 from weevr.config.collect import errors_recorded, raise_or_record
 from weevr.config.interpolation import fabric_namespace, load_context, resolve_variables
 from weevr.config.interpolation_errors import ReferenceScope, param_name
+from weevr.config.param_provenance import ParamProvenance, ParamTier, PinEntry
 from weevr.config.params import (
     BindingReads,
     ParamScope,
@@ -72,6 +73,50 @@ def strictness(document: Mapping[str, Any], inherited: bool, override: bool | No
     return own if isinstance(own, bool) else inherited
 
 
+_TIERS: dict[str, ParamTier] = {"loom": "loom", "weave": "weave", "thread": "thread"}
+
+
+def param_tier(kind: str) -> ParamTier | None:
+    """The tier declarations in a config of ``kind`` record; ``None`` for other kinds."""
+    return _TIERS.get(kind)
+
+
+Position = tuple[str | None, tuple[str | int, ...]]
+"""A config's place in a load: its file and where it sits in that file."""
+
+
+class ScopeFallbacks:
+    """The names each config read through a ``${param.x:-d}`` fallback.
+
+    Kept by the config's position (file and place in it), so every walk state
+    of one config adds to the same names, and a scope opened again for the
+    same config reads them back. A file pulled in twice (two ``as`` entries)
+    shares one record: both read the same references, and each scope keeps
+    only the names it leaves unbound (:meth:`ParamScope.provenance`).
+    """
+
+    def __init__(self) -> None:
+        """Start with no fallback read."""
+        self._by_position: dict[Position, set[str]] = {}
+
+    def note(self, position: Position, names: set[str]) -> None:
+        """Record that references in the config at ``position`` read ``names`` by fallback."""
+        if names:
+            self._by_position.setdefault(position, set()).update(names)
+
+    def provenance(self, scope: ParamScope, position: Position) -> Mapping[str, ParamProvenance]:
+        """The param provenance of the config at ``position``, in ``scope``.
+
+        Args:
+            scope: The config's param scope.
+            position: The config's file and where it sits in that file.
+
+        Returns:
+            ``scope``'s provenance, its fallback reads included.
+        """
+        return scope.provenance(sorted(self._by_position.get(position, ())))
+
+
 @dataclass(frozen=True, eq=False)
 class WalkState:
     """What one config's resolution carries down the walk.
@@ -96,10 +141,13 @@ class WalkState:
         reads: The bindings the load read, shared by the whole walk.
         undeclared: Undeclared references found, shared by the whole walk.
         warnings: Load warnings found, shared by the whole walk.
+        fallbacks: Fallback reads by config position, shared by the whole walk.
         assets: The registry assets this config sees, by kind and name: its
             own declarations over every enclosing config's (a lower
             declaration shadows a higher one of the same kind and name).
         trail: The files from the load's root down to :attr:`file`.
+        at: Where this config sits in :attr:`file`; empty for a config in
+            its own file.
         defaults: The ``defaults:`` blocks of this config and every enclosing
             one, the nearest's keys winning.
     """
@@ -113,9 +161,11 @@ class WalkState:
     reads: BindingReads = field(default_factory=BindingReads)
     undeclared: UndeclaredParams = field(default_factory=UndeclaredParams)
     warnings: list[Diagnostic] = field(default_factory=list)
+    fallbacks: ScopeFallbacks = field(default_factory=ScopeFallbacks)
     assets: Mapping[AssetKey, DeclaredAsset] = field(default_factory=dict)
     trail: tuple[str, ...] = ()
     defaults: Mapping[str, Any] = field(default_factory=dict)
+    at: tuple[str | int, ...] = ()
 
     @classmethod
     def start(
@@ -123,6 +173,7 @@ class WalkState:
         document: Mapping[str, Any],
         *,
         file: str | None,
+        kind: str,
         runtime_params: Mapping[str, Any] | None = None,
         fabric_context: Mapping[str, Any] | None = None,
         strict_override: bool | None = None,
@@ -133,6 +184,7 @@ class WalkState:
             document: The root config; its ``params:`` declare the root scope
                 and its ``strict_params`` applies.
             file: The root config's file.
+            kind: The root config's kind, recorded on its declarations.
             runtime_params: The invoker's runtime params, bound above the root.
             fabric_context: Fabric environment values.
             strict_override: The load's ``strict_params`` argument.
@@ -145,7 +197,7 @@ class WalkState:
         """
         reads = BindingReads()
         scope = ParamScope.root(runtime_params).open_child(
-            document.get("params"), file=file, reads=reads
+            document.get("params"), file=file, reads=reads, tier=param_tier(kind)
         )
         return cls(
             scope=scope,
@@ -159,6 +211,11 @@ class WalkState:
             trail=() if file is None else (file,),
             defaults=_layered_defaults({}, document),
         )
+
+    @property
+    def provenance(self) -> Mapping[str, ParamProvenance]:
+        """Where this config's params came from; complete once its references resolved."""
+        return self.fallbacks.provenance(self.scope, (self.file, self.at))
 
     @cached_property
     def context(self) -> dict[str, Any]:
@@ -192,6 +249,7 @@ class WalkState:
             strict=strictness(body, self.strict, self.strict_override),
             assets=visible_assets(self.assets, written, self.file, at),
             defaults=_layered_defaults(self.defaults, written),
+            at=at,
         )
 
     def in_file(self, scope: ParamScope, document: Mapping[str, Any], file: str) -> "WalkState":
@@ -213,6 +271,7 @@ class WalkState:
             assets=visible_assets(self.assets, document, file),
             trail=(*self.trail, file),
             defaults=_layered_defaults(self.defaults, document),
+            at=(),
         )
 
 
@@ -297,15 +356,25 @@ def substitute(config: Any, walk: WalkState, at: tuple[str | int, ...] = ()) -> 
     """
     scope = walk.scope
     read_at: dict[str, str] = {}
+    fell_back: set[str] = set()
     deferred: list[Diagnostic] = []
     reference_scope = ReferenceScope(
-        declared={name: spec.file for name, spec in scope.specs.items()},
+        declared={name: spec.declaration(name) for name, spec in scope.specs.items()},
         defaults=walk.defaults,
         trail=walk.trail,
         strict=walk.strict,
     )
     resolved = resolve_variables(
-        config, walk.context, at=at, scope=reference_scope, read_at=read_at, deferred=deferred
+        config,
+        walk.context,
+        at=at,
+        scope=reference_scope,
+        read_at=read_at,
+        fell_back=fell_back,
+        deferred=deferred,
+    )
+    walk.fallbacks.note(
+        (walk.file, walk.at), {n for key in fell_back if (n := param_name(key)) is not None}
     )
     walk.warnings.extend(
         raise_or_record(deferred, file=walk.file, error_type=VariableResolutionError)
@@ -353,7 +422,11 @@ def resolve_scoped(
     for i, entry in inline.items():
         where = (*at, key, i)
         child_scope = walk.scope.open_child(
-            entry.get("params"), file=walk.file, at=where, reads=walk.reads
+            entry.get("params"),
+            file=walk.file,
+            at=where,
+            reads=walk.reads,
+            tier=param_tier(child_type),
         )
         if inline_scopes is not None:
             inline_scopes[where] = child_scope
@@ -391,24 +464,48 @@ class ChildEntry:
             when it pins none.
     """
 
-    def __init__(self, pins: dict[str, Any] | None, parent: WalkState) -> None:
-        """Hold the entry's ``pins`` for opening a scope beneath ``parent``."""
+    def __init__(
+        self,
+        pins: dict[str, Any] | None,
+        parent: WalkState,
+        *,
+        alias: str | None = None,
+        at: tuple[str | int, ...] = (),
+    ) -> None:
+        """Hold the entry's ``pins`` for opening a scope beneath ``parent``.
+
+        Args:
+            pins: The entry's resolved pins; ``None`` when it pins none.
+            parent: The parent's walk state; its file holds the entry.
+            alias: The entry's renaming key's value; the child's own name
+                stands in without it.
+            at: Where the entry sits in the parent's file.
+        """
         self.pins = pins
         self._parent = parent
+        self._alias = alias
+        self._at = at
         self._opened: tuple[str, WalkState] | None = None
 
-    def open(self, child: dict[str, Any], path: str) -> WalkState:
+    def open(self, child: dict[str, Any], path: str, kind: str) -> WalkState:
         """Open the child's scope: its declared ``params:`` bound with the entry's pins.
 
         Args:
             child: The child's document, as loaded.
             path: The child's file.
+            kind: The child's kind, recorded on its declarations.
 
         Returns:
             The child's walk state, also kept as :attr:`opened`.
         """
+        entry = PinEntry(self._alias or child["name"], self._parent.file, self._at)
         scope = self._parent.scope.open_child(
-            child.get("params"), file=path, pins=self.pins, reads=self._parent.reads
+            child.get("params"),
+            file=path,
+            pins=self.pins,
+            reads=self._parent.reads,
+            tier=param_tier(kind),
+            pinned_by=entry,
         )
         state = self._parent.in_file(scope, child, path)
         self._opened = (child["name"], state)
@@ -475,7 +572,7 @@ def enter_child(
         RuntimeError: The block left normally without opening the child.
     """
     errors_before = errors_recorded()
-    child = ChildEntry(pins, walk)
+    child = ChildEntry(pins, walk, alias=entry.get(alias_key), at=at)
     yield child
     opened = child.opened
     if errors_recorded() == errors_before:

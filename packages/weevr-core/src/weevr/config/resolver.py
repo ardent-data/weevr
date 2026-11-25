@@ -2,12 +2,14 @@
 
 import re
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from weevr.config.collect import skip_on_error
 from weevr.config.locations import ConfigLocation
+from weevr.config.param_provenance import ParamProvenance
 from weevr.config.params import ScopePositions
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.config.scoping import (
@@ -45,6 +47,8 @@ class ResolvedChild:
         children: A weave's threads (for a loom's weave children).
         at: Where an inline child sits in its parent's file
             (``("threads", 2)``); empty for a child in its own file.
+        provenance: Where each of the child's params came from
+            (:meth:`weevr.config.params.ParamScope.provenance`).
     """
 
     entry: dict[str, Any]
@@ -53,6 +57,7 @@ class ResolvedChild:
     authored: dict[str, Any] | None = None
     children: list["ResolvedChild"] = field(default_factory=list)
     at: tuple[str | int, ...] = ()
+    provenance: Mapping[str, ParamProvenance] = field(default_factory=dict)
 
 
 def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionError:
@@ -369,8 +374,11 @@ def resolve_references(
                             # Set qualified key
                             child_dict["qualified_key"] = ref
 
-                            weave_walk = entered.open(child_dict, str(weave_path))
-                            resolved_child = resolve_scoped(child_dict, child_type, weave_walk)
+                            weave_walk = entered.open(child_dict, str(weave_path), child_type)
+                            weave_scopes: ScopePositions = {}
+                            resolved_child = resolve_scoped(
+                                child_dict, child_type, weave_walk, inline_scopes=weave_scopes
+                            )
 
                             grandchildren = resolve_references(
                                 resolved_child,
@@ -379,6 +387,7 @@ def resolve_references(
                                 weave_walk,
                                 visited.copy(),
                                 authored=child_dict,
+                                inline_scopes=weave_scopes,
                             )
                         children.append(
                             ResolvedChild(
@@ -387,6 +396,7 @@ def resolve_references(
                                 source_path=str(weave_path),
                                 authored=child_dict,
                                 children=grandchildren,
+                                provenance=weave_walk.provenance,
                             )
                         )
                     finally:
@@ -423,8 +433,11 @@ def resolve_references(
                     weave_scope = (inline_scopes or {}).get(inline_at)
                     if weave_scope is None:
                         weave_scope = walk.scope.open_child(
-                            inline.get("params"), file=file, at=inline_at
+                            inline.get("params"), file=file, at=inline_at, tier="weave"
                         )
+                    weave_walk = walk.inline(
+                        weave_scope, inline, at=inline_at, authored=inline_authored
+                    )
                     children.append(
                         ResolvedChild(
                             entry=entry,
@@ -434,14 +447,14 @@ def resolve_references(
                                 inline,
                                 "weave",
                                 project_root,
-                                walk.inline(
-                                    weave_scope, inline, at=inline_at, authored=inline_authored
-                                ),
+                                weave_walk,
                                 visited.copy(),
                                 authored=inline_authored,
                                 at=inline_at,
+                                inline_scopes=inline_scopes,
                             ),
                             at=inline_at,
+                            provenance=weave_walk.provenance,
                         )
                     )
 
@@ -505,7 +518,7 @@ def resolve_references(
                             # Set qualified key
                             child_dict["qualified_key"] = ref
 
-                            thread_walk = entered.open(child_dict, str(thread_path))
+                            thread_walk = entered.open(child_dict, str(thread_path), child_type)
                             resolved_child = substitute(child_dict, thread_walk)
 
                         # Track effective name uniqueness
@@ -528,6 +541,7 @@ def resolve_references(
                                 data=resolved_child,
                                 source_path=str(thread_path),
                                 authored=child_dict,
+                                provenance=thread_walk.provenance,
                             )
                         )
                     finally:
@@ -566,12 +580,20 @@ def resolve_references(
                         )
                     seen_effective_names.add(effective_name)
 
+                    thread_at = (*at, "threads", index)
+                    # As for an inline weave: the variable pass opened its scope.
+                    thread_scope = (inline_scopes or {}).get(thread_at)
+                    if thread_scope is None:
+                        thread_scope = walk.scope.open_child(
+                            entry.get("params"), file=file, at=thread_at, tier="thread"
+                        )
                     children.append(
                         ResolvedChild(
                             entry=entry,
                             data=inline,
                             authored=authored_entry("threads", index),
-                            at=(*at, "threads", index),
+                            at=thread_at,
+                            provenance=walk.fallbacks.provenance(thread_scope, (file, thread_at)),
                         )
                     )
 

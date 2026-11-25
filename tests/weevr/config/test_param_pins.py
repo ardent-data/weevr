@@ -448,7 +448,7 @@ class TestEnterChild:
     def test_opened_state_is_the_childs(self) -> None:
         walk = WalkState(scope=ParamScope.root({"x": "rt"}), file="w.weave")
         entered = ChildEntry({"x": "pin"}, walk)
-        opened = entered.open({"name": "t", "strict_params": True}, "t.thread")
+        opened = entered.open({"name": "t", "strict_params": True}, "t.thread", "thread")
         assert (opened.file, opened.strict, opened.scope.values()) == (
             "t.thread",
             True,
