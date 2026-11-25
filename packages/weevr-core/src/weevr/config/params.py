@@ -16,6 +16,10 @@ effective spec's ``type`` by :func:`coerce_param`; a value it rejects fails
 declaration. A child scope coerces the value as supplied, not an ancestor's
 coerced value, so its own declaration decides.
 
+Coercion decides what a whole-value reference (``field: ${param.x}``) reads.
+A reference embedded in a larger string renders the value as supplied
+(:attr:`Binding.text`): the supplied ``"007"`` for an ``int`` stays ``007``.
+
 A required spec left with none of these fails ``P101`` at its declaration. An
 optional spec with no default, like an undeclared name nobody supplied, stays
 unbound: a ``${param.x}`` reference to it falls back to its ``:-`` default or
@@ -56,12 +60,14 @@ class Binding:
     """One bound param value.
 
     Attributes:
-        value: The bound value, coerced to its declared type when it has one.
+        value: The bound value, coerced to its declared type when it has one;
+            what a whole-value reference reads.
         source: Where the value came from. Supplied values (``runtime``,
             ``pin``) flow into child scopes; a ``default`` is re-derived in
             each scope from its effective spec.
-        origin: The supplied binding this one coerces; ``None`` when the
-            value is as supplied. Reading a coerced binding reads its origin.
+        origin: The binding this one coerces, holding the value as supplied
+            (or as the default was written); ``None`` when the value is as
+            supplied. Reading a coerced binding reads its origin.
         pin: The entry pin that supplied the value, for a ``pin`` binding.
     """
 
@@ -79,6 +85,24 @@ class Binding:
     def supplied(self) -> bool:
         """Whether the value was supplied rather than taken from a spec default."""
         return self.source != "default"
+
+    @property
+    def text(self) -> str:
+        """The text a reference embedded in a larger string renders: the value as supplied.
+
+        A supplied string is its own text, whatever its declared type made of
+        it (``"007"``, ``"TRUE"``). A date or datetime binds as its ISO
+        string, which is its text. Any other value renders as YAML writes it:
+        a bool as ``true`` or ``false``, the rest by ``str()``.
+        """
+        supplied = self.supplied_binding.value
+        if isinstance(supplied, str):
+            return supplied
+        if isinstance(self.value, str):
+            return self.value
+        if isinstance(supplied, bool):
+            return "true" if supplied else "false"
+        return str(supplied)
 
 
 @dataclass(frozen=True)
@@ -329,7 +353,7 @@ class ParamScope:
             if name in bindings:
                 continue
             if spec.default is not None:
-                bindings[name] = Binding(spec.coerce(name, spec.default), "default")
+                bindings[name] = spec.bind(name, Binding(spec.default, "default"))
                 sources[name] = "default"
             elif spec.required:
                 message = (
@@ -420,6 +444,10 @@ class ParamScope:
     def values(self) -> dict[str, Any]:
         """The bound values by name, for the ``param`` namespace."""
         return {name: binding.value for name, binding in self.bindings.items()}
+
+    def texts(self) -> dict[str, str]:
+        """By bound name, the text an embedded reference renders (:attr:`Binding.text`)."""
+        return {name: binding.text for name, binding in self.bindings.items()}
 
 
 def _declaration(specs: Mapping[str, DeclaredSpec], name: str) -> ParamDeclaration | None:
@@ -773,7 +801,9 @@ def coerce_param(value: Any, type_name: str) -> Any:
     Returns:
         The value as the type's native Python value; for ``date`` and
         ``timestamp``, its ISO string. A value already of the bound form is
-        returned as the same object.
+        returned as the same object. The coerced value is what a whole-value
+        reference reads; an embedded reference renders the value as supplied
+        (:attr:`Binding.text`).
 
     Raises:
         TypeError: The value is not one the type accepts.

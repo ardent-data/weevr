@@ -21,7 +21,7 @@
           "since-2024-01-01",
           "lake-lh-001",
           "east",
-          "dry-False"
+          "dry-false"
         ]
       }
     },
@@ -45,7 +45,7 @@
           "since-2024-01-01",
           "lake-lh-001",
           "west",
-          "dry-False"
+          "dry-false"
         ]
       }
     }

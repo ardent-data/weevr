@@ -49,7 +49,11 @@ _BUILTIN_FUNCS: dict[str, Any] = {
 
 
 def _resolve_params(expr: str, params: dict[str, Any]) -> str:
-    """Replace ${param.name} references with parameter values."""
+    """Replace ${param.name} references with parameter values.
+
+    A value renders as an embedded load-time reference does: a string as
+    supplied, a bool as ``true`` or ``false``, anything else by ``str()``.
+    """
 
     def _replace(match: re.Match[str]) -> str:
         param_name = match.group(1)
@@ -58,7 +62,10 @@ def _resolve_params(expr: str, params: dict[str, Any]) -> str:
                 f"Unresolved parameter reference '${{param.{param_name}}}' in condition",
                 config_key="condition",
             )
-        return str(params[param_name])
+        value = params[param_name]
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return str(value)
 
     return _PARAM_REF.sub(_replace, expr)
 

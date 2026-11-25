@@ -16,6 +16,7 @@ diagnostics a reference fails with are built in
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from weevr.config.audit_templates import HIERARCHY_CONTEXT_KEYS
@@ -83,9 +84,19 @@ def fabric_namespace(fabric_context: Mapping[str, Any] | None) -> dict[str, Any]
     return {k.removeprefix("fabric."): v for k, v in fabric_context.items() if v is not None}
 
 
+@dataclass(frozen=True)
+class _Rendered:
+    """A bound param value and the text an embedded reference renders for it."""
+
+    value: Any
+    text: str
+
+
 def load_context(
     params: Mapping[str, Any] | None,
     fabric: Mapping[str, Any] | None = None,
+    *,
+    texts: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """The load-time namespaces a ``${...}`` reference reads.
 
@@ -93,6 +104,10 @@ def load_context(
         params: The scope's bound params, the ``param`` namespace.
         fabric: The ``fabric`` namespace (:func:`fabric_namespace`); ``None``
             when the load has no Fabric context.
+        texts: By param name, the text a reference embedded in a larger
+            string renders in place of ``str()`` of the value: the value as
+            supplied. A whole-value reference still reads the value. A value
+            whose text is its ``str()`` is held as it is.
 
     Returns:
         ``{"param": ..., "fabric": ...}``: ``param`` present when it has
@@ -103,7 +118,13 @@ def load_context(
     if fabric is not None:
         context["fabric"] = dict(fabric)
     if params:
-        context["param"] = dict(params)
+        texts = texts or {}
+        context["param"] = {
+            name: _Rendered(value, text)
+            if (text := texts.get(name)) is not None and text != str(value)
+            else value
+            for name, value in params.items()
+        }
     return context
 
 
@@ -122,11 +143,23 @@ def _get_dotted_value(context: dict[str, Any], key: str) -> Any:
     """
     value: Any = context
     for part in key.split("."):
+        if isinstance(value, _Rendered):
+            value = value.value
         if isinstance(value, dict) and part in value:
             value = value[part]
         else:
             raise KeyError(key)
     return value
+
+
+def _native(value: Any) -> Any:
+    """The value a whole-value reference reads."""
+    return value.value if isinstance(value, _Rendered) else value
+
+
+def _embedded(value: Any) -> str:
+    """The text a reference embedded in a larger string renders."""
+    return value.text if isinstance(value, _Rendered) else str(value)
 
 
 # Regex pattern for ${name} and ${name:-default}
@@ -203,6 +236,9 @@ def resolve_variables(
     Supports ``${namespace.name}`` and ``${namespace.name:-default}``. The
     ``param`` and ``fabric`` namespaces resolve from ``context``, falling back
     to the default; ``param`` values can be traversed (``${param.env.lakehouse}``).
+    A string that is one whole reference becomes the value itself; a reference
+    embedded in a larger string renders the param's supplied text where
+    :func:`load_context` was given one, else ``str()`` of the value.
     Left in place for execution time: ``${var.*}`` and ``${run.*}``, and the known
     hierarchy variables (``HIERARCHY_CONTEXT_KEYS``) when no default is given.
     A ``${fabric.x}`` with no default is left in place too when ``context``
@@ -287,7 +323,7 @@ def resolve_variables(
                 deferred,
                 fell_back,
             )
-            return config if value is _KEEP else value
+            return config if value is _KEEP else _native(value)
 
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1).strip()
@@ -302,7 +338,7 @@ def resolve_variables(
                 deferred,
                 fell_back,
             )
-            return match.group(0) if value is _KEEP else str(value)
+            return match.group(0) if value is _KEEP else _embedded(value)
 
         return VARIABLE_PATTERN.sub(replace_var, config)
 

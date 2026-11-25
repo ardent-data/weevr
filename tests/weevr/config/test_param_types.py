@@ -19,7 +19,9 @@ import pytest
 
 from documents import write_document
 from weevr.config import load_config, load_resolved
+from weevr.config.interpolation import resolve_variables
 from weevr.config.params import ParamScope
+from weevr.config.scoping import scope_context
 from weevr.diagnostics import Diagnostic
 from weevr.errors import ConfigError, ConfigSchemaError
 
@@ -259,11 +261,11 @@ class TestThroughLoad:
         assert model.sources["s"].options["n"] == 42
         assert type(model.sources["s"].options["n"]) is int
 
-    def test_coerced_value_stringifies_when_embedded(self, tmp_path: Path) -> None:
+    def test_embedded_reference_keeps_the_supplied_text(self, tmp_path: Path) -> None:
         path = _tree(tmp_path, loom=_spec("bool"), thread={}, alias="out.t_${param.p}")
         doc = load_resolved(path, runtime_params={"p": "TRUE"}, project_root=tmp_path).document
         thread: Any = doc.children["w"].children["t"].model
-        assert thread.target.alias == "out.t_True"
+        assert thread.target.alias == "out.t_TRUE"
 
     def test_whole_value_date_is_the_string(self, tmp_path: Path) -> None:
         body = {
@@ -309,5 +311,120 @@ class TestThroughLoad:
         )
         resolved = load_resolved(path, project_root=tmp_path)
         thread: Any = resolved.document.children["w"].children["t"].model
-        assert thread.target.alias == "out.7"
+        assert thread.target.alias == "out.007"
         assert [d.code for d in resolved.warnings if d.code == "P123"] == []
+
+
+def _embedded(scope: ParamScope) -> str:
+    """How ``${param.p}`` renders embedded in a larger string in ``scope``."""
+    return resolve_variables("[${param.p}]", scope_context(scope))[1:-1]
+
+
+def _whole(scope: ParamScope) -> Any:
+    """What a whole-value ``${param.p}`` reference reads in ``scope``."""
+    return resolve_variables("${param.p}", scope_context(scope))
+
+
+class TestEmbeddedText:
+    """An embedded reference renders the value as supplied; a whole value gets the coerced one."""
+
+    @pytest.mark.parametrize(
+        ("ptype", "supplied", "whole"),
+        [
+            ("bool", "true", True),
+            ("bool", "TRUE", True),
+            ("bool", "False", False),
+            ("int", "007", 7),
+            ("int", "+5", 5),
+            ("float", "1.50", 1.5),
+            ("string", "abc", "abc"),
+            ("date", "2024-1-5", "2024-1-5"),
+        ],
+    )
+    def test_supplied_text_is_kept(self, ptype: str, supplied: str, whole: Any) -> None:
+        scope = ParamScope.root({"p": supplied}).child(_spec(ptype))
+        assert _embedded(scope) == supplied
+        assert _whole(scope) == whole
+        assert type(_whole(scope)) is type(whole)
+
+    @pytest.mark.parametrize(
+        ("ptype", "supplied", "text"),
+        [
+            ("bool", True, "true"),
+            ("bool", False, "false"),
+            ("int", 5, "5"),
+            ("float", 5, "5"),
+            ("float", 1.5, "1.5"),
+            ("date", date(2024, 1, 2), "2024-01-02"),
+            ("timestamp", datetime(2024, 1, 2, 3, 4, 5), "2024-01-02T03:04:05"),
+            ("list[string]", ["a", "b"], "['a', 'b']"),
+        ],
+    )
+    def test_native_runtime_value_renders_as_yaml_writes_it(
+        self, ptype: str, supplied: Any, text: str
+    ) -> None:
+        scope = ParamScope.root({"p": supplied}).child(_spec(ptype))
+        assert _embedded(scope) == text
+
+    def test_yaml_default_renders_as_written(self) -> None:
+        scope = ParamScope.root().child(_spec("bool", required=False, default=True))
+        assert _embedded(scope) == "true"
+        assert _whole(scope) is True
+
+    def test_string_default_keeps_its_text(self) -> None:
+        scope = ParamScope.root().child(_spec("int", required=False, default="007"))
+        assert _embedded(scope) == "007"
+        assert _whole(scope) == 7
+
+    def test_pin_keeps_its_text(self) -> None:
+        scope = ParamScope.root().child(_spec("bool", required=False))
+        scope = scope.child(None, pins={"p": "True"})
+        assert _embedded(scope) == "True"
+        assert _whole(scope) is True
+
+    def test_inherited_binding_keeps_its_text(self) -> None:
+        parent = ParamScope.root({"p": "007"}).child(_spec("int"))
+        child = parent.child(None)
+        assert _embedded(child) == "007"
+        assert _whole(child) == 7
+
+    def test_nearer_declaration_recoerces_the_supplied_text(self) -> None:
+        parent = ParamScope.root({"p": "1.50"}).child(_spec("float"))
+        assert _whole(parent) == 1.5
+        child = parent.child(_spec("string"))
+        assert _whole(child) == "1.50"
+        assert _embedded(child) == "1.50"
+
+    def test_undeclared_native_bool_renders_as_yaml_writes_it(self) -> None:
+        scope = ParamScope.root({"p": True}).child(None)
+        assert _embedded(scope) == "true"
+        assert _whole(scope) is True
+
+    def test_undeclared_supplied_string_keeps_its_text(self) -> None:
+        scope = ParamScope.root({"p": "True"}).child(None)
+        assert _embedded(scope) == "True"
+        assert _whole(scope) == "True"
+
+    def test_dotted_reference_traverses_a_declared_value(self) -> None:
+        spec = {"p": {"name": "p", "type": "object"}}
+        scope = ParamScope.root({"p": {"env": "dev"}}).child(spec)
+        context = scope_context(scope)
+        assert resolve_variables("x_${param.p.env}", context) == "x_dev"
+        assert resolve_variables("${param.p.env}", context) == "dev"
+
+    def test_loom_condition_compares_the_supplied_text(self, tmp_path: Path) -> None:
+        write_document(tmp_path / "t.thread", THREAD)
+        write_document(
+            tmp_path / "w.weave", {"config_version": "2.0", "threads": [{"ref": "t.thread"}]}
+        )
+        path = write_document(
+            tmp_path / "l.loom",
+            {
+                "config_version": "2.0",
+                "params": {"flag": {"name": "flag", "type": "bool"}},
+                "weaves": [{"ref": "w.weave", "condition": {"when": "${param.flag} == 'true'"}}],
+            },
+        )
+        resolved = load_resolved(path, runtime_params={"flag": "true"}, project_root=tmp_path)
+        loom: Any = resolved.document.model
+        assert loom.weaves[0].condition.when == "true == 'true'"

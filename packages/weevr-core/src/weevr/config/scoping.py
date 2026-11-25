@@ -328,14 +328,16 @@ def scope_context(
     supply the ``fabric`` namespace.
 
     Args:
-        scope: The param scope; its bound values are the ``param`` namespace.
+        scope: The param scope; its bound values are the ``param`` namespace,
+            and each value's supplied text is what an embedded reference
+            renders (:meth:`ParamScope.texts`).
         fabric_context: The load's Fabric values; ``None`` when it has none
             (:func:`fabric_namespace`).
 
     Returns:
         The context for :func:`resolve_variables`.
     """
-    return load_context(scope.values(), fabric_namespace(fabric_context))
+    return load_context(scope.values(), fabric_namespace(fabric_context), texts=scope.texts())
 
 
 # Per parent kind: the list holding its children, the children's kind, and the entry
