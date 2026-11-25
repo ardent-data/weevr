@@ -10,6 +10,12 @@ closure-style; per name, highest first:
    that is the runtime params.
 3. The nearest declared default: the effective spec's ``default``.
 
+Each value bound for a declared name is checked and coerced against the
+effective spec's ``type`` by :func:`coerce_param`; a value it rejects fails
+``P102`` (``P103`` for a malformed date or timestamp string) at that spec's
+declaration. A child scope coerces the value as supplied, not an ancestor's
+coerced value, so its own declaration decides.
+
 A required spec left with none of these fails ``P101`` at its declaration. An
 optional spec with no default, like an undeclared name nobody supplied, stays
 unbound: a ``${param.x}`` reference to it falls back to its ``:-`` default or
@@ -20,14 +26,18 @@ an ancestor's, while supplied values always beat defaults.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import math
+import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from types import MappingProxyType
 from typing import Any, Literal
 
 from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import ConfigSchemaError
+from weevr.model.params import ParamSpec
 
 BindingSource = Literal["runtime", "pin", "default"]
 """Where a binding's value came from: supplied (``runtime``, ``pin``) or ``default``."""
@@ -38,14 +48,22 @@ class Binding:
     """One bound param value.
 
     Attributes:
-        value: The bound value.
+        value: The bound value, coerced to its declared type when it has one.
         source: Where the value came from. Supplied values (``runtime``,
             ``pin``) flow into child scopes; a ``default`` is re-derived in
             each scope from its effective spec.
+        origin: The supplied binding this one coerces; ``None`` when the
+            value is as supplied. Reading a coerced binding reads its origin.
     """
 
     value: Any
     source: BindingSource
+    origin: Binding | None = field(default=None, compare=False, repr=False)
+
+    @property
+    def supplied_binding(self) -> Binding:
+        """The binding as supplied: :attr:`origin`, else this binding."""
+        return self.origin or self
 
     @property
     def supplied(self) -> bool:
@@ -55,28 +73,122 @@ class Binding:
 
 @dataclass(frozen=True)
 class DeclaredSpec:
-    """A ParamSpec and where it was declared.
+    """A declared param spec, read once into one shape, and where it was declared.
 
     Attributes:
-        spec: The ``ParamSpec`` or its ``model_dump`` mapping.
+        type: The declared type name (``ParamSpec.type``); ``None`` when the
+            declaration names none or a non-string, which the model rejects
+            at hydration. Such a spec coerces nothing.
+        required: Whether the param must be bound (the ParamSpec default is ``True``).
+        default: The spec's default; ``None`` when it has none.
         file: The declaring file; ``None`` when unknown.
         at: Where the declaring document sits in ``file`` (empty for a
             document in its own file).
     """
 
-    spec: Any
+    type: str | None
+    required: bool
+    default: Any
     file: str | None
     at: tuple[str | int, ...] = ()
 
-    @property
-    def default(self) -> Any:
-        """The spec's default; ``None`` when it has none."""
-        return spec_field(self.spec, "default")
+    @classmethod
+    def read(
+        cls, name: str, spec: Any, file: str | None, at: tuple[str | int, ...] = ()
+    ) -> DeclaredSpec:
+        """Read a ``ParamSpec`` or its mapping into a declared spec.
 
-    @property
-    def required(self) -> bool:
-        """Whether the spec is required (the ParamSpec default is ``True``)."""
-        return bool(spec_field(self.spec, "required", True))
+        Args:
+            name: The param name.
+            spec: The ``ParamSpec`` or its mapping, as declared.
+            file: The declaring file.
+            at: Where the declaring document sits in ``file``.
+
+        Returns:
+            The declared spec.
+
+        Raises:
+            ConfigSchemaError: ``spec`` is neither a ParamSpec nor a mapping (``C102``).
+        """
+        if isinstance(spec, ParamSpec):
+            fields: Mapping[str, Any] = spec.model_dump()
+        elif isinstance(spec, dict):
+            fields = spec
+        else:
+            raise _not_a_mapping(name, spec, file, at)
+        declared_type = fields.get("type")
+        required = fields.get("required", True)
+        return cls(
+            type=declared_type if isinstance(declared_type, str) else None,
+            required=required if isinstance(required, bool) else True,
+            default=fields.get("default"),
+            file=file,
+            at=at,
+        )
+
+    def coerce(self, name: str, value: Any) -> Any:
+        """``value`` coerced to this spec's type, or an error at this declaration.
+
+        Args:
+            name: The param name.
+            value: The value to bind.
+
+        Returns:
+            The coerced value (see :func:`coerce_param`).
+
+        Raises:
+            ConfigSchemaError: The value does not fit the type (``P102``), or
+                is a malformed date or timestamp string (``P103``).
+        """
+        if self.type is None:
+            return value
+        try:
+            return coerce_param(value, self.type)
+        except (TypeError, ValueError) as exc:
+            # Only a date or timestamp string can be malformed; any other
+            # failure is a type mismatch.
+            if isinstance(exc, ValueError) and self.type in _ISO_TYPES:
+                code = "P103"
+                message = f"Parameter '{name}' is not a valid ISO {self.type}: {value!r}"
+            else:
+                code = "P102"
+                message = f"Parameter '{name}' expected {self.type}, got {type(value).__name__}"
+            cause = exc
+        raise ConfigSchemaError(
+            message,
+            cause=cause,
+            file_path=self.file,
+            config_key=name,
+            diagnostics=[
+                diagnostic(
+                    code,
+                    message,
+                    file=self.file,
+                    pointer=json_pointer((*self.at, "params", name)),
+                    expected=[self.type],
+                )
+            ],
+        )
+
+    def bind(self, name: str, binding: Binding) -> Binding:
+        """``binding``'s supplied value coerced to this spec's type.
+
+        Args:
+            name: The param name.
+            binding: The binding in force, possibly coerced by an ancestor's spec.
+
+        Returns:
+            The supplied binding itself when coercion keeps its value, else a
+            binding of the coerced value whose :attr:`Binding.origin` is it.
+
+        Raises:
+            ConfigSchemaError: See :meth:`coerce`.
+        """
+        supplied = binding.supplied_binding
+        value = self.coerce(name, supplied.value)
+        if value is supplied.value:
+            return supplied
+        return Binding(value, supplied.source, origin=supplied)
 
 
 def _frozen(mapping: Mapping[str, Any] | None = None) -> Mapping[str, Any]:
@@ -148,21 +260,26 @@ class ParamScope:
             The child scope.
 
         Raises:
-            ConfigSchemaError: A declared spec is not a mapping (``C102``), or
-                a required spec has no value (``P101``, at its declaration).
+            ConfigSchemaError: A declared spec is not a mapping (``C102``), a
+                required spec has no value (``P101``, at its declaration), or a
+                bound value does not fit its effective spec's type (``P102`` or
+                ``P103``, at that spec's declaration).
         """
         declared = {
-            name: DeclaredSpec(_checked(name, spec, file, at), file, at)
-            for name, spec in (specs or {}).items()
+            name: DeclaredSpec.read(name, spec, file, at) for name, spec in (specs or {}).items()
         }
         effective = {**self.specs, **declared}
-        bindings = {name: b for name, b in self.bindings.items() if b.supplied}
-        bindings.update({name: Binding(value, "pin") for name, value in (pins or {}).items()})
+        supplied = {name: b for name, b in self.bindings.items() if b.supplied}
+        supplied.update({name: Binding(value, "pin") for name, value in (pins or {}).items()})
+        bindings = {
+            name: effective[name].bind(name, b) if name in effective else b
+            for name, b in supplied.items()
+        }
         for name, spec in effective.items():
             if name in bindings:
                 continue
             if spec.default is not None:
-                bindings[name] = Binding(spec.default, "default")
+                bindings[name] = Binding(spec.coerce(name, spec.default), "default")
             elif spec.required:
                 message = (
                     f"Required parameter '{name}' is missing (no runtime value and no default)"
@@ -187,8 +304,7 @@ class ParamScope:
         """Open the child scope declaring ``specs``, with ``pins`` already resolved.
 
         Like :meth:`child`, and each declared name's binding counts as read in
-        ``reads``: a pin that satisfies a declaration is consumed. Declared
-        defaults bind exactly as written.
+        ``reads``: a pin that satisfies a declaration is consumed.
 
         Args:
             specs: The document's own ``params:``; ``None`` when it declares none.
@@ -224,8 +340,8 @@ class BindingReads:
     """The bindings a load read, by identity.
 
     A pin is consumed when some binding read in its subtree is the very
-    binding the pin created: a nearer pin for the same name makes a new
-    binding, so it does not count as reading the outer one.
+    binding the pin created, or a coercion of it: a nearer pin for the same
+    name makes a new binding, so it does not count as reading the outer one.
     """
 
     def __init__(self) -> None:
@@ -238,8 +354,9 @@ class BindingReads:
         Args:
             binding: The binding a reference or declaration used.
         """
+        supplied = binding.supplied_binding
         # Holding the binding keeps its id from being reused by a later one.
-        self._read[id(binding)] = binding
+        self._read[id(supplied)] = supplied
 
     def was_read(self, binding: Binding) -> bool:
         """Whether ``binding`` was read.
@@ -248,19 +365,21 @@ class BindingReads:
             binding: A binding from some scope.
 
         Returns:
-            ``True`` when :meth:`note` recorded this exact binding.
+            ``True`` when :meth:`note` recorded this binding or a coercion of
+            the binding it coerces.
         """
-        return self._read.get(id(binding)) is binding
+        supplied = binding.supplied_binding
+        return self._read.get(id(supplied)) is supplied
 
 
-def _checked(name: str, spec: Any, file: str | None, at: tuple[str | int, ...]) -> Any:
-    """``spec`` when it is a ParamSpec or mapping; else a ``C102`` error."""
-    if isinstance(spec, dict) or hasattr(spec, "required"):
-        return spec
+def _not_a_mapping(
+    name: str, spec: Any, file: str | None, at: tuple[str | int, ...]
+) -> ConfigSchemaError:
+    """The ``C102`` error for a declared spec that is not a mapping."""
     message = (
         f"Parameter '{name}' must be a mapping with 'name' and 'type', got {type(spec).__name__}"
     )
-    raise ConfigSchemaError(
+    return ConfigSchemaError(
         message,
         file_path=file,
         config_key=name,
@@ -276,22 +395,143 @@ def _checked(name: str, spec: Any, file: str | None, at: tuple[str | int, ...]) 
     )
 
 
-def spec_field(spec: Any, name: str, default: Any = None) -> Any:
-    """Read a field from either a ParamSpec instance or its ``model_dump`` dict.
+_INT = re.compile(r"[+-]?[0-9]+")
+_FLOAT = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+
+
+def _mismatch(value: Any, type_name: str) -> TypeError:
+    return TypeError(f"{type(value).__name__} is not a {type_name}")
+
+
+def _to_string(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    raise _mismatch(value, "string")
+
+
+def _to_int(value: Any) -> int:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str) and _INT.fullmatch(value):
+        try:
+            return int(value)
+        except ValueError:  # more digits than int() converts
+            pass
+    raise _mismatch(value, "int")
+
+
+def _to_float(value: Any) -> float:
+    numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
+    if numeric or (isinstance(value, str) and _FLOAT.fullmatch(value)):
+        try:
+            result = float(value)
+        except OverflowError:  # an int too large for a float
+            result = math.inf
+        if math.isfinite(result):
+            return value if isinstance(value, float) else result
+    raise _mismatch(value, "float")
+
+
+def _to_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.lower() in ("true", "false"):
+        return value.lower() == "true"
+    raise _mismatch(value, "bool")
+
+
+def _to_date(value: Any) -> str:
+    """A date as its ISO string: a ``YYYY-MM-DD`` string as written, a date's ``isoformat()``.
+
+    A string is checked with ``strptime("%Y-%m-%d")``, so an unpadded
+    ``2024-1-5`` is accepted as in v1; values bind as written. Binding keeps
+    dates as strings; native date objects are left to later field-type
+    coercion.
+    """
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str):
+        datetime.strptime(value, "%Y-%m-%d")
+        return value
+    raise _mismatch(value, "date")
+
+
+def _to_timestamp(value: Any) -> str:
+    """A timestamp as its ISO string: an ISO string as written, a datetime's ``isoformat()``.
+
+    A string is checked with ``datetime.fromisoformat``, so a date-only
+    ``2024-01-05``, a space separator, and the compact (``20240105T1030``)
+    and week (``2024-W01-1``) forms are accepted as in v1; values bind as
+    written. Binding keeps timestamps as strings, so ``T`` and ``Z`` survive
+    in embedded references; native datetime objects are left to later
+    field-type coercion.
+    """
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        datetime.fromisoformat(value)
+        return value
+    raise _mismatch(value, "timestamp")
+
+
+def _to_string_list(value: Any) -> list[str]:
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise _mismatch(value, "list[string]")
+
+
+_ISO_TYPES = frozenset({"date", "timestamp"})
+"""The types whose malformed strings fail ``P103`` rather than ``P102``."""
+
+_COERCIONS: dict[str, Callable[[Any], Any]] = {
+    "string": _to_string,
+    "int": _to_int,
+    "float": _to_float,
+    "bool": _to_bool,
+    "date": _to_date,
+    "timestamp": _to_timestamp,
+    "list[string]": _to_string_list,
+}
+
+
+def coerce_param(value: Any, type_name: str) -> Any:
+    """Coerce ``value`` to the param type ``type_name``, by the narrow binding table.
+
+    - ``string``: a string.
+    - ``int``: an int (not a bool), or a base-10 string (``"42"``, ``"-3"``).
+    - ``float``: a finite float, an int (not a bool), or a numeric string.
+    - ``bool``: a bool, or ``"true"`` / ``"false"`` in any case.
+    - ``date``: a ``YYYY-MM-DD`` string (bound as written), or a date
+      (a datetime's date part), bound as its ``isoformat()``.
+    - ``timestamp``: an ISO 8601 string (bound as written), or a datetime,
+      bound as its ``isoformat()``.
+
+    Date and timestamp strings are accepted as in v1; values bind as written.
+    A date may be unpadded (``2024-1-5``). A timestamp may be date-only, use a
+    space separator, or take the compact (``20240105T1030``) or week
+    (``2024-W01-1``) forms ``datetime.fromisoformat`` reads on Python 3.12
+    and 3.13.
+    - ``list[string]``: a list of strings.
+
+    A type name outside the table passes the value through unchanged.
 
     Args:
-        spec: A ``ParamSpec`` or its mapping.
-        name: The field name.
-        default: The value when the field is absent.
+        value: The value to coerce.
+        type_name: A ``ParamSpec.type`` name.
 
     Returns:
-        The field's value, else ``default``.
+        The value as the type's native Python value; for ``date`` and
+        ``timestamp``, its ISO string. A value already of the bound form is
+        returned as the same object.
+
+    Raises:
+        TypeError: The value is not one the type accepts.
+        ValueError: A date or timestamp string is not in ISO format.
     """
-    if hasattr(spec, name):
-        return getattr(spec, name)
-    if isinstance(spec, dict):
-        return spec.get(name, default)
-    return default
+    convert = _COERCIONS.get(type_name)
+    return value if convert is None else convert(value)
 
 
 def missing_parameter(

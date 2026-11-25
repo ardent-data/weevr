@@ -39,7 +39,6 @@ from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
     ResolvedChild,
     resolve_references,
-    validate_params,
 )
 from weevr.config.root import find_project_root, read_project
 from weevr.config.scoping import resolve_config_variables
@@ -161,6 +160,8 @@ def resolve_config(
 
     Raises:
         ConfigError: Unsupported extension or a name/filename mismatch.
+        ConfigSchemaError: A declared param has no value (``P101``) or a value
+            its type rejects (``P102``, ``P103``).
         VariableResolutionError: A variable has no value and no default.
     """
     root, project = resolve_project_root(location, project_root, project)
@@ -171,8 +172,6 @@ def resolve_config(
 
     declared_param_specs = config_dict.get("params")
     scope = ParamScope.root(runtime_params).child(declared_param_specs, file=str(location))
-    # Type validation only — required-missing already raised above.
-    validate_params(declared_param_specs, scope.values())
 
     inline_scopes: ScopePositions = {}
     try:

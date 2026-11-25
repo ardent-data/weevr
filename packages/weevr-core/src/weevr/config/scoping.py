@@ -11,7 +11,12 @@ from contextlib import contextmanager
 from typing import Any
 
 from weevr.config.collect import recorded
-from weevr.config.interpolation import BareNames, build_param_context, resolve_variables
+from weevr.config.interpolation import (
+    BareNames,
+    fabric_namespace,
+    load_context,
+    resolve_variables,
+)
 from weevr.config.params import BindingReads, ParamScope, ScopePositions, unconsumed_pins
 from weevr.diagnostics import Diagnostic
 
@@ -94,6 +99,26 @@ def resolve_config_variables(
     )
 
 
+def scope_context(
+    scope: ParamScope,
+    *,
+    runtime_params: Mapping[str, Any] | None = None,
+    fabric_context: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The load-time namespaces a reference in ``scope`` reads.
+
+    Args:
+        scope: The param scope; its bound values are the ``param`` namespace.
+        runtime_params: Runtime parameters; their ``fabric`` key stands in for
+            the Fabric context.
+        fabric_context: Optional Fabric environment values.
+
+    Returns:
+        The context for :func:`resolve_variables`.
+    """
+    return load_context(scope.values(), fabric_namespace(runtime_params, fabric_context))
+
+
 # The list each kind holds its children in, and the kind of those children.
 _CHILD_LISTS = {"loom": ("weaves", "weave"), "weave": ("threads", "thread")}
 
@@ -140,9 +165,7 @@ def resolve_scoped(
 
     An inline child's entry keys resolve in ``scope``, its body in the child's.
     """
-    context = build_param_context(
-        runtime_params, fabric_context=fabric_context, entry_params=scope.values()
-    )
+    context = scope_context(scope, runtime_params=runtime_params, fabric_context=fabric_context)
     key, child_type = _CHILD_LISTS.get(config_type, ("", ""))
     entries = config.get(key) if key else None
     if not isinstance(entries, list):

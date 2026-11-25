@@ -3,33 +3,25 @@
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 from weevr.config.collect import skip_on_error
-from weevr.config.interpolation import build_param_context
 from weevr.config.locations import ConfigLocation
-from weevr.config.params import (
-    BindingReads,
-    ParamScope,
-    ScopePositions,
-    missing_parameter,
-    spec_field,
-)
+from weevr.config.params import BindingReads, ParamScope, ScopePositions
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.config.scoping import (
     enter_child,
     is_inline_thread,
     is_inline_weave,
     resolve_scoped,
+    scope_context,
     substitute,
 )
 from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import (
     ConfigError,
-    ConfigSchemaError,
     ReferenceResolutionError,
 )
 
@@ -62,93 +54,6 @@ class ResolvedChild:
     at: tuple[str | int, ...] = ()
 
 
-def resolve_declared_params(
-    param_specs: dict[str, Any] | None,
-    runtime_params: dict[str, Any] | None,
-    *,
-    file_path: str | None = None,
-) -> dict[str, Any]:
-    """Resolve loom/weave-level declared ``params:`` to a flat ``{name: value}`` dict.
-
-    Precedence per declared param:
-
-    1. Value from ``runtime_params`` if supplied
-    2. ``ParamSpec.default`` if set on the spec
-    3. ``ConfigSchemaError`` if the param is required
-    4. Omitted from the result if optional with no default
-
-    The returned dict is intended to bind under the ``param.*`` namespace via
-    :func:`build_param_context`'s ``entry_params`` argument, so that
-    ``${param.x}`` expressions resolve to the layered value.
-
-    Runtime keys not declared in ``param_specs`` are ignored — declared scope
-    is the only contract honored at this layer.
-
-    Args:
-        param_specs: Mapping of declared params (``ParamSpec`` instances or
-            their ``model_dump`` dicts). ``None`` or empty returns ``{}``.
-        runtime_params: Caller-supplied values keyed by param name.
-        file_path: Optional originating config file path for error messages.
-
-    Returns:
-        Resolved ``{name: value}`` dict ready for ``entry_params``.
-
-    Raises:
-        ConfigSchemaError: A required declared param has no runtime value and
-            no spec default. The message includes the file path and param name.
-    """
-    if not param_specs:
-        return {}
-
-    for name, spec in param_specs.items():
-        if not isinstance(spec, dict) and not hasattr(spec, "required"):
-            message = (
-                f"Parameter '{name}' must be a mapping with 'name' and 'type', "
-                f"got {type(spec).__name__}"
-            )
-            raise ConfigSchemaError(
-                message,
-                file_path=file_path,
-                config_key=name,
-                diagnostics=[
-                    diagnostic(
-                        "C102",
-                        message,
-                        file=file_path,
-                        pointer=json_pointer(("params", name)),
-                        expected=["mapping"],
-                    )
-                ],
-            )
-
-    runtime = runtime_params or {}
-    resolved: dict[str, Any] = {}
-    for name, spec in param_specs.items():
-        # Treat an explicit None runtime value as absent so that the declared
-        # default and required-check still apply. A literal None almost always
-        # signals an unbound notebook variable rather than an intentional null.
-        if name in runtime and runtime[name] is not None:
-            resolved[name] = runtime[name]
-            continue
-
-        default = spec_field(spec, "default", default=None)
-        if default is not None:
-            resolved[name] = default
-            continue
-
-        required = spec_field(spec, "required", default=True)
-        if required:
-            message = f"Required parameter '{name}' is missing (no runtime value and no default)"
-            raise ConfigSchemaError(
-                message,
-                file_path=file_path,
-                config_key=name,
-                diagnostics=[missing_parameter(name, message, file_path)],
-            )
-        # Optional with no default → omit
-    return resolved
-
-
 def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionError:
     """A weave or thread entry that names a child but has neither ``ref`` nor a body."""
     return _reference_error(
@@ -156,152 +61,6 @@ def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionE
         f"{kind.capitalize()} entry '{name}' has a name but no body",
         pointer=pointer,
         hint=f"ref: {name}.{kind}",
-    )
-
-
-def validate_params(
-    param_specs: dict[str, Any] | None,
-    context: dict[str, Any],
-) -> None:
-    """Validate parameters against their type specifications.
-
-    Args:
-        param_specs: Parameter specifications from config
-        context: Actual parameter values
-
-    Raises:
-        ConfigSchemaError: If required params missing or type mismatches
-    """
-    if not param_specs:
-        return
-
-    for param_name, spec in param_specs.items():
-        # Handle both dict specs and ParamSpec objects
-        if hasattr(spec, "required"):
-            required = spec.required
-            param_type = spec.type
-            default = spec.default
-        else:
-            required = spec.get("required", True)
-            param_type = spec.get("type", "string")
-            default = spec.get("default")
-
-        # Check required params
-        if required and param_name not in context:
-            if default is not None:
-                # Use default if provided
-                context[param_name] = default
-                continue
-            else:
-                message = f"Required parameter '{param_name}' is missing"
-                raise ConfigSchemaError(
-                    message,
-                    config_key=param_name,
-                    diagnostics=[missing_parameter(param_name, message, None)],
-                )
-
-        # Skip validation if param not present (and not required)
-        if param_name not in context:
-            continue
-
-        value = context[param_name]
-
-        # Type validation
-        if param_type == "string":
-            if not isinstance(value, str):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected string, got {type(value).__name__}",
-                )
-
-        elif param_type == "int":
-            if not isinstance(value, int) or isinstance(value, bool):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected int, got {type(value).__name__}",
-                )
-
-        elif param_type == "float":
-            if not isinstance(value, (int, float)) or isinstance(value, bool):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected float, got {type(value).__name__}",
-                )
-
-        elif param_type == "bool":
-            if not isinstance(value, bool):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected bool, got {type(value).__name__}",
-                )
-
-        elif param_type == "date":
-            if isinstance(value, str):
-                try:
-                    datetime.strptime(value, "%Y-%m-%d")
-                except ValueError as e:
-                    raise _parameter_error(
-                        "P103",
-                        param_name,
-                        f"Parameter '{param_name}' invalid date format, expected YYYY-MM-DD",
-                        cause=e,
-                    ) from e
-            elif not isinstance(value, date):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected date or ISO date string",
-                )
-
-        elif param_type == "timestamp":
-            if isinstance(value, str):
-                try:
-                    datetime.fromisoformat(value)
-                except ValueError as e:
-                    raise _parameter_error(
-                        "P103",
-                        param_name,
-                        f"Parameter '{param_name}' invalid timestamp format, "
-                        "expected ISO format (YYYY-MM-DDTHH:MM:SS)",
-                        cause=e,
-                    ) from e
-            elif not isinstance(value, datetime):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected timestamp or ISO timestamp string",
-                )
-
-        elif param_type == "list[string]":
-            if not isinstance(value, list):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected list, got {type(value).__name__}",
-                )
-            if not all(isinstance(item, str) for item in value):
-                raise _parameter_error(
-                    "P102",
-                    param_name,
-                    f"Parameter '{param_name}' expected list of strings",
-                )
-
-
-def _parameter_error(
-    code: str, name: str, message: str, cause: Exception | None = None
-) -> ConfigSchemaError:
-    """A parameter value that has the wrong type or format, pointed at its declaration."""
-    return ConfigSchemaError(
-        message,
-        cause=cause,
-        config_key=name,
-        diagnostics=[
-            diagnostic(code, message, pointer=json_pointer(("params", name)), origin=__name__)
-        ],
     )
 
 
@@ -575,9 +334,7 @@ def resolve_references(
     if reads is None:
         reads = BindingReads()
     # Entry pins belong to this config: they resolve in its scope, once.
-    parent_context = (
-        None if pins_resolved else build_param_context(runtime_params, entry_params=env.values())
-    )
+    parent_context = None if pins_resolved else scope_context(env, runtime_params=runtime_params)
 
     def authored_entry(key: str, index: int) -> dict[str, Any] | None:
         entries = (authored or {}).get(key)
@@ -790,9 +547,7 @@ def resolve_references(
                             child_dict["qualified_key"] = ref
 
                             thread_scope = entered.open(child_dict, str(thread_path))
-                            context = build_param_context(
-                                runtime_params, entry_params=thread_scope.values()
-                            )
+                            context = scope_context(thread_scope, runtime_params=runtime_params)
                             resolved_child = substitute(
                                 child_dict,
                                 context,

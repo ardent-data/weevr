@@ -12,55 +12,53 @@ from weevr.config.audit_templates import (
     AuditContext,
     resolve_context_variables,
 )
-from weevr.config.interpolation import BareNames, build_param_context, resolve_variables
-from weevr.config.resolver import (
-    resolve_declared_params,
-    validate_params,
-)
+from weevr.config.interpolation import BareNames, resolve_variables
+from weevr.config.params import ParamScope
+from weevr.config.scoping import scope_context
 from weevr.errors import ConfigSchemaError, VariableResolutionError
-from weevr.model.params import ParamSpec
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-class TestBuildParamContext:
-    """Test build_param_context function."""
+class TestScopeContext:
+    """The load-time namespaces: the scope's bound params and the Fabric context."""
 
-    def test_runtime_params_only(self):
-        """Runtime params are not a namespace: they reach ${param.x} as bindings."""
+    def test_runtime_params_bind_under_param(self):
+        """Runtime params reach ``${param.x}`` as the root scope's bindings, not flat."""
         runtime = {"env": "prod", "lakehouse": "gold"}
-        assert build_param_context(runtime_params=runtime) == {}
+        context = scope_context(ParamScope.root(runtime), runtime_params=runtime)
+        assert context == {"param": runtime}
 
     def test_fabric_context_workspace_id(self):
         """Fabric context provides workspace_id as nested dict under 'fabric'."""
         fabric = {"fabric.workspace_id": "ws-abc-123"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-abc-123"
 
     def test_fabric_context_lakehouse_id(self):
         """Fabric context provides lakehouse_id as nested dict under 'fabric'."""
         fabric = {"fabric.lakehouse_id": "lh-xyz-456"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         assert context["fabric"]["lakehouse_id"] == "lh-xyz-456"
 
     def test_fabric_context_none_values_excluded(self):
         """Fabric context keys with None values are excluded from context."""
         fabric = {"fabric.workspace_id": "ws-abc-123", "fabric.lakehouse_id": None}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-abc-123"
         assert "lakehouse_id" not in context["fabric"]
 
     def test_fabric_context_all_none_excluded(self):
         """Fabric context with all None values produces no 'fabric' key."""
         fabric = {"fabric.workspace_id": None, "fabric.lakehouse_id": None}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         assert "fabric" not in context
 
     def test_runtime_param_overrides_fabric_context(self):
         """Explicit runtime param overrides fabric context value."""
         fabric = {"fabric.workspace_id": "ws-from-spark"}
         runtime = {"fabric": {"workspace_id": "ws-override"}}
-        context = build_param_context(runtime_params=runtime, fabric_context=fabric)
+        context = scope_context(ParamScope.root(), runtime_params=runtime, fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-override"
 
     def test_full_priority_chain_with_fabric(self):
@@ -71,51 +69,31 @@ class TestBuildParamContext:
             "fabric.workspace_name": "wks-spark",
         }
         runtime = {"fabric": {"workspace_id": "ws-runtime"}, "env": "prod"}
-        context = build_param_context(runtime_params=runtime, fabric_context=fabric)
+        context = scope_context(ParamScope.root(), runtime_params=runtime, fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-runtime"  # Runtime wins
         assert "env" not in context
 
     def test_fabric_context_none_param_no_error(self):
         """Passing None for fabric_context is valid and produces no fabric key."""
-        context = build_param_context(fabric_context=None)
+        context = scope_context(ParamScope.root(), fabric_context=None)
         assert "fabric" not in context
 
-
-class TestEntryParams:
-    """Test entry_params layer in build_param_context (M121 Task 3)."""
-
-    def test_entry_params_nested_under_param_key(self):
-        """entry_params values nest under context['param']."""
-        context = build_param_context(entry_params={"table": "ADR6"})
-        assert context["param"]["table"] == "ADR6"
-
-    def test_entry_params_resolve_via_dotted_access(self):
-        """${param.table} resolves via dotted key access."""
-        context = build_param_context(entry_params={"table": "ADR6"})
-        result = resolve_variables({"x": "${param.table}"}, context)
-        assert result["x"] == "ADR6"
-
-    def test_entry_params_no_interference_with_flat(self):
-        """Runtime params are not merged flat beside the param namespace."""
-        context = build_param_context(
-            runtime_params={"env": "prod"},
-            entry_params={"table": "ADR6"},
-        )
+    def test_scope_bindings_nest_under_param_key(self):
+        """A scope's bound values nest under context['param'] and resolve dotted."""
+        scope = ParamScope.root().child(None, pins={"table": "ADR6"})
+        context = scope_context(scope)
         assert context == {"param": {"table": "ADR6"}}
-        result = resolve_variables({"b": "${param.table}"}, context)
-        assert result == {"b": "ADR6"}
+        assert resolve_variables({"x": "${param.table}"}, context) == {"x": "ADR6"}
 
-    def test_entry_params_none_no_effect(self):
-        """entry_params=None adds no 'param' key (backwards compat)."""
-        context = build_param_context(entry_params=None)
-        assert "param" not in context
+    def test_empty_scope_adds_no_param_key(self):
+        """A scope with no bindings adds no 'param' key."""
+        assert "param" not in scope_context(ParamScope.root())
 
-    def test_runtime_overrides_entry_params(self):
-        """A runtime param named 'param' does not replace the param namespace."""
-        context = build_param_context(
-            runtime_params={"param": {"table": "OVERRIDE"}},
-            entry_params={"table": "ADR6"},
-        )
+    def test_runtime_param_named_param_does_not_replace_namespace(self):
+        """A runtime param named 'param' is one binding, not the namespace."""
+        runtime = {"param": {"table": "OVERRIDE"}}
+        scope = ParamScope.root(runtime).child(None, pins={"table": "ADR6"})
+        context = scope_context(scope, runtime_params=runtime)
         assert context["param"]["table"] == "ADR6"
 
 
@@ -124,7 +102,7 @@ class TestConsumedKeysTracking:
 
     def test_param_keys_tracked(self):
         """${param.x} and ${param.y} usage tracked in consumed_keys."""
-        context = build_param_context(entry_params={"x": 1, "y": 2})
+        context = {"param": {"x": 1, "y": 2}}
         consumed: set[str] = set()
         resolve_variables(
             {"a": "${param.x}", "b": "${param.y}"},
@@ -135,7 +113,7 @@ class TestConsumedKeysTracking:
 
     def test_duplicate_usage_idempotent(self):
         """Same param used twice produces single entry in consumed_keys."""
-        context = build_param_context(entry_params={"x": 1})
+        context = {"param": {"x": 1}}
         consumed: set[str] = set()
         resolve_variables(
             {"a": "${param.x}", "b": "${param.x}"},
@@ -254,7 +232,7 @@ class TestStandaloneTemplateErrors:
 
     def test_standalone_unresolved_param_hints_template(self):
         """Standalone thread with ${param.x} raises with param.table in msg."""
-        context = build_param_context()
+        context = {}
         config = {"alias": "${param.table}"}
         with pytest.raises(VariableResolutionError, match="param.table"):
             resolve_variables(config, context)
@@ -286,7 +264,7 @@ class TestFabricVariableResolution:
     def test_fabric_workspace_id_resolves(self):
         """${fabric.workspace_id} resolves from fabric context."""
         fabric = {"fabric.workspace_id": "ws-abc-123"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         config = {"workspace": "${fabric.workspace_id}"}
         result = resolve_variables(config, context)
         assert result["workspace"] == "ws-abc-123"
@@ -294,14 +272,14 @@ class TestFabricVariableResolution:
     def test_fabric_lakehouse_id_resolves(self):
         """${fabric.lakehouse_id} resolves from fabric context."""
         fabric = {"fabric.lakehouse_id": "lh-xyz-456"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         config = {"lakehouse": "${fabric.lakehouse_id}"}
         result = resolve_variables(config, context)
         assert result["lakehouse"] == "lh-xyz-456"
 
     def test_fabric_workspace_id_missing_raises(self):
         """${fabric.workspace_id} with no fabric context raises VariableResolutionError."""
-        context = build_param_context()
+        context = {}
         config = {"workspace": "${fabric.workspace_id}"}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
@@ -309,7 +287,7 @@ class TestFabricVariableResolution:
 
     def test_fabric_workspace_id_with_default_fallback(self):
         """${fabric.workspace_id:-fallback} uses default when fabric context absent."""
-        context = build_param_context()
+        context = {}
         config = {"workspace": "${fabric.workspace_id:-local-ws}"}
         result = resolve_variables(config, context)
         assert result["workspace"] == "local-ws"
@@ -317,7 +295,7 @@ class TestFabricVariableResolution:
     def test_fabric_context_in_embedded_string(self):
         """${fabric.workspace_id} embedded in longer string resolves correctly."""
         fabric = {"fabric.workspace_id": "ws-abc-123"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         config = {"path": "abfss://data@storage/${fabric.workspace_id}/files"}
         result = resolve_variables(config, context)
         assert result["path"] == "abfss://data@storage/ws-abc-123/files"
@@ -419,264 +397,8 @@ class TestResolveVariables:
         assert result["env"] == "dev"
 
 
-class TestValidateParams:
-    """Test validate_params function."""
-
-    def test_string_type_valid(self):
-        """Validate string parameter."""
-        specs = {"env": {"type": "string", "required": True}}
-        context = {"env": "dev"}
-        validate_params(specs, context)  # Should not raise
-
-    def test_string_type_invalid(self):
-        """Reject non-string for string type."""
-        specs = {"env": {"type": "string", "required": True}}
-        context = {"env": 123}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected string" in str(exc_info.value).lower()
-
-    def test_int_type_valid(self):
-        """Validate int parameter."""
-        specs = {"port": {"type": "int", "required": True}}
-        context = {"port": 5432}
-        validate_params(specs, context)  # Should not raise
-
-    def test_int_type_invalid(self):
-        """Reject non-int for int type."""
-        specs = {"port": {"type": "int", "required": True}}
-        context = {"port": "5432"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected int" in str(exc_info.value).lower()
-
-    def test_float_type_valid(self):
-        """Validate float parameter."""
-        specs = {"ratio": {"type": "float", "required": True}}
-        context = {"ratio": 3.14}
-        validate_params(specs, context)  # Should not raise
-
-    def test_float_accepts_int(self):
-        """Float type should accept int values."""
-        specs = {"ratio": {"type": "float", "required": True}}
-        context = {"ratio": 3}
-        validate_params(specs, context)  # Should not raise
-
-    def test_bool_type_valid(self):
-        """Validate bool parameter."""
-        specs = {"enabled": {"type": "bool", "required": True}}
-        context = {"enabled": True}
-        validate_params(specs, context)  # Should not raise
-
-    def test_bool_type_invalid(self):
-        """Reject non-bool for bool type."""
-        specs = {"enabled": {"type": "bool", "required": True}}
-        context = {"enabled": "true"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected bool" in str(exc_info.value).lower()
-
-    def test_date_type_valid_string(self):
-        """Validate date parameter as ISO string."""
-        specs = {"start_date": {"type": "date", "required": True}}
-        context = {"start_date": "2024-01-15"}
-        validate_params(specs, context)  # Should not raise
-
-    def test_date_type_invalid_format(self):
-        """Reject invalid date format."""
-        specs = {"start_date": {"type": "date", "required": True}}
-        context = {"start_date": "01/15/2024"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "date format" in str(exc_info.value).lower()
-
-    def test_timestamp_type_valid_string(self):
-        """Validate timestamp parameter as ISO string."""
-        specs = {"created_at": {"type": "timestamp", "required": True}}
-        context = {"created_at": "2024-01-15T10:30:00"}
-        validate_params(specs, context)  # Should not raise
-
-    def test_timestamp_type_invalid_format(self):
-        """Reject invalid timestamp format."""
-        specs = {"created_at": {"type": "timestamp", "required": True}}
-        context = {"created_at": "invalid-timestamp"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "timestamp format" in str(exc_info.value).lower()
-
-    def test_list_string_type_valid(self):
-        """Validate list[string] parameter."""
-        specs = {"tags": {"type": "list[string]", "required": True}}
-        context = {"tags": ["dev", "critical"]}
-        validate_params(specs, context)  # Should not raise
-
-    def test_list_string_type_not_list(self):
-        """Reject non-list for list[string] type."""
-        specs = {"tags": {"type": "list[string]", "required": True}}
-        context = {"tags": "dev"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected list" in str(exc_info.value).lower()
-
-    def test_list_string_type_non_string_items(self):
-        """Reject list with non-string items."""
-        specs = {"tags": {"type": "list[string]", "required": True}}
-        context = {"tags": ["dev", 123]}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "list of strings" in str(exc_info.value).lower()
-
-    def test_required_param_missing(self):
-        """Raise error for missing required parameter."""
-        specs = {"env": {"type": "string", "required": True}}
-        context = {}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "Required parameter" in str(exc_info.value)
-        assert "env" in str(exc_info.value)
-
-    def test_required_param_with_default(self):
-        """Use default for required param when missing."""
-        specs = {"env": {"type": "string", "required": True, "default": "dev"}}
-        context = {}
-        validate_params(specs, context)
-        assert context["env"] == "dev"  # Default applied
-
-    def test_optional_param_missing(self):
-        """Optional param missing should not raise."""
-        specs = {"optional": {"type": "string", "required": False}}
-        context = {}
-        validate_params(specs, context)  # Should not raise
-
-    def test_none_param_specs(self):
-        """None param specs should not raise."""
-        validate_params(None, {"env": "dev"})  # Should not raise
-
-    def test_empty_param_specs(self):
-        """Empty param specs should not raise."""
-        validate_params({}, {"env": "dev"})  # Should not raise
-
-
-class TestResolveDeclaredParams:
-    """Test loom/weave-level declared param resolution under the param.* namespace."""
-
-    def test_runtime_override_wins_over_declared_default(self):
-        """Runtime value beats the spec's declared default."""
-        specs = {
-            "workspace_id": {
-                "name": "workspace_id",
-                "type": "string",
-                "required": True,
-                "default": "default-ws",
-            }
-        }
-        result = resolve_declared_params(specs, {"workspace_id": "runtime-ws"})
-        assert result == {"workspace_id": "runtime-ws"}
-
-    def test_declared_default_used_when_runtime_omits(self):
-        """Spec default applied when runtime supplies no value."""
-        specs = {
-            "region": {
-                "name": "region",
-                "type": "string",
-                "required": False,
-                "default": "eastus",
-            }
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert result == {"region": "eastus"}
-
-    def test_required_missing_raises_with_file_context(self):
-        """Required param with no default and no runtime value raises with file path."""
-        specs = {
-            "workspace_id": {
-                "name": "workspace_id",
-                "type": "string",
-                "required": True,
-            }
-        }
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            resolve_declared_params(specs, runtime_params=None, file_path="silver.loom")
-        msg = str(exc_info.value)
-        assert "workspace_id" in msg
-        assert "silver.loom" in msg
-
-    def test_optional_param_no_default_omitted(self):
-        """Non-required param with no default and no runtime value is omitted."""
-        specs = {
-            "region": {"name": "region", "type": "string", "required": False},
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert "region" not in result
-
-    def test_works_with_paramspec_objects(self):
-        """Helper accepts ParamSpec instances directly (pre-dump)."""
-        specs = {
-            "workspace_id": ParamSpec(
-                name="workspace_id", type="string", required=True, default="ws-default"
-            )
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert result == {"workspace_id": "ws-default"}
-
-    def test_works_with_dict_specs(self):
-        """Helper accepts model_dump'd dict specs (post-pydantic)."""
-        specs = {
-            "max_rows": {
-                "name": "max_rows",
-                "type": "int",
-                "required": False,
-                "default": 1000,
-            }
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert result == {"max_rows": 1000}
-
-    def test_required_default_not_set_required_implicit_true(self):
-        """`required` defaults to True (matching ParamSpec field default)."""
-        specs = {"x": {"name": "x", "type": "string"}}  # no `required` key
-        with pytest.raises(ConfigSchemaError):
-            resolve_declared_params(specs, runtime_params=None)
-
-    def test_none_specs_returns_empty(self):
-        """None or empty specs returns empty dict."""
-        assert resolve_declared_params(None, {"x": 1}) == {}
-        assert resolve_declared_params({}, {"x": 1}) == {}
-
-    def test_only_declared_keys_consumed(self):
-        """Runtime keys not declared in specs are ignored (declared scope only)."""
-        specs = {"declared": {"name": "declared", "type": "string", "required": True}}
-        result = resolve_declared_params(
-            specs, runtime_params={"declared": "v", "extra": "ignored"}
-        )
-        assert result == {"declared": "v"}
-
-    def test_type_mismatch_via_validate_params(self):
-        """Type-mismatched runtime value is rejected by the paired validate_params call."""
-        specs = {"max_rows": {"name": "max_rows", "type": "int", "required": True}}
-        resolved = resolve_declared_params(specs, runtime_params={"max_rows": "abc"})
-        with pytest.raises(ConfigSchemaError, match="expected int"):
-            validate_params(specs, resolved)
-
-    def test_none_runtime_value_treated_as_absent(self):
-        """Runtime ``None`` value is ignored so default + required checks apply."""
-        # With a default: default is used.
-        with_default = {"region": {"name": "region", "type": "string", "default": "eastus"}}
-        result = resolve_declared_params(with_default, runtime_params={"region": None})
-        assert result == {"region": "eastus"}
-
-        # Without a default and required: raises required-missing, not type-mismatch.
-        required = {
-            "workspace_id": {
-                "name": "workspace_id",
-                "type": "string",
-                "required": True,
-            }
-        }
-        with pytest.raises(ConfigSchemaError, match="missing"):
-            resolve_declared_params(
-                required, runtime_params={"workspace_id": None}, file_path="x.loom"
-            )
+class TestDeclaredParamsAndDefaults:
+    """Declared params bind in the scope; ``defaults`` stay out of the variables."""
 
     def test_defaults_and_declared_params_independent(self):
         """``defaults`` are not variables: a bare reference to one fails ``P111``."""
@@ -688,14 +410,11 @@ class TestResolveDeclaredParams:
             }
         }
         config_defaults = {"env": "dev"}
-        resolved_params = resolve_declared_params(
-            param_specs, runtime_params={"workspace_id": "ws-1"}
-        )
-        context = build_param_context(
-            runtime_params={"workspace_id": "ws-1"}, entry_params=resolved_params
-        )
+        runtime = {"workspace_id": "ws-1"}
+        scope = ParamScope.root(runtime).child(param_specs)
+        context = scope_context(scope, runtime_params=runtime)
         assert resolve_variables({"w": "${param.workspace_id}"}, context) == {"w": "ws-1"}
-        names = BareNames(declared=frozenset(param_specs), defaults=config_defaults)
+        names = BareNames(declared=frozenset(scope.specs), defaults=config_defaults)
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables({"lakehouse": "${env}"}, context, names=names)
         assert [d.code for d in exc_info.value.diagnostics] == ["P111"]
@@ -708,7 +427,7 @@ class TestUnresolvedParamHints:
     def test_unresolved_param_lists_available_names(self):
         """Error message lists declared param names for typo detection."""
         # Loom declares `workspace_id`; YAML mistypes as `workspaceid`.
-        context = build_param_context(entry_params={"workspace_id": "ws-1"})
+        context = {"param": {"workspace_id": "ws-1"}}
         config = {"workspace": "${param.workspaceid}"}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
@@ -1377,7 +1096,7 @@ class TestStandaloneThreadResources:
         assert thread.post_steps is not None and len(thread.post_steps) == 1
 
     def test_param_validation_required_param_missing_raises(self):
-        """validate_params raises ConfigSchemaError when a required thread param is absent."""
+        """A required thread param with no value fails P101 when its scope binds."""
         from weevr.model.thread import Thread
 
         data = {
@@ -1386,18 +1105,12 @@ class TestStandaloneThreadResources:
         }
         thread = Thread.model_validate(data)
 
-        # Build param specs dict from thread.params (as validate_params expects)
-        assert thread.params is not None
-        param_specs = {k: v for k, v in thread.params.items()}
-        context: dict = {}
-
         with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(param_specs, context)
-        assert "Required parameter" in str(exc_info.value)
-        assert "env" in str(exc_info.value)
+            ParamScope.root().child(thread.params)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P101"]
 
     def test_param_validation_type_mismatch_raises(self):
-        """validate_params raises ConfigSchemaError when a thread param has wrong type."""
+        """A thread param value its type rejects fails P102 when its scope binds."""
         from weevr.model.thread import Thread
 
         data = {
@@ -1406,16 +1119,12 @@ class TestStandaloneThreadResources:
         }
         thread = Thread.model_validate(data)
 
-        assert thread.params is not None
-        param_specs = {k: v for k, v in thread.params.items()}
-        context = {"count": "not_an_int"}
-
         with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(param_specs, context)
-        assert "expected int" in str(exc_info.value).lower()
+            ParamScope.root({"count": "not_an_int"}).child(thread.params)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P102"]
 
     def test_param_validation_with_defaults_passes(self):
-        """validate_params uses default when required param is absent but has a default."""
+        """A required thread param with a default binds the default."""
         from weevr.model.thread import Thread
 
         data = {
@@ -1431,12 +1140,7 @@ class TestStandaloneThreadResources:
         }
         thread = Thread.model_validate(data)
 
-        assert thread.params is not None
-        param_specs = {k: v for k, v in thread.params.items()}
-        context: dict = {}
-
-        validate_params(param_specs, context)  # Should not raise
-        assert context["mode"] == "batch"
+        assert ParamScope.root().child(thread.params).values() == {"mode": "batch"}
 
     def test_variable_resolution_within_standalone_thread(self):
         """${param.param} references inside a standalone thread config resolve correctly."""
@@ -1726,7 +1430,7 @@ class TestThreadParameterizationE2E:
             "sources": {"d": {"type": "delta", "alias": "${param.table}"}},
             "target": {},
         }
-        context = build_param_context()
+        context = {}
         with pytest.raises(VariableResolutionError, match="param.table"):
             resolve_variables(config, context)
 

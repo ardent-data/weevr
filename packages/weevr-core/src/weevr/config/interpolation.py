@@ -7,7 +7,7 @@ for execution. Each namespace resolves on its own; nothing falls back from one
 to another. A bare ``${x}`` fails ``P111`` with the reference rewritten into its
 namespace, and an unknown namespace fails ``P112``.
 
-:func:`build_param_context` assembles the load-time namespaces, and
+:func:`load_context` assembles the load-time namespaces, and
 :func:`resolve_variables` substitutes ``${...}`` references against them.
 """
 
@@ -47,37 +47,49 @@ class BareNames:
     defaults: Mapping[str, Any] = field(default_factory=dict)
 
 
-def build_param_context(
-    runtime_params: dict[str, Any] | None = None,
-    fabric_context: dict[str, Any] | None = None,
-    entry_params: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Build the load-time namespaces a ``${...}`` reference reads.
+def fabric_namespace(
+    runtime_params: Mapping[str, Any] | None = None,
+    fabric_context: Mapping[str, Any] | None = None,
+) -> Any:
+    """The ``fabric`` namespace a ``${fabric.x}`` reference reads.
 
     Args:
-        runtime_params: Runtime parameters. Only their ``fabric`` key is read
-            here: it stands in for the Fabric context in loads with no session.
-            Their values reach ``${param.x}`` through ``entry_params``.
+        runtime_params: Runtime parameters. A ``fabric`` key among them stands
+            in for the Fabric context in loads with no session, and wins.
         fabric_context: Fabric environment values keyed as ``fabric.<field>``
             (e.g. ``fabric.workspace_id``). None values are omitted.
-        entry_params: The scope's bound params, the ``param`` namespace.
+
+    Returns:
+        The namespace's values; ``None`` when there are none.
+    """
+    if runtime_params and "fabric" in runtime_params:
+        return runtime_params["fabric"]
+    fabric = {
+        k.split(".", 1)[1]: v
+        for k, v in (fabric_context or {}).items()
+        if v is not None and k.startswith("fabric.")
+    }
+    return fabric or None
+
+
+def load_context(
+    params: Mapping[str, Any] | None,
+    fabric: Any = None,
+) -> dict[str, Any]:
+    """The load-time namespaces a ``${...}`` reference reads.
+
+    Args:
+        params: The scope's bound params, the ``param`` namespace.
+        fabric: The ``fabric`` namespace (:func:`fabric_namespace`).
 
     Returns:
         ``{"param": ..., "fabric": ...}``, each present when it has values.
     """
     context: dict[str, Any] = {}
-    if fabric_context:
-        fabric_dict = {
-            k.split(".", 1)[1]: v
-            for k, v in fabric_context.items()
-            if v is not None and k.startswith("fabric.")
-        }
-        if fabric_dict:
-            context["fabric"] = fabric_dict
-    if runtime_params and "fabric" in runtime_params:
-        context["fabric"] = runtime_params["fabric"]
-    if entry_params:
-        context["param"] = entry_params
+    if fabric:
+        context["fabric"] = fabric
+    if params:
+        context["param"] = dict(params)
     return context
 
 
@@ -310,7 +322,7 @@ def resolve_variables(
 
     Args:
         config: Config structure to resolve (dict, list, str, or primitive)
-        context: The load-time namespaces (:func:`build_param_context`).
+        context: The load-time namespaces (:func:`load_context`).
         consumed_keys: Optional set to track which context keys were consumed
             during resolution. When provided, each resolved dotted key is
             added to the set for post-resolution unused-param analysis.

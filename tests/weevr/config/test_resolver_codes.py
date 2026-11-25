@@ -17,12 +17,8 @@ from weevr.config.interpolation import resolve_variables
 from weevr.config.loader import resolve_config
 from weevr.config.locations import LocalConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
-from weevr.config.resolver import (
-    resolve_declared_params,
-    resolve_ref_path,
-    resolve_references,
-    validate_params,
-)
+from weevr.config.params import ParamScope
+from weevr.config.resolver import resolve_ref_path, resolve_references
 from weevr.diagnostics import Diagnostic, Severity
 from weevr.errors import (
     ConfigError,
@@ -57,24 +53,16 @@ class TestParameters:
     def test_missing_required_declared_param(self):
         specs = {"region": {"type": "string", "required": True}}
         with pytest.raises(ConfigSchemaError) as exc:
-            resolve_declared_params(specs, None, file_path="a.loom")
+            ParamScope.root().child(specs, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "P101"
         assert diag.severity is Severity.ERROR
         assert diag.file == "a.loom"
         assert diag.pointer == "/params/region"
 
-    def test_missing_required_param_in_validation_has_same_code(self):
-        specs = {"region": {"type": "string", "required": True}}
-        with pytest.raises(ConfigSchemaError) as exc:
-            validate_params(specs, {})
-        diag = _only(exc.value)
-        assert diag.code == "P101"
-        assert diag.pointer == "/params/region"
-
     def test_param_spec_not_a_mapping(self):
         with pytest.raises(ConfigSchemaError) as exc:
-            resolve_declared_params({"region": "string"}, None, file_path="a.loom")
+            ParamScope.root().child({"region": "string"}, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "C102"
         assert diag.file == "a.loom"
@@ -84,7 +72,7 @@ class TestParameters:
         ("ptype", "value"),
         [
             ("string", 1),
-            ("int", "1"),
+            ("int", "1.5"),
             ("int", True),
             ("float", "x"),
             ("bool", "yes"),
@@ -97,16 +85,18 @@ class TestParameters:
     def test_type_mismatch(self, ptype, value):
         specs = {"p": {"type": ptype, "required": True}}
         with pytest.raises(ConfigSchemaError) as exc:
-            validate_params(specs, {"p": value})
+            ParamScope.root({"p": value}).child(specs, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "P102"
+        assert diag.file == "a.loom"
         assert diag.pointer == "/params/p"
+        assert diag.expected == (ptype,)
 
     @pytest.mark.parametrize(("ptype", "value"), [("date", "31/12/2024"), ("timestamp", "nope")])
     def test_format_error(self, ptype, value):
         specs = {"p": {"type": ptype, "required": True}}
         with pytest.raises(ConfigSchemaError) as exc:
-            validate_params(specs, {"p": value})
+            ParamScope.root({"p": value}).child(specs, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "P103"
         assert diag.pointer == "/params/p"
