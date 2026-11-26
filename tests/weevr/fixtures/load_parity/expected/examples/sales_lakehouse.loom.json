@@ -55,11 +55,13 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "sales_lakehouse.loom",
+    "strict_params": null,
     "variables": null,
     "weaves": [
       {
         "condition": null,
         "name": "dimensions",
+        "params": null,
         "ref": null
       },
       {
@@ -67,6 +69,7 @@
           "when": "table_exists('curated.dim_customer')"
         },
         "name": "facts",
+        "params": null,
         "ref": null
       }
     ]
@@ -116,6 +119,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": null,
@@ -207,6 +211,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": null,
@@ -335,6 +340,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "dimensions",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,
@@ -362,6 +368,7 @@
       "post_steps": null,
       "pre_steps": null,
       "qualified_key": "facts",
+      "strict_params": null,
       "threads": [
         {
           "as_": null,

@@ -1,0 +1,110 @@
+{
+  "config_name": "sales_lakehouse",
+  "config_type": "loom",
+  "model": {
+    "config_version": "2.0",
+    "defaults": {
+      "execution": {
+        "log_level": "standard"
+      },
+      "write": {
+        "mode": "overwrite"
+      }
+    },
+    "execution": {},
+    "name": "sales_lakehouse",
+    "params": {
+      "lakehouse_path": {
+        "description": "Root path for the lakehouse storage layer",
+        "name": "lakehouse_path",
+        "type": "string"
+      },
+      "load_date": {
+        "default": "2025-01-01",
+        "description": "Date to use for incremental load boundaries",
+        "name": "load_date",
+        "required": false,
+        "type": "date"
+      }
+    },
+    "qualified_key": "sales_lakehouse.loom",
+    "weaves": [
+      {
+        "name": "dimensions"
+      },
+      {
+        "condition": {
+          "when": "table_exists('curated.dim_customer')"
+        },
+        "name": "facts"
+      }
+    ]
+  },
+  "threads": {
+    "dimensions": {
+      "dim_customer": {
+        "config_version": "2.0",
+        "execution": {},
+        "name": "dim_customer",
+        "qualified_key": "dim_customer",
+        "sources": {
+          "customers": {
+            "alias": "staging.customers",
+            "type": "delta"
+          }
+        },
+        "target": {
+          "path": "/lakehouse/default/curated/dim_customer"
+        },
+        "write": {}
+      }
+    },
+    "facts": {
+      "fact_orders": {
+        "config_version": "2.0",
+        "execution": {},
+        "name": "fact_orders",
+        "qualified_key": "fact_orders",
+        "sources": {
+          "orders": {
+            "alias": "staging.orders",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "order_date >= '2025-01-01'"
+            }
+          }
+        ],
+        "target": {
+          "path": "/lakehouse/default/curated/fact_orders"
+        },
+        "write": {}
+      }
+    }
+  },
+  "weaves": {
+    "dimensions": {
+      "config_version": "2.0",
+      "name": "dimensions",
+      "qualified_key": "dimensions",
+      "threads": [
+        {
+          "name": "dim_customer"
+        }
+      ]
+    },
+    "facts": {
+      "config_version": "2.0",
+      "name": "facts",
+      "qualified_key": "facts",
+      "threads": [
+        {
+          "name": "fact_orders"
+        }
+      ]
+    }
+  }
+}

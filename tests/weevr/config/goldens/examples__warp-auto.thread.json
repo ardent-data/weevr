@@ -1,0 +1,34 @@
+{
+  "config_name": "warp-auto",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "name": "warp-auto",
+    "qualified_key": "warp-auto.thread",
+    "sources": {
+      "orders": {
+        "alias": "bronze.raw_orders",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "select": {
+          "columns": [
+            "order_id",
+            "customer_id",
+            "amount",
+            "order_date"
+          ]
+        }
+      }
+    ],
+    "target": {
+      "alias": "gold.fact_orders",
+      "schema_drift": "adaptive",
+      "warp_mode": "auto"
+    }
+  },
+  "threads": {},
+  "weaves": {}
+}

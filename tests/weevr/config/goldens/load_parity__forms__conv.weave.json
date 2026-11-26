@@ -1,0 +1,34 @@
+{
+  "config_name": "conv",
+  "config_type": "weave",
+  "model": {
+    "config_version": "2.0",
+    "name": "conv",
+    "qualified_key": "conv.weave",
+    "threads": [
+      {
+        "ref": "threads/conv.thread"
+      }
+    ]
+  },
+  "threads": {
+    "conv": {
+      "conv": {
+        "config_version": "2.0",
+        "name": "conv",
+        "qualified_key": "threads/conv.thread",
+        "sources": {
+          "data": {
+            "path": "<root>/data/conv.csv",
+            "type": "csv"
+          }
+        },
+        "target": {
+          "alias": "gold.conv"
+        },
+        "template_ref": "threads/conv.thread"
+      }
+    }
+  },
+  "weaves": {}
+}

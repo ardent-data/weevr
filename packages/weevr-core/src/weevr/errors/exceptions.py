@@ -162,10 +162,11 @@ class ConfigVersionError(ConfigError):
 
 
 class VariableResolutionError(ConfigError):
-    """Raised when a ``${variable}`` reference cannot be resolved.
+    """Raised when a ``${namespace.name}`` reference cannot be resolved.
 
-    This occurs when a variable placeholder has no matching entry in the
-    parameter context and no default value (``${var:-default}``) is provided.
+    This occurs when a ``${param.x}`` or ``${fabric.x}`` reference has no value
+    and no default (``${param.x:-default}``), when a reference names no
+    namespace (``${x}``), or when its namespace is unknown.
     """
 
     pass

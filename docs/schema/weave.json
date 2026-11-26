@@ -1307,7 +1307,7 @@
       "type": "object"
     }
   },
-  "description": "A collection of thread references with optional shared defaults.",
+  "description": "A collection of thread references with optional shared defaults.\n\n``strict_params`` overrides the loom's setting for the weave and its\nthreads, unless a thread sets its own.",
   "properties": {
     "name": {
       "default": "",
@@ -1370,6 +1370,19 @@
       "default": null,
       "description": "Typed parameter declarations with defaults and validation.",
       "title": "Params"
+    },
+    "strict_params": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Enforce the params contract in this scope and below: a ${param.x} reference must be declared (P120) and, at the root, every runtime param must be declared or referenced (P121). The most specific setting wins; unset inherits, and is lenient at the root.",
+      "title": "Strict Params"
     },
     "execution": {
       "anyOf": [

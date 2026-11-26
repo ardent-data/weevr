@@ -2,11 +2,12 @@
 
 A load produces one :class:`ResolvedDocument` for the file it was given, with
 a child document for each config that file pulls in: a loom's weaves, and
-each weave's threads. Every node holds the hydrated model, and every child
-records the parent entry that pulled it in as an :class:`EntryMeta`.
+each weave's threads. Every node holds the hydrated model, every child
+records the parent entry that pulled it in as an :class:`EntryMeta`, and every
+node records where its param values came from as its :class:`Provenance`.
 
-It imports only :mod:`weevr.model` and the registry cascade, so it loads
-without PySpark or the engine wheel.
+It imports only :mod:`weevr.model`, the registry cascade and the provenance
+records, so it loads without PySpark or the engine wheel.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from weevr.config.inheritance import cascade_registry
+from weevr.config.param_provenance import ParamProvenance
 from weevr.model import Loom, Thread, Weave
 from weevr.model.column_set import ColumnSet
 from weevr.model.lookup import Lookup
@@ -38,8 +40,8 @@ class EntryMeta:
             an inline child or a weave found by name.
         alias: The entry's ``as`` name, which becomes the child's effective
             name (threads only).
-        params: Values the entry passes to a template thread's ``params``
-            (threads only).
+        params: The entry's ``params``: values a ``ref:`` entry pins for its
+            subtree (an inline child's own declarations).
         dependencies: Threads this one waits for, as declared on the entry
             (threads only).
         condition: The entry's run condition.
@@ -60,7 +62,7 @@ class EntryMeta:
     def from_entry(cls, entry: ThreadEntry | WeaveEntry) -> EntryMeta:
         """Build from a hydrated weave's thread entry or a loom's weave entry."""
         if isinstance(entry, WeaveEntry):
-            return cls(ref=entry.ref, condition=entry.condition)
+            return cls(ref=entry.ref, params=entry.params, condition=entry.condition)
         return cls(
             ref=entry.ref,
             alias=entry.as_,
@@ -130,6 +132,34 @@ def _frozen_children() -> Mapping[str, ResolvedDocument]:
     return MappingProxyType({})
 
 
+def _frozen_params() -> Mapping[str, ParamProvenance]:
+    return MappingProxyType({})
+
+
+@dataclass(frozen=True)
+class Provenance:
+    """Where one config's resolved values came from, read at load. Read-only.
+
+    Holds names and source kinds only, never the values themselves.
+
+    Attributes:
+        params: By param name, where this config's value came from: each
+            name its scope binds, and each unbound name a ``${param.x:-d}``
+            reference here read through its fallback. Each record
+            (:class:`weevr.config.param_provenance.ParamProvenance`) gives the value
+            source (``runtime``, ``pin``, ``inherited``, ``default`` or
+            ``fallback``), the winning declaration's tier, file and pointer
+            (``None`` for an undeclared name), and the pinning entry when the
+            value traces to a pin. Empty for a tree built from models.
+    """
+
+    params: Mapping[str, ParamProvenance] = field(default_factory=_frozen_params)
+
+    def __post_init__(self) -> None:
+        """Freeze ``params``."""
+        object.__setattr__(self, "params", MappingProxyType(dict(self.params)))
+
+
 @dataclass(frozen=True)
 class ResolvedDocument:
     """One loaded config and the configs it pulls in, fully resolved and hydrated.
@@ -154,6 +184,8 @@ class ResolvedDocument:
         project_root: The project root the load resolved references and
             Source paths against; ``None`` when unknown. Set on the loaded
             file's node only.
+        provenance: Where this config's values came from: per param, its
+            value source and winning declaration (:class:`Provenance`).
     """
 
     model: Thread | Weave | Loom
@@ -165,6 +197,7 @@ class ResolvedDocument:
     effective: ScopeRegistries = field(default_factory=ScopeRegistries)
     project: Project | None = None
     project_root: str | None = None
+    provenance: Provenance = field(default_factory=Provenance)
 
     def __post_init__(self) -> None:
         """Freeze ``children`` so the tree can't be changed through it."""

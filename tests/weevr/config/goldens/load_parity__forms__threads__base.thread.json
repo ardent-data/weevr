@@ -1,0 +1,62 @@
+{
+  "config_name": "base",
+  "config_type": "thread",
+  "model": {
+    "column_sets": {
+      "thread_map": {
+        "param": "thread_map"
+      }
+    },
+    "config_version": "2.0",
+    "lookups": {
+      "shared": {
+        "source": {
+          "alias": "ref.shared_thread",
+          "type": "delta"
+        }
+      }
+    },
+    "name": "base",
+    "qualified_key": "threads/base.thread",
+    "sources": {
+      "orders": {
+        "alias": "raw.orders",
+        "type": "delta"
+      },
+      "region": {
+        "lookup": "regions"
+      },
+      "shared": {
+        "lookup": "shared"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "order_id is not null"
+        }
+      },
+      {
+        "filter": {
+          "expr": "customer_id is not null"
+        }
+      },
+      {
+        "rename": {
+          "column_set": "thread_map"
+        }
+      }
+    ],
+    "target": {
+      "alias": "gold.base"
+    },
+    "variables": {
+      "shared_var": {
+        "default": 3,
+        "type": "int"
+      }
+    }
+  },
+  "threads": {},
+  "weaves": {}
+}

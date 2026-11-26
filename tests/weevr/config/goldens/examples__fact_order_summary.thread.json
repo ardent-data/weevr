@@ -1,0 +1,62 @@
+{
+  "config_name": "fact_order_summary",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "name": "fact_order_summary",
+    "qualified_key": "fact_order_summary.thread",
+    "sources": {
+      "orders": {
+        "alias": "raw.orders",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "status = 'completed' AND order_date >= '2025-01-01'"
+        }
+      },
+      {
+        "derive": {
+          "columns": {
+            "order_year": "year(order_date)",
+            "total_with_tax": "subtotal + tax_amount"
+          }
+        }
+      },
+      {
+        "select": {
+          "columns": [
+            "order_id",
+            "customer_id",
+            "order_date",
+            "order_year",
+            "subtotal",
+            "tax_amount",
+            "total_with_tax",
+            "region"
+          ]
+        }
+      },
+      {
+        "cast": {
+          "columns": {
+            "subtotal": "decimal(18,2)",
+            "tax_amount": "decimal(18,2)",
+            "total_with_tax": "decimal(18,2)"
+          }
+        }
+      }
+    ],
+    "target": {
+      "alias": "curated.fact_order_summary",
+      "partition_by": [
+        "order_year"
+      ]
+    },
+    "write": {}
+  },
+  "threads": {},
+  "weaves": {}
+}

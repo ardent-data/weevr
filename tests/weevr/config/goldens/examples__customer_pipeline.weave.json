@@ -1,0 +1,94 @@
+{
+  "config_name": "customer_pipeline",
+  "config_type": "weave",
+  "model": {
+    "config_version": "2.0",
+    "execution": {
+      "log_level": "verbose"
+    },
+    "name": "customer_pipeline",
+    "qualified_key": "customer_pipeline.weave",
+    "threads": [
+      {
+        "name": "staging_customers"
+      },
+      {
+        "dependencies": [
+          "staging_customers"
+        ],
+        "name": "dim_customer"
+      },
+      {
+        "dependencies": [
+          "dim_customer"
+        ],
+        "name": "fact_customer_orders"
+      }
+    ]
+  },
+  "threads": {
+    "customer_pipeline": {
+      "dim_customer": {
+        "config_version": "2.0",
+        "name": "dim_customer",
+        "qualified_key": "dim_customer",
+        "sources": {
+          "customers": {
+            "alias": "staging.customers",
+            "type": "delta"
+          }
+        },
+        "target": {
+          "alias": "curated.dim_customer"
+        }
+      },
+      "fact_customer_orders": {
+        "config_version": "2.0",
+        "name": "fact_customer_orders",
+        "qualified_key": "fact_customer_orders",
+        "sources": {
+          "customers": {
+            "alias": "curated.dim_customer",
+            "type": "delta"
+          },
+          "orders": {
+            "alias": "raw.orders",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "join": {
+              "on": [
+                {
+                  "left": "customer_id",
+                  "right": "customer_id"
+                }
+              ],
+              "source": "customers",
+              "type": "left"
+            }
+          }
+        ],
+        "target": {
+          "alias": "curated.fact_customer_orders"
+        }
+      },
+      "staging_customers": {
+        "config_version": "2.0",
+        "name": "staging_customers",
+        "qualified_key": "staging_customers",
+        "sources": {
+          "raw_customers": {
+            "alias": "raw.customers",
+            "type": "delta"
+          }
+        },
+        "target": {
+          "alias": "staging.customers"
+        }
+      }
+    }
+  },
+  "weaves": {}
+}

@@ -8,8 +8,8 @@ turn a v1 project folder into a v2 one.
 
 The rules are deterministic. Given the same folder and the same project
 `id`, every implementation produces the same bytes. The weevr repository
-proves them against a fixture project (`tests/fixtures/migration/v1/`)
-and its expected result (`tests/fixtures/migration/v2/`).
+proves them against fixture projects (`tests/fixtures/migration/v1/`)
+and their expected results (`tests/fixtures/migration/v2/`).
 
 ## Scope
 
@@ -189,6 +189,144 @@ An existing `weevr.yaml` is left as it is.
 `requires_weevr` is not written. A tool that writes one before weevr
 2.0.0 is final should use `">=2.0.0a1,<3"`: under PEP 440 the
 pre-release `2.0.0a2` sorts below `2`, so `">=2,<3"` would reject it.
+
+### 6. Name the namespace of a bare reference
+
+v1 let a document write `${name}` with no namespace. v2 reads only
+`${param.x}`, `${fabric.x}`, `${var.x}`, `${run.x}` and the hierarchy
+namespaces `${thread.x}`, `${weave.x}` and `${loom.x}`; a bare reference
+fails with `P111`. Every bare `${name}` and `${name:-default}` in a
+document (a reference whose first segment is none of those namespaces) is
+rewritten by the first of rules 7 to 10 that matches. A reference already in
+a namespace is not touched.
+
+References are found in every string value of the document: plain,
+quoted, and block scalar text. A `#` comment is never edited. The
+`:-default` text stays exactly as written through every rewrite, so
+`${env:-dev}` becomes `${param.env:-dev}`.
+
+A name is classified in the reference's **scope chain**: the document that
+holds it, then the looms and weaves above it, reached by the `ref:` entries
+and weave names that rule 4 resolves. A document referenced from more than
+one parent takes all of them. The chain is ordered nearest first: the document
+itself, then its parents level by level (parents, then their parents), the
+documents on one level sorted by project-relative path, each document once, so a
+reference cycle ends at the first revisit. The first document in this order
+that matches decides. Inline weaves and threads share the chain of the
+document that holds them.
+
+Two limits. A reference in a mapping **key** (`${x}: 1`) is not rewritten; a
+document holding one is left as v1 and a tool should report it. A reference
+nested in another's `:-` default (`${x:-${y}}`) is not supported: the pattern
+`${name}` or `${name:-default}` ends at the first `}`, so only the outer
+reference is rewritten (`${param.x:-${y}}`) and the inner one stays bare, for
+the author to fix.
+
+v1 read a bare name from the runtime parameters first, then from `defaults:`,
+then from the Fabric context. The order of rules 7 to 10 keeps that
+behavior. A migration has no runtime parameters, so a name only a run could
+supply is classified by rule 10 and reported.
+
+### 7. A declared param becomes `${param.x}`
+
+When `x` is declared in a `params:` block of any document in the chain
+(or of an inline weave or thread there), `${x}` becomes `${param.x}`.
+
+### 8. A `defaults:` key becomes a param
+
+When `x` is a key of the root `defaults:` block of a document in the chain
+and rule 7 did not match, the key is converted to a param declared at the
+same tier, and `${x}` becomes `${param.x}`. The nearest document in the chain
+that has the key wins, as the v1 cascade did.
+
+The key moves out of `defaults:` and into the same document's `params:`
+block as a `ParamSpec`, with the key's value as its `default`:
+
+```diff
+-defaults:
+-  env: prod
++params:
++  env:
++    name: env
++    type: string
++    default: prod
+```
+
+- Only a key a reference names is converted. Other `defaults:` keys stay.
+- Placement. When the document has no root `params:`, a new `params:` block
+  takes the place of the converted keys' `defaults:` block: it starts at the
+  `defaults:` line, with the `defaults:` keys that stay below it. When there is
+  a root `params:` block, the new specs follow its last content line.
+  Specs are written in the order the keys appear in `defaults:`.
+- Indentation. Let `n` be the indent of the `defaults:` entries. A new
+  `params:` block puts each name at `n` spaces and its `name`, `type` and
+  `default` lines at `2n`. An existing `params:` block keeps its own name
+  indent `m`: a new spec there puts the name at `m` and those lines at `m + n`.
+  The `name`, `type`, `default` order is fixed.
+- When a new `params:` block is created and `defaults:` keys remain, one blank
+  line separates them. It is not added when the block is extended, and a
+  `defaults:` block left with no keys is removed with its header.
+- Every added line takes the line ending of the `defaults:` line (of the last
+  `params:` line when the block is extended), or `\n` when that line has none; a
+  missing final newline stays missing.
+- The key's text and trailing comment are kept as the `default`.
+- The `type` follows the value as a YAML 1.1 parser reads it, and the `default` keeps
+  the value's text as written: a boolean (`true`, `yes`, `off`) gives `bool`, an
+  integer (`500`, `0x1F`, `1_000`) gives `int`, a float (`1.5`, `1.0e+3`) gives
+  `float`, a list of strings gives `list[string]`, and everything else, such as
+  `1e3` (not a float in YAML 1.1), gives `string`. A date or timestamp written
+  without quotes (`2024-01-01`) is quoted in the `default` and typed `string`, as
+  v1 substituted its text.
+- An embedded reference to a boolean renders as written, `true` or `false`.
+  v1 rendered `True` or `False`, so text built from a v1 boolean default
+  changes case: with `dry_run: false`, `dry-${dry_run}` gave `dry-False` in v1,
+  and its migrated `dry-${param.dry_run}` gives `dry-false`.
+- Only a one-line scalar, or a one-line list of strings, in a block `defaults:` is
+  converted, and only when the document's root `params:` is absent or a block
+  mapping. Any other key, such as a flow mapping, a block list or a null, is not
+  converted; a reference to it is classified by rule 10 and reported, and its author
+  declares the param.
+- Only a document's root `defaults:` is read. The `defaults:` block of an inline
+  weave or thread is not converted, and a reference to its keys is classified by
+  rule 10 and reported.
+
+### 9. A Fabric key becomes `${fabric.x}`
+
+When `x` is `workspace_id`, `lakehouse_id` or `workspace_name` and rules 7 and
+8 did not match, `${x}` becomes `${fabric.x}`. A dotted reference never matches
+this rule.
+
+### 10. Everything else becomes `${param.x}`, and is reported
+
+A name that no rule above matches can only have been supplied at run time. It
+becomes `${param.x}`, and the migration reports it as a **fallback**: the
+reference now needs a `params:` declaration, or the load warns (`P120`). A
+fallback is a review signal. It is never an error, and a run that supplies
+the value behaves as in v1.
+
+### Dotted names
+
+A dotted bare name, `${a.b.c}`, is classified by its first segment `a`
+with rules 7, 8 and 10, and the whole name is prefixed: `${env.lakehouse}` becomes
+`${param.env.lakehouse}`. Rule 9 does not apply to a dotted name, since a Fabric
+key has no sub-keys. A migration report lists it as a fallback when rule 10 classified
+the first segment.
+
+The reference migrator's report lists each reference rewritten, with its rule
+(7 to 10, and whether the name was dotted), and marks the fallbacks. It also lists
+the documents it left as v1 because the edits would not have had the effect the
+rules describe.
+
+The engine's `P111` hint computes the same rewrite for a document that still
+holds a bare reference, with two differences. A migration has no run, so its
+order is the one above.
+
+- The hint also checks whether the load supplied the name at run time before it
+  reads `defaults:`. This only changes the hint's wording, not the namespace it
+  suggests.
+- For a dotted name whose first segment is not declared, supplied or a `defaults:`
+  key, the engine raises `P112` (unknown namespace) and suggests no rewrite. The
+  migration writes `${param.a.b}` and reports it as a rule 10 fallback.
 
 ### Example
 

@@ -1,0 +1,106 @@
+{
+  "config_name": "enrichment_pipeline",
+  "config_type": "weave",
+  "model": {
+    "config_version": "2.0",
+    "execution": {
+      "log_level": "verbose"
+    },
+    "lookups": {
+      "country_codes": {
+        "materialize": true,
+        "source": {
+          "alias": "ref.country_codes",
+          "type": "delta"
+        },
+        "strategy": "broadcast"
+      },
+      "region_mapping": {
+        "source": {
+          "alias": "ref.region_mapping",
+          "type": "delta"
+        }
+      }
+    },
+    "name": "enrichment_pipeline",
+    "qualified_key": "enrichment_pipeline.weave",
+    "threads": [
+      {
+        "name": "enrich_customers"
+      },
+      {
+        "dependencies": [
+          "enrich_customers"
+        ],
+        "name": "enrich_orders"
+      }
+    ]
+  },
+  "threads": {
+    "enrichment_pipeline": {
+      "enrich_customers": {
+        "config_version": "2.0",
+        "name": "enrich_customers",
+        "qualified_key": "enrich_customers",
+        "sources": {
+          "countries": {
+            "lookup": "country_codes"
+          },
+          "customers": {
+            "alias": "raw.customers",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "join": {
+              "on": [
+                {
+                  "left": "country_code",
+                  "right": "country_code"
+                }
+              ],
+              "source": "countries",
+              "type": "left"
+            }
+          }
+        ],
+        "target": {
+          "alias": "curated.customers_enriched"
+        }
+      },
+      "enrich_orders": {
+        "config_version": "2.0",
+        "name": "enrich_orders",
+        "qualified_key": "enrich_orders",
+        "sources": {
+          "orders": {
+            "alias": "raw.orders",
+            "type": "delta"
+          },
+          "regions": {
+            "lookup": "region_mapping"
+          }
+        },
+        "steps": [
+          {
+            "join": {
+              "on": [
+                {
+                  "left": "region_id",
+                  "right": "region_id"
+                }
+              ],
+              "source": "regions",
+              "type": "left"
+            }
+          }
+        ],
+        "target": {
+          "alias": "curated.orders_enriched"
+        }
+      }
+    }
+  },
+  "weaves": {}
+}

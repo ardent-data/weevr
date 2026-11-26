@@ -23,6 +23,7 @@
     "post_steps": null,
     "pre_steps": null,
     "qualified_key": "conv.weave",
+    "strict_params": null,
     "threads": [
       {
         "as_": null,
@@ -75,6 +76,7 @@
           }
         },
         "steps": [],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "gold.conv",

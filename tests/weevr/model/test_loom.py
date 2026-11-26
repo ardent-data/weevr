@@ -180,7 +180,7 @@ class TestWeaveEntry:
                 "config_version": "2.0",
                 "weaves": [
                     "always",
-                    {"name": "conditional", "condition": {"when": "${env} == 'prod'"}},
+                    {"name": "conditional", "condition": {"when": "${param.env} == 'prod'"}},
                     "cleanup",
                 ],
             }

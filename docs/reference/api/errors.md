@@ -226,18 +226,21 @@ Raised when the configuration structure does not match the expected schema.
 
 - Required fields missing (e.g., `sources` or `target` in a thread)
 - Unknown config type passed to validation
-- Required parameter not supplied at runtime
+- Required parameter with no value: nothing supplied it and its declaration
+  has no default (`P101`)
 - Parameter value does not match declared type (wrong type for int, bool,
-  date, etc.)
-- Date parameter not in `YYYY-MM-DD` format
-- Timestamp parameter not in ISO 8601 format
+  date, etc.) (`P102`)
+- Date parameter not in `YYYY-MM-DD` format, or timestamp parameter not in
+  ISO 8601 format (`P103`)
 
 **Resolution:**
 
 1. Compare your config against the
    [YAML Schema Reference](../yaml-schema/thread.md) for required fields
-2. Check that all declared parameters are supplied with correct types
-3. Use `YYYY-MM-DD` for date parameters and ISO 8601 for timestamps
+2. Check that all declared parameters are supplied with correct types. The
+   parameter errors name the declaring file and point at `/params/<name>`.
+3. Use `YYYY-MM-DD` for date parameters and ISO 8601 for timestamps; see the
+   [coercion table](../../guides/params.md#type-coercion)
 
 **Example:**
 
@@ -297,21 +300,33 @@ config_version: "2.0"
 
 ### VariableResolutionError
 
-Raised when a `${variable}` reference cannot be resolved and has no
-default value.
+Raised when a `${param.x}` or `${fabric.x}` reference cannot be resolved
+and has no default value (`P110`), when a reference names no namespace
+(`${x}`, `P111`), or when it names an unknown namespace, hierarchy key, or
+Fabric key (`P112`). Under `strict_params` it is also raised for the param
+warnings that become errors: a `${param.x}` no declaration covers (`P120`), a
+runtime param nothing declares or references (`P121`), and a `${fabric.x}`
+left unresolved because the load has no Fabric context (`P113`).
 
 **Common causes:**
 
-- Variable referenced in config but not supplied in runtime parameters
-- Typo in variable name
-- Missing `params:` declaration in parent config
+- Param referenced in config but not supplied by runtime params, an entry
+  pin, or a declared default
+- Typo in the param name
+- A v1 bare reference (`${env}`) that needs its namespace
+- A `${fabric.x}` read through `load_config()` or `load_resolved()` with a
+  `fabric_context` that lacks the key
 
 **Resolution:**
 
 1. Supply the missing parameter at runtime through the context:
    `Context(spark, "my-project.weevr", params={"env": "prod"})`
-2. Add a default value in the config: `${env:-dev}`
-3. Check for typos in the variable name
+2. Declare it with a default in a `params:` block, or add an inline fallback
+   in the config: `${param.env:-dev}`
+3. Check for typos: the `P110` hint suggests the nearest declared name and
+   gives a `params:` block to paste
+4. Rewrite a bare reference as the `P111` message shows; see
+   [Moving off bare references](../../guides/params.md#moving-off-bare-references)
 
 **Example:**
 
@@ -320,16 +335,17 @@ default value.
 sources:
   orders:
     type: delta
-    alias: ${env}.raw.orders
+    alias: ${param.env}.raw.orders
 
 # Fixed — add a default value
 sources:
   orders:
     type: delta
-    alias: ${env:-dev}.raw.orders
+    alias: ${param.env:-dev}.raw.orders
 ```
 
-**Related:** [Config Resolution](../../guides/config-resolution.md)
+**Related:** [Config Resolution](../../guides/config-resolution.md),
+[Params](../../guides/params.md)
 
 ---
 

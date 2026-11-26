@@ -9,20 +9,17 @@ import pytest
 import yaml
 
 from documents import write_document, write_project
+from resolving import resolve_tree
 from weevr.config import load_config
 from weevr.config.attribution import attribute_errors
 from weevr.config.audit_templates import resolve_template_columns
 from weevr.config.inheritance import check_defaults_shape
+from weevr.config.interpolation import resolve_variables
 from weevr.config.loader import resolve_config
 from weevr.config.locations import LocalConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
-from weevr.config.resolver import (
-    resolve_declared_params,
-    resolve_ref_path,
-    resolve_references,
-    resolve_variables,
-    validate_params,
-)
+from weevr.config.params import ParamScope
+from weevr.config.resolver import resolve_ref_path
 from weevr.diagnostics import Diagnostic, Severity
 from weevr.errors import (
     ConfigError,
@@ -57,24 +54,16 @@ class TestParameters:
     def test_missing_required_declared_param(self):
         specs = {"region": {"type": "string", "required": True}}
         with pytest.raises(ConfigSchemaError) as exc:
-            resolve_declared_params(specs, None, file_path="a.loom")
+            ParamScope.root().child(specs, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "P101"
         assert diag.severity is Severity.ERROR
         assert diag.file == "a.loom"
         assert diag.pointer == "/params/region"
 
-    def test_missing_required_param_in_validation_has_same_code(self):
-        specs = {"region": {"type": "string", "required": True}}
-        with pytest.raises(ConfigSchemaError) as exc:
-            validate_params(specs, {})
-        diag = _only(exc.value)
-        assert diag.code == "P101"
-        assert diag.pointer == "/params/region"
-
     def test_param_spec_not_a_mapping(self):
         with pytest.raises(ConfigSchemaError) as exc:
-            resolve_declared_params({"region": "string"}, None, file_path="a.loom")
+            ParamScope.root().child({"region": "string"}, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "C102"
         assert diag.file == "a.loom"
@@ -84,7 +73,7 @@ class TestParameters:
         ("ptype", "value"),
         [
             ("string", 1),
-            ("int", "1"),
+            ("int", "1.5"),
             ("int", True),
             ("float", "x"),
             ("bool", "yes"),
@@ -97,16 +86,18 @@ class TestParameters:
     def test_type_mismatch(self, ptype, value):
         specs = {"p": {"type": ptype, "required": True}}
         with pytest.raises(ConfigSchemaError) as exc:
-            validate_params(specs, {"p": value})
+            ParamScope.root({"p": value}).child(specs, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "P102"
+        assert diag.file == "a.loom"
         assert diag.pointer == "/params/p"
+        assert diag.expected == (ptype,)
 
     @pytest.mark.parametrize(("ptype", "value"), [("date", "31/12/2024"), ("timestamp", "nope")])
     def test_format_error(self, ptype, value):
         specs = {"p": {"type": ptype, "required": True}}
         with pytest.raises(ConfigSchemaError) as exc:
-            validate_params(specs, {"p": value})
+            ParamScope.root({"p": value}).child(specs, file="a.loom")
         diag = _only(exc.value)
         assert diag.code == "P103"
         assert diag.pointer == "/params/p"
@@ -177,7 +168,7 @@ class TestReferences:
             pytest.raises(ReferenceResolutionError) as exc,
             attribute_errors(LocalConfigLocation(weave)),
         ):
-            resolve_references(config, "weave", tmp_path)
+            resolve_tree(config, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C301"
         assert diag.file == str(weave)
@@ -190,7 +181,7 @@ class TestReferences:
             _write(tmp_path / "ghost.weave", {"config_version": "2.0", "threads": []})
         loom = {"config_version": "2.0", "weaves": [{"name": "ghost"}]}
         with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(loom, "loom", tmp_path)
+            resolve_tree(loom, "loom", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C313"
         assert diag.pointer == "/weaves/0"
@@ -210,7 +201,7 @@ class TestReferences:
         if with_file:
             _write(tmp_path / "t.thread", THREAD_BODY)
         with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(_weave([entry]), "weave", tmp_path)
+            resolve_tree(_weave([entry]), "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C313"
         assert diag.pointer == "/threads/0"
@@ -226,14 +217,14 @@ class TestReferences:
 
     def test_inline_thread_with_entry_keys_and_body_still_loads(self, tmp_path):
         weave = _weave([{"name": "t", "dependencies": [], **THREAD_BODY}])
-        (child,) = resolve_references(weave, "weave", tmp_path)
+        (child,) = resolve_tree(weave, "weave", tmp_path)
         assert child.source_path is None
         assert child.data["name"] == "t"
 
     def test_aliased_refs_to_one_thread_still_load(self, tmp_path):
         _write(tmp_path / "t.thread", THREAD_BODY)
         weave = _weave([{"ref": "t.thread", "as": "a"}, {"ref": "t.thread", "as": "b"}])
-        assert len(resolve_references(weave, "weave", tmp_path)) == 2
+        assert len(resolve_tree(weave, "weave", tmp_path)) == 2
 
     def test_inline_body_wins_over_same_named_file(self, tmp_path):
         _write(
@@ -244,7 +235,7 @@ class TestReferences:
             "config_version": "2.0",
             "weaves": [{"name": "a", "config_version": "2.0", "threads": []}],
         }
-        (child,) = resolve_references(loom, "loom", tmp_path)
+        (child,) = resolve_tree(loom, "loom", tmp_path)
         assert child.source_path is None
         assert child.data["threads"] == []
 
@@ -259,7 +250,7 @@ class TestReferences:
     def test_non_string_ref(self, tmp_path, ref):
         weave = _weave([{"name": "a"}, {"ref": ref}])
         with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(weave, "weave", tmp_path)
+            resolve_tree(weave, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C304"
         assert diag.pointer == "/threads/1/ref"
@@ -299,7 +290,7 @@ class TestReferences:
     def test_ref_scheme_through_weave_entry(self, tmp_path):
         weave = _weave([{"name": "a", **THREAD_BODY}, {"ref": "item://x/y.thread"}])
         with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(weave, "weave", tmp_path)
+            resolve_tree(weave, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C312"
         assert diag.pointer == "/threads/1/ref"
@@ -346,7 +337,7 @@ class TestReferences:
         weave = _weave([{"ref": "b.weave"}])
         visited = dict.fromkeys(["a.weave", "b.weave", "c.weave"])
         with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(weave, "weave", tmp_path, visited=visited)
+            resolve_tree(weave, "weave", tmp_path, visited=visited)
         diag = _only(exc.value)
         assert diag.code == "C302"
         assert diag.expected == ("b.weave", "c.weave", "b.weave")
@@ -356,7 +347,7 @@ class TestEntryForms:
     def test_inline_thread_without_name(self, tmp_path):
         weave = _weave([{"name": "a", **THREAD_BODY}, {**THREAD_BODY}])
         with pytest.raises(ConfigError) as exc:
-            resolve_references(weave, "weave", tmp_path)
+            resolve_tree(weave, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C305"
         assert diag.pointer == "/threads/1"
@@ -364,7 +355,7 @@ class TestEntryForms:
     def test_inline_weave_without_name(self, tmp_path):
         loom = {"config_version": "2.0", "weaves": [{"threads": []}]}
         with pytest.raises(ConfigError) as exc:
-            resolve_references(loom, "loom", tmp_path)
+            resolve_tree(loom, "loom", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C305"
         assert diag.pointer == "/weaves/0"
@@ -372,7 +363,7 @@ class TestEntryForms:
     def test_duplicate_inline_names(self, tmp_path):
         weave = _weave([{"name": "a", **THREAD_BODY}, {"name": "a", **THREAD_BODY}])
         with pytest.raises(ConfigError) as exc:
-            resolve_references(weave, "weave", tmp_path)
+            resolve_tree(weave, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C306"
         assert diag.pointer == "/threads/1"
@@ -384,7 +375,7 @@ class TestEntryForms:
             [{"ref": "a.thread", "as": "x"}, {"ref": "b.thread", "as": "x"}],
         )
         with pytest.raises(ConfigError) as exc:
-            resolve_references(weave, "weave", tmp_path)
+            resolve_tree(weave, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C306"
         assert diag.pointer == "/threads/1"
@@ -393,7 +384,7 @@ class TestEntryForms:
         _write(tmp_path / "a.thread", THREAD_BODY)
         weave = _weave([{"ref": "a.thread", "as": "x"}, {"ref": "a.thread"}])
         with pytest.raises(ConfigError) as exc:
-            resolve_references(weave, "weave", tmp_path)
+            resolve_tree(weave, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C307"
         assert diag.pointer == "/threads/1"
@@ -402,7 +393,7 @@ class TestEntryForms:
         _write(tmp_path / "a.thread", THREAD_BODY)
         weave = _weave([{"ref": "a.thread", "params": {"x": "${param.nope}"}}])
         with pytest.raises(VariableResolutionError) as exc:
-            resolve_references(weave, "weave", tmp_path)
+            resolve_tree(weave, "weave", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "P110"
         assert diag.pointer == "/threads/0/params/x"
@@ -419,7 +410,7 @@ class TestEntryForms:
             ],
         }
         with pytest.raises(ConfigError) as exc:
-            resolve_references(loom, "loom", tmp_path)
+            resolve_tree(loom, "loom", tmp_path)
         diag = _only(exc.value)
         assert diag.code == "C306"
         assert diag.pointer == "/weaves/0/threads/1"
@@ -518,7 +509,9 @@ def test_unresolved_variable_under_with_points_at_the_authored_key(tmp_path: Pat
         "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
-        "with": {"orders": {"from": "main", "steps": [{"filter": {"expr": "x = '${nope}'"}}]}},
+        "with": {
+            "orders": {"from": "main", "steps": [{"filter": {"expr": "x = '${param.nope}'"}}]}
+        },
     }
     path = tmp_path / "t.thread"
     write_document(path, yaml.safe_dump(thread, sort_keys=False))
@@ -540,7 +533,7 @@ def test_a_user_key_named_with_underscore_keeps_its_name(tmp_path: Path) -> None
         "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
-        "steps": [{"derive": {"columns": {"with_": "'${nope}'"}}}],
+        "steps": [{"derive": {"columns": {"with_": "'${param.nope}'"}}}],
     }
     path = tmp_path / "t.thread"
     write_document(path, yaml.safe_dump(thread, sort_keys=False))

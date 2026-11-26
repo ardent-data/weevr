@@ -1,0 +1,53 @@
+{
+  "load": "nightly.loom",
+  "weave": "ingest",
+  "thread": "orders",
+  "fabric_context": {"workspace_name": "ws-dev", "lakehouse_id": "lh-001"},
+  "scenarios": {
+    "defaults": {
+      "runtime_params": {
+        "run_date": "2024-06-01",
+        "storage": {"container": "landing"}
+      },
+      "values": {
+        "sources.orders.alias": "prod.orders_eastus",
+        "sources.landing.path": "<root>/Files/landing/2024-06-01/orders_500.csv",
+        "target.alias": "gold.ws-dev_orders",
+        "target.partition_by": ["region", "day"],
+        "target.audit_columns._loaded_by": "'${thread.name}'",
+        "tags": [
+          "bronze",
+          "env-prod",
+          "since-2024-01-01",
+          "lake-lh-001",
+          "east",
+          "dry-false"
+        ]
+      }
+    },
+    "runtime": {
+      "runtime_params": {
+        "env": "staging",
+        "region": "westus",
+        "tier": "silver",
+        "run_date": "2024-06-02",
+        "storage": {"container": "archive", "region": "west"}
+      },
+      "values": {
+        "sources.orders.alias": "staging.orders_westus",
+        "sources.landing.path": "<root>/Files/archive/2024-06-02/orders_500.csv",
+        "target.alias": "gold.ws-dev_orders",
+        "target.partition_by": ["region", "day"],
+        "target.audit_columns._loaded_by": "'${thread.name}'",
+        "tags": [
+          "silver",
+          "env-staging",
+          "since-2024-01-01",
+          "lake-lh-001",
+          "west",
+          "dry-false"
+        ]
+      }
+    }
+  }
+}

@@ -1226,7 +1226,7 @@
       "type": "object"
     },
     "WeaveEntry": {
-      "description": "A weave reference within a loom, with optional condition.\n\nAttributes:\n    name: Weave name. Required for inline definitions; derived from\n        filename stem for external references.\n    ref: Path to an external ``.weave`` file, relative to project root.\n        Mutually exclusive with inline definition (name + body).\n    condition: Optional condition for conditional execution.",
+      "description": "A weave reference within a loom, with optional condition.\n\nAttributes:\n    name: Weave name. Required for inline definitions; derived from\n        filename stem for external references.\n    ref: Path to an external ``.weave`` file, relative to project root.\n        Mutually exclusive with inline definition (name + body).\n    params: Values pinned for the referenced weave's whole subtree, under\n        the ``param`` namespace. Each value resolves in the loom's scope\n        first, then binds in the weave, where it beats runtime params. On\n        an inline weave, ``params`` holds the weave's own declarations.\n    condition: Optional condition for conditional execution.",
       "properties": {
         "name": {
           "default": "",
@@ -1247,6 +1247,20 @@
           "description": "Path to an external .weave file, relative to project root. Mutually exclusive with inline definition.",
           "title": "Ref"
         },
+        "params": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Values pinned for the referenced weave and everything beneath it, under the param namespace. Resolved in the loom's scope; they beat runtime params within the subtree.",
+          "title": "Params"
+        },
         "condition": {
           "anyOf": [
             {
@@ -1264,7 +1278,7 @@
       "type": "object"
     }
   },
-  "description": "A deployment unit containing weave references with optional shared defaults.",
+  "description": "A deployment unit containing weave references with optional shared defaults.\n\n``strict_params: true`` makes the params warnings errors for the loom and\neverything beneath it, unless a weave or thread sets its own.",
   "properties": {
     "name": {
       "default": "",
@@ -1327,6 +1341,19 @@
       "default": null,
       "description": "Typed parameter declarations with defaults and validation.",
       "title": "Params"
+    },
+    "strict_params": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Enforce the params contract in this scope and below: a ${param.x} reference must be declared (P120) and, at the root, every runtime param must be declared or referenced (P121). The most specific setting wins; unset inherits, and is lenient at the root.",
+      "title": "Strict Params"
     },
     "execution": {
       "anyOf": [

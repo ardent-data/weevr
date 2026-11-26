@@ -732,6 +732,76 @@
       "docs_anchor": "p110"
     },
     {
+      "code": "P111",
+      "name": "bare-variable-reference",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${...} reference names no namespace: ${x} instead of ${param.x}.",
+      "docs_anchor": "p111"
+    },
+    {
+      "code": "P112",
+      "name": "unknown-variable-namespace",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave, loom or fabric namespace.",
+      "docs_anchor": "p112"
+    },
+    {
+      "code": "P113",
+      "name": "fabric-reference-deferred",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${fabric.x} reference is left unresolved because the load has no Fabric context: a core loader given no fabric_context. An error under strict_params.",
+      "docs_anchor": "p113"
+    },
+    {
+      "code": "P120",
+      "name": "undeclared-parameter",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${param.x} reference is bound, but no params: declaration in its scope chain covers it. An error under strict_params.",
+      "docs_anchor": "p120"
+    },
+    {
+      "code": "P121",
+      "name": "unused-supplied-parameter",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A runtime parameter is supplied that nothing in the loaded tree declares or references. An error under strict_params.",
+      "docs_anchor": "p121"
+    },
+    {
+      "code": "P122",
+      "name": "pin-ignored-by-upstream-asset",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A weave or thread entry pins a parameter that a registry asset declared above the entry reads; the asset resolved in its own scope, so the pin does not retarget it. Never an error, even under strict_params.",
+      "docs_anchor": "p122"
+    },
+    {
+      "code": "P123",
+      "name": "unconsumed-pin",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A weave or thread entry pins a parameter that nothing beneath the entry reads or declares.",
+      "docs_anchor": "p123"
+    },
+    {
       "code": "R101",
       "name": "lookup-key-values-overlap",
       "category": "config",

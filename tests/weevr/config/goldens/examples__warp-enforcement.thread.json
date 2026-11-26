@@ -1,0 +1,35 @@
+{
+  "config_name": "warp-enforcement",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "name": "warp-enforcement",
+    "qualified_key": "warp-enforcement.thread",
+    "sources": {
+      "customers": {
+        "alias": "bronze.raw_customers",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "select": {
+          "columns": [
+            "customer_id",
+            "customer_name",
+            "email",
+            "region"
+          ]
+        }
+      }
+    ],
+    "target": {
+      "alias": "gold.dim_customer",
+      "schema_drift": "strict",
+      "warp": "dim_customer",
+      "warp_enforcement": "enforce"
+    }
+  },
+  "threads": {},
+  "weaves": {}
+}

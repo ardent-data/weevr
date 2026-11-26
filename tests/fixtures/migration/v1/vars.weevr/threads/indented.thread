@@ -1,0 +1,14 @@
+type: thread
+config_version: "1.0"
+
+defaults:
+    batch: 10
+    note: kept
+
+sources:
+    items:
+        type: delta
+        alias: raw.items
+
+target:
+    alias: "gold.items_${batch}"

@@ -13,7 +13,7 @@ from weevr.model.execution import ExecutionConfig
 from weevr.model.hooks import HookStep, reject_pre_step_baseline_checks
 from weevr.model.lookup import Lookup
 from weevr.model.naming import NamingConfig
-from weevr.model.params import ParamSpec
+from weevr.model.params import STRICT_PARAMS_DESCRIPTION, ParamSpec
 from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec
 
@@ -26,6 +26,10 @@ class WeaveEntry(FrozenBase):
             filename stem for external references.
         ref: Path to an external ``.weave`` file, relative to project root.
             Mutually exclusive with inline definition (name + body).
+        params: Values pinned for the referenced weave's whole subtree, under
+            the ``param`` namespace. Each value resolves in the loom's scope
+            first, then binds in the weave, where it beats runtime params. On
+            an inline weave, ``params`` holds the weave's own declarations.
         condition: Optional condition for conditional execution.
     """
 
@@ -41,6 +45,14 @@ class WeaveEntry(FrozenBase):
         description=(
             "Path to an external .weave file, relative to project root. "
             "Mutually exclusive with inline definition."
+        ),
+    )
+    params: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Values pinned for the referenced weave and everything beneath it, "
+            "under the param namespace. Resolved in the loom's scope; they beat "
+            "runtime params within the subtree."
         ),
     )
     condition: ConditionSpec | None = Field(
@@ -61,7 +73,11 @@ class WeaveEntry(FrozenBase):
 
 
 class Loom(FrozenBase):
-    """A deployment unit containing weave references with optional shared defaults."""
+    """A deployment unit containing weave references with optional shared defaults.
+
+    ``strict_params: true`` makes the params warnings errors for the loom and
+    everything beneath it, unless a weave or thread sets its own.
+    """
 
     name: str = Field(
         default="",
@@ -91,6 +107,10 @@ class Loom(FrozenBase):
     params: dict[str, ParamSpec] | None = Field(
         default=None,
         description="Typed parameter declarations with defaults and validation.",
+    )
+    strict_params: bool | None = Field(
+        default=None,
+        description=STRICT_PARAMS_DESCRIPTION,
     )
     execution: ExecutionConfig | None = Field(
         default=None,

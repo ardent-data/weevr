@@ -82,8 +82,9 @@ execution time from the workspace, lakehouse, schema, and table name.
 
 When all lakehouses are within the current Fabric session's workspace, you
 can use `${fabric.workspace_id}` and `${fabric.lakehouse_id}` rather than
-hardcoding GUIDs. The engine reads these values from the active Spark
-session at execution time.
+hardcoding GUIDs. `Context` reads these values from the active Spark
+session when it loads the config. Runtime params never supply them; for
+loading outside Fabric, see [Params: Fabric values](params.md#fabric-values).
 
 ```yaml
 connections:

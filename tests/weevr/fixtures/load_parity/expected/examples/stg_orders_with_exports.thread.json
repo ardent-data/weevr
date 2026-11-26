@@ -89,6 +89,7 @@
         }
       }
     ],
+    "strict_params": null,
     "tags": null,
     "target": {
       "alias": "silver.stg_orders",

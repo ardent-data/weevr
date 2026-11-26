@@ -1,0 +1,43 @@
+{
+  "config_name": "pair_inline",
+  "config_type": "weave",
+  "model": {
+    "config_version": "2.0",
+    "name": "pair_inline",
+    "qualified_key": "pair_inline.weave",
+    "threads": [
+      {
+        "name": "pair"
+      }
+    ]
+  },
+  "threads": {
+    "pair_inline": {
+      "pair": {
+        "config_version": "2.0",
+        "name": "pair",
+        "qualified_key": "pair",
+        "sources": {
+          "data": {
+            "options": {
+              "header": true
+            },
+            "path": "<root>/data/pair.csv",
+            "type": "csv"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "id is not null"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.pair"
+        }
+      }
+    }
+  },
+  "weaves": {}
+}

@@ -309,7 +309,7 @@ class TestLoadResolvedRejects:
         with pytest.raises(ConfigError, match="does not match filename stem"):
             load_resolved(cfg)
 
-    def test_fabric_reference_without_default_raises(self, tmp_path: Path) -> None:
+    def test_fabric_reference_the_context_lacks_raises(self, tmp_path: Path) -> None:
         cfg = tmp_path / "t.thread"
         write_document(
             cfg,
@@ -317,7 +317,7 @@ class TestLoadResolvedRejects:
             '    alias: "${fabric.workspace_id}"\ntarget:\n  alias: out\n',
         )
         with pytest.raises(VariableResolutionError, match="fabric.workspace_id"):
-            load_resolved(cfg)
+            load_resolved(cfg, fabric_context={})
 
 
 _DUP_THREAD = """\
@@ -462,12 +462,12 @@ class TestResolvedChildren:
                 "t.thread": self._TEMPLATE,
                 "w.weave": (
                     'config_version: "2.0"\n'
-                    "defaults: {schema: gold}\n"
+                    "params: {schema: {name: schema, type: string, default: gold}}\n"
                     "threads:\n"
                     "  - ref: t.thread\n    as: a\n    params: {table: A}\n"
                     '  - name: inline\n    config_version: "2.0"\n'
                     "    sources: {s: {type: delta, alias: raw.x}}\n"
-                    '    target: {alias: "${schema}.inline"}\n'
+                    '    target: {alias: "${param.schema}.inline"}\n'
                 ),
             },
         )
@@ -480,7 +480,7 @@ class TestResolvedChildren:
         assert by_file.source_path == str(tmp_path / "t.thread")
 
         assert inline.authored is not None
-        assert inline.authored["target"]["alias"] == "${schema}.inline"
+        assert inline.authored["target"]["alias"] == "${param.schema}.inline"
         assert inline.data["target"]["alias"] == "gold.inline"
         assert inline.source_path is None
 
@@ -495,11 +495,11 @@ class TestResolvedChildren:
                     'config_version: "2.0"\n'
                     "weaves:\n"
                     '  - name: w\n    config_version: "2.0"\n'
-                    "    defaults: {schema: gold}\n"
+                    "    params: {schema: {name: schema, type: string, default: gold}}\n"
                     "    threads:\n"
                     '      - name: t\n        config_version: "2.0"\n'
                     "        sources: {s: {type: delta, alias: raw.x}}\n"
-                    '        target: {alias: "${schema}.t"}\n'
+                    '        target: {alias: "${param.schema}.t"}\n'
                 ),
             },
         )
@@ -508,7 +508,7 @@ class TestResolvedChildren:
         (thread,) = weave.children
         assert weave.source_path is None
         assert thread.authored is not None
-        assert thread.authored["target"]["alias"] == "${schema}.t"
+        assert thread.authored["target"]["alias"] == "${param.schema}.t"
         assert thread.data["target"]["alias"] == "gold.t"
 
     def test_a_standalone_thread_keeps_its_authored_dict(self, tmp_path: Path) -> None:

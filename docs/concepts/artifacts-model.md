@@ -94,16 +94,16 @@ unchanged. See [Idempotency](idempotency.md) for details.
 ## Source path resolution
 
 Sources are declared with a type and an abstract reference that resolves
-to a physical location through variable injection:
+to a physical location through params, bound when the config loads:
 
 ```yaml
 sources:
   customers:
     type: delta
-    alias: ${env.lakehouse}.customers   # env is a param you pass to Context
+    alias: ${param.env.lakehouse}.customers   # env is a param you pass to Context
   orders_file:
     type: csv
-    path: ${env.files_path}/orders/
+    path: ${param.env.files_path}/orders/
 ```
 
 Delta sources use an **alias** that resolves to a four-part name
@@ -112,12 +112,17 @@ File sources use a **path** that resolves to a OneLake file location.
 
 !!! tip "Environment-agnostic config"
 
-    `env` is not a built-in namespace; it is a nested parameter you pass,
-    for example `Context(spark, project, params={"env": {"lakehouse":
-    "bronze", "files_path": "Files/raw"}})`. With lakehouse and path
-    references written this way, the same thread configuration works
-    across dev, staging, and prod; only the params passed to `Context`
-    differ between environments.
+    `env` is not a built-in namespace; it is a param whose value is a
+    mapping, for example `Context(spark, project, params={"env": {"lakehouse":
+    "bronze", "files_path": "Files/raw"}})`, and `${param.env.lakehouse}`
+    reads one of its keys. With lakehouse and path references written this
+    way, the same thread configuration works across dev, staging, and prod;
+    only the params passed to `Context` differ between environments.
+
+    A mapping has no `ParamSpec` type, so references into `env` warn `P120`
+    (an error under `strict_params`). Flat params, such as
+    `${param.lakehouse}`, can be declared and type-checked. See the
+    [Params guide](../guides/params.md).
 
 ## Target path resolution
 
@@ -128,7 +133,7 @@ target:
   alias: silver.dim_customer
 ```
 
-The alias resolves through variable injection to a concrete Delta table
+The alias, with any `${param.x}` in it bound at load, names a concrete Delta table
 location. weevr handles table creation (when configured) and all DML
 operations against the resolved path.
 

@@ -1,0 +1,44 @@
+{
+  "config_name": "pair_file",
+  "config_type": "weave",
+  "model": {
+    "config_version": "2.0",
+    "name": "pair_file",
+    "qualified_key": "pair_file.weave",
+    "threads": [
+      {
+        "ref": "threads/pair.thread"
+      }
+    ]
+  },
+  "threads": {
+    "pair_file": {
+      "pair": {
+        "config_version": "2.0",
+        "name": "pair",
+        "qualified_key": "threads/pair.thread",
+        "sources": {
+          "data": {
+            "options": {
+              "header": true
+            },
+            "path": "<root>/data/pair.csv",
+            "type": "csv"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "id is not null"
+            }
+          }
+        ],
+        "target": {
+          "alias": "gold.pair"
+        },
+        "template_ref": "threads/pair.thread"
+      }
+    }
+  },
+  "weaves": {}
+}

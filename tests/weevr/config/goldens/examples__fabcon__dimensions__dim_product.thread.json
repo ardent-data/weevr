@@ -1,0 +1,48 @@
+{
+  "config_name": "dim_product",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "keys": {
+      "business_key": [
+        "product_id"
+      ],
+      "surrogate_key": {
+        "algorithm": "xxhash64",
+        "name": "product_sk"
+      }
+    },
+    "name": "dim_product",
+    "qualified_key": "dimensions/dim_product.thread",
+    "sources": {
+      "products": {
+        "alias": "staging.stg_products",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "select": {
+          "columns": [
+            "product_id",
+            "product_name",
+            "category",
+            "unit_price",
+            "supplier"
+          ]
+        }
+      }
+    ],
+    "target": {
+      "alias": "silver.dim_product"
+    },
+    "write": {
+      "match_keys": [
+        "product_id"
+      ],
+      "mode": "merge"
+    }
+  },
+  "threads": {},
+  "weaves": {}
+}

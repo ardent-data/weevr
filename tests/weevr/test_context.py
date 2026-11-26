@@ -7,6 +7,7 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -490,6 +491,121 @@ connections:
         assert "workspace_id" in str(exc_info.value)
 
 
+_STRICT_THREAD = """\
+config_version: "2.0"
+sources:
+  data:
+    type: delta
+    alias: raw.customers
+target:
+  alias: "out.${param.x}"
+"""
+
+
+class TestContextStrictParams:
+    """``Context(strict_params=...)`` overrides every document's setting."""
+
+    @staticmethod
+    def _context(
+        tmp_path: Path,
+        body: str,
+        strict_params: bool | None,
+        params: dict[str, Any] | None = None,
+    ) -> Context:
+        project = write_project(tmp_path / "strict.weevr")
+        write_document(project / "t.thread", body)
+        return Context(
+            spark=MagicMock(spec=SparkSession),
+            project=str(project),
+            params=params or {"x": "a"},
+            strict_params=strict_params,
+        )
+
+    def test_true_escalates_a_lenient_document(self, tmp_path: Path) -> None:
+        ctx = self._context(tmp_path, _STRICT_THREAD, strict_params=True)
+        with pytest.raises(ConfigError) as info:
+            ctx.load("t.thread")
+        assert [d.code for d in info.value.diagnostics] == ["P120"]
+
+    def test_false_relaxes_a_strict_document(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "strict_params: true\n"
+        loaded = self._context(tmp_path, body, strict_params=False).load("t.thread")
+        assert [d.code for d in loaded.diagnostics] == ["P120"]
+        assert not loaded.diagnostics[0].is_error
+
+    def test_unset_leaves_the_document_setting(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "strict_params: true\n"
+        with pytest.raises(ConfigError):
+            self._context(tmp_path, body, strict_params=None).load("t.thread")
+
+    def test_context_param_a_config_does_not_use_warns(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "params:\n  x: {name: x, type: string}\n"
+        ctx = self._context(tmp_path, body, strict_params=None, params={"x": "a", "b": "c"})
+        (warning,) = ctx.load("t.thread").diagnostics
+        assert (warning.code, warning.expected, warning.is_error) == ("P121", ("b",), False)
+
+    def test_context_param_a_config_does_not_use_fails_strict(self, tmp_path: Path) -> None:
+        body = _STRICT_THREAD + "params:\n  x: {name: x, type: string}\n"
+        ctx = self._context(tmp_path, body, strict_params=True, params={"x": "a", "b": "c"})
+        with pytest.raises(ConfigError) as info:
+            ctx.load("t.thread")
+        assert [(d.code, d.expected) for d in info.value.diagnostics] == [("P121", ("b",))]
+
+    def test_validate_records_the_error(self, tmp_path: Path) -> None:
+        ctx = self._context(tmp_path, _STRICT_THREAD, strict_params=True)
+        result = ctx.run("t.thread", mode="validate")
+        assert result.status == "failure"
+        assert "P120" in {d.code for d in result.diagnostics}
+
+
+_MANIFEST_THREAD = """\
+config_version: "2.0"
+params:
+  x: {name: x, type: string}
+sources:
+  s: {type: delta, alias: raw.t}
+target:
+  alias: "out.${param.x}"
+"""
+
+
+class TestValidateParamManifest:
+    """Validate mode attaches the param manifest whether or not the load succeeds."""
+
+    @staticmethod
+    def _context(tmp_path: Path, params: dict[str, Any] | None = None) -> Context:
+        project = write_project(tmp_path / "manifest.weevr")
+        write_document(project / "t.thread", _MANIFEST_THREAD)
+        write_document(project / "w.weave", {"config_version": "2.0", "threads": [{"ref": "x"}]})
+        return Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
+
+    def test_set_when_the_load_succeeds(self, tmp_path: Path) -> None:
+        result = self._context(tmp_path, {"x": "a"}).run("t.thread", mode="validate")
+        assert "P101" not in {d.code for d in result.diagnostics}
+        assert result.param_manifest is not None
+        assert result.param_manifest.executable == "t"
+        assert result.param_manifest.invoker_required == ("x",)
+
+    def test_set_when_a_required_param_is_missing(self, tmp_path: Path) -> None:
+        result = self._context(tmp_path).run("t.thread", mode="validate")
+        assert result.status == "failure"
+        assert "P101" in {d.code for d in result.diagnostics}
+        assert result.param_manifest is not None
+        assert [p.name for p in result.param_manifest.declared] == ["x"]
+        assert result.param_manifest.invoker_required == ("x",)
+
+    def test_none_when_the_documents_cannot_be_read(self, tmp_path: Path) -> None:
+        result = self._context(tmp_path).run("w.weave", mode="validate")
+        assert result.status == "failure"
+        assert result.param_manifest is None
+
+    def test_not_set_outside_validate(self, tmp_path: Path) -> None:
+        result = RunResult(
+            status="success", mode=ExecutionMode.PLAN, config_type="t", config_name="t"
+        )
+        assert result.param_manifest is None
+
+
 _ATTR_THREAD = """\
 config_version: "2.0"
 sources:
@@ -731,6 +847,10 @@ class TestContextLoadChildForeach:
         assert via_weave.steps == direct.steps
 
 
+# A loom params block declaring ``src``.
+_LOOM_SRC = "params:\n  src: {name: src, type: string, default: raw.events}\n"
+
+
 class TestContextLoadInlineWeave:
     """A loom's inline weave hydrates, cascades, and plans like a weave file."""
 
@@ -802,39 +922,38 @@ target:
         assert loaded.model.weaves[0].condition.when == "true"
 
     @staticmethod
-    def _load_defaults(tmp_path: Path, loom_defaults: str, params: dict | None = None):
+    def _load_declared(tmp_path: Path, loom_params: str, params: dict | None = None):
         loom = (
-            'config_version: "2.0"\n' + loom_defaults + "weaves:\n"
+            'config_version: "2.0"\n' + loom_params + "weaves:\n"
             '  - name: inline_ops\n    config_version: "2.0"\n'
-            "    defaults:\n      tbl: ops.from_weave\n    threads:\n"
+            "    params:\n      tbl: {name: tbl, type: string, default: ops.from_weave}\n"
+            "    threads:\n"
             '      - name: ops_audit\n        config_version: "2.0"\n'
             "        sources:\n          events:\n            type: delta\n"
-            '            alias: "${src}"\n        target:\n'
-            '          alias: "${tbl}"\n'
+            '            alias: "${param.src}"\n        target:\n'
+            '          alias: "${param.tbl}"\n'
         )
         project = write_project(tmp_path / "defaults.weevr")
         write_document(project / "x.loom", loom)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
         return ctx.load("x.loom").document.weave_threads()["inline_ops"]["ops_audit"]
 
-    def test_inline_weave_defaults_resolve_variables(self, tmp_path: Path) -> None:
-        """The inline weave's own defaults resolve ${var}; loom defaults still reach it."""
-        thread = self._load_defaults(tmp_path, "defaults:\n  src: raw.events\n")
+    def test_inline_weave_params_resolve_variables(self, tmp_path: Path) -> None:
+        """The inline weave's own params resolve; loom params still reach it."""
+        thread = self._load_declared(tmp_path, _LOOM_SRC)
         assert thread.target.alias == "ops.from_weave"
         assert thread.sources["events"].alias == "raw.events"
 
     def test_inline_weave_defaults_override_loom_defaults(self, tmp_path: Path) -> None:
-        """A weave default wins over a loom default of the same name."""
-        thread = self._load_defaults(
-            tmp_path, "defaults:\n  src: raw.events\n  tbl: ops.from_loom\n"
+        """A weave param default wins over a loom param default of the same name."""
+        thread = self._load_declared(
+            tmp_path, _LOOM_SRC + "  tbl: {name: tbl, type: string, default: ops.from_loom}\n"
         )
         assert thread.target.alias == "ops.from_weave"
 
     def test_runtime_param_overrides_inline_weave_default(self, tmp_path: Path) -> None:
-        """Runtime params still take priority over the inline weave's defaults."""
-        thread = self._load_defaults(
-            tmp_path, "defaults:\n  src: raw.events\n", params={"tbl": "ops.from_run"}
-        )
+        """Runtime params still take priority over the inline weave's param defaults."""
+        thread = self._load_declared(tmp_path, _LOOM_SRC, params={"tbl": "ops.from_run"})
         assert thread.target.alias == "ops.from_run"
 
     def test_inline_weave_plans(self, tmp_path: Path) -> None:
@@ -2977,3 +3096,21 @@ class TestNamingOnJoinedColumns:
         assert result.status == "failure"
         assert not target.exists()
         assert "prefix" in result.summary()
+
+
+class TestLoadProvenance:
+    """``Context.load`` returns the tree with each node's param provenance."""
+
+    def test_runtime_param_recorded_at_the_root(self, tmp_path: Path) -> None:
+        project = write_project(tmp_path / "p.weevr")
+        thread = {
+            "config_version": "2.0",
+            "params": {"r": {"name": "r", "type": "string"}},
+            "sources": {"s": {"type": "delta", "alias": "raw.t"}},
+            "target": {"alias": "o.t"},
+        }
+        write_document(project / "t.thread", thread)
+        spark = MagicMock(spec=SparkSession)
+        spark.conf.get.side_effect = lambda key: ""
+        loaded = Context(spark, str(project), params={"r": "v"}).load("t.thread")
+        assert loaded.document.provenance.params["r"].source == "runtime"

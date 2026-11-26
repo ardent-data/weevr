@@ -1,0 +1,68 @@
+{
+  "config_name": "fact_transactions",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "load": {
+      "mode": "incremental_watermark",
+      "watermark_column": "transaction_ts",
+      "watermark_type": "timestamp"
+    },
+    "name": "fact_transactions",
+    "qualified_key": "fact_transactions.thread",
+    "sources": {
+      "transactions": {
+        "alias": "raw.transactions",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "amount > 0"
+        }
+      },
+      {
+        "derive": {
+          "columns": {
+            "transaction_date": "to_date(transaction_ts)"
+          }
+        }
+      },
+      {
+        "select": {
+          "columns": [
+            "transaction_id",
+            "customer_id",
+            "product_id",
+            "amount",
+            "currency",
+            "transaction_ts",
+            "transaction_date"
+          ]
+        }
+      },
+      {
+        "cast": {
+          "columns": {
+            "amount": "decimal(12,2)"
+          }
+        }
+      }
+    ],
+    "target": {
+      "alias": "silver.fact_transactions",
+      "partition_by": [
+        "transaction_date"
+      ]
+    },
+    "write": {
+      "match_keys": [
+        "transaction_id"
+      ],
+      "mode": "merge"
+    }
+  },
+  "threads": {},
+  "weaves": {}
+}

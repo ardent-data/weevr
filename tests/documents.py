@@ -95,3 +95,55 @@ def write_project(root: Path, name: str = "test", project_id: str = TEST_PROJECT
     root.mkdir(parents=True, exist_ok=True)
     (root / "weevr.yaml").write_text(project_yaml(name, project_id))
     return root
+
+
+def write_named(root: Path, name: str, body: str | Mapping[str, Any]) -> Path:
+    """Write the document ``name`` under ``root`` (:func:`write_document`).
+
+    Args:
+        root: The directory to write in.
+        name: The file name; its typed extension gives the kind.
+        body: YAML text, or a mapping dumped as YAML.
+
+    Returns:
+        The written path.
+    """
+    return write_document(root / name, body)
+
+
+def thread_body(alias: str = "out.t", **extra: Any) -> dict[str, Any]:
+    """A minimal thread: one delta source (``raw.t``) and a target at ``alias``.
+
+    Args:
+        alias: The target alias.
+        **extra: Further top-level keys; a ``target`` replaces the default one.
+
+    Returns:
+        The thread body.
+    """
+    return {
+        "config_version": "2.0",
+        "sources": {"s": {"type": "delta", "alias": "raw.t"}},
+        "target": {"alias": alias},
+        **extra,
+    }
+
+
+def weave_body(threads: list[Any], **extra: Any) -> dict[str, Any]:
+    """A weave over ``threads``, with ``extra`` top-level keys."""
+    return {"config_version": "2.0", "threads": threads, **extra}
+
+
+def loom_body(weaves: list[Any], **extra: Any) -> dict[str, Any]:
+    """A loom over ``weaves``, with ``extra`` top-level keys."""
+    return {"config_version": "2.0", "weaves": weaves, **extra}
+
+
+def string_spec(name: str, **fields: Any) -> dict[str, Any]:
+    """One ``string`` param spec named ``name``, with ``fields`` over it."""
+    return {"name": name, "type": "string", **fields}
+
+
+def string_specs(**specs: dict[str, Any]) -> dict[str, Any]:
+    """A ``params:`` block of ``string`` specs, each name's fields over its spec."""
+    return {name: string_spec(name, **fields) for name, fields in specs.items()}

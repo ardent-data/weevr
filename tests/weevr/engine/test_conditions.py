@@ -30,6 +30,17 @@ class TestParamConditions:
         cond = ConditionSpec(when="${param.mode} != 'full'")
         assert evaluate_condition(cond, params={"mode": "full"}) is False
 
+    def test_native_bool_param_renders_as_yaml_writes_it(self):
+        """A native bool param renders true/false, as an embedded load-time reference does."""
+        cond = ConditionSpec(when="${param.flag} == 'true'")
+        assert evaluate_condition(cond, params={"flag": True}) is True
+        assert evaluate_condition(cond, params={"flag": False}) is False
+
+    def test_supplied_param_text_is_kept(self):
+        """A supplied string renders exactly as supplied."""
+        cond = ConditionSpec(when="${param.flag} == 'TRUE'")
+        assert evaluate_condition(cond, params={"flag": "TRUE"}) is True
+
     def test_unresolved_param_raises(self):
         """Missing parameter raises ConfigError."""
         cond = ConditionSpec(when="${param.missing} == 'value'")

@@ -143,6 +143,7 @@
       }
     ],
     "qualified_key": "customer_pipeline.weave",
+    "strict_params": null,
     "threads": [
       {
         "as_": null,
@@ -272,6 +273,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "silver.dim_customer",
@@ -374,6 +376,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "silver.dim_product",
@@ -553,6 +556,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "silver.fact_orders",
@@ -678,6 +682,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "staging.stg_customers",
@@ -775,6 +780,7 @@
             }
           }
         ],
+        "strict_params": null,
         "tags": null,
         "target": {
           "alias": "staging.stg_products",

@@ -393,6 +393,48 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unresolved-variable",
         "A ${...} variable has no value and no default.",
     ),
+    _config(
+        "P111",
+        "bare-variable-reference",
+        "A ${...} reference names no namespace: ${x} instead of ${param.x}.",
+    ),
+    _config(
+        "P112",
+        "unknown-variable-namespace",
+        "A ${...} reference starts with an unknown namespace, or names an unknown key "
+        "of a thread, weave, loom or fabric namespace.",
+    ),
+    _config_warning(
+        "P113",
+        "fabric-reference-deferred",
+        "A ${fabric.x} reference is left unresolved because the load has no Fabric "
+        "context: a core loader given no fabric_context. An error under strict_params.",
+    ),
+    _config_warning(
+        "P120",
+        "undeclared-parameter",
+        "A ${param.x} reference is bound, but no params: declaration in its scope chain "
+        "covers it. An error under strict_params.",
+    ),
+    _config_warning(
+        "P121",
+        "unused-supplied-parameter",
+        "A runtime parameter is supplied that nothing in the loaded tree declares or "
+        "references. An error under strict_params.",
+    ),
+    _config_warning(
+        "P122",
+        "pin-ignored-by-upstream-asset",
+        "A weave or thread entry pins a parameter that a registry asset declared above "
+        "the entry reads; the asset resolved in its own scope, so the pin does not "
+        "retarget it. Never an error, even under strict_params.",
+    ),
+    _config_warning(
+        "P123",
+        "unconsumed-pin",
+        "A weave or thread entry pins a parameter that nothing beneath the entry reads "
+        "or declares.",
+    ),
     # R101–R119 — lookup and column-set definitions (model/*.py)
     _config(
         "R101",

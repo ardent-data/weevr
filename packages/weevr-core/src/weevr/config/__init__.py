@@ -7,12 +7,21 @@ from typing import Any
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import collecting
 from weevr.config.discovery import DiscoveredDocument, discover_documents
-from weevr.config.document import EntryMeta, ResolvedDocument, ScopeRegistries
+from weevr.config.document import EntryMeta, Provenance, ResolvedDocument, ScopeRegistries
 from weevr.config.loader import COMPONENT_TYPES as _COMPONENT_TYPES
 from weevr.config.loader import hydrate_resolved as _hydrate_resolved
 from weevr.config.loader import load_resolved
 from weevr.config.loader import resolve_config as _resolve_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
+from weevr.config.manifest import param_manifest
+from weevr.config.manifest_types import ManifestParam, ParamManifest
+from weevr.config.param_provenance import (
+    ParamDeclaration,
+    ParamPin,
+    ParamProvenance,
+    ParamSource,
+    ParamTier,
+)
 from weevr.config.root import find_project_root
 from weevr.config.run_store import (
     RUN_STORE_TABLES,
@@ -29,6 +38,14 @@ __all__ = [
     "RUN_STORE_TABLES",
     "DiscoveredDocument",
     "EntryMeta",
+    "ManifestParam",
+    "ParamDeclaration",
+    "ParamManifest",
+    "ParamPin",
+    "ParamProvenance",
+    "ParamSource",
+    "ParamTier",
+    "Provenance",
     "ResolvedDocument",
     "RunStoreLocation",
     "ScopeRegistries",
@@ -37,6 +54,7 @@ __all__ = [
     "find_project_root",
     "load_config",
     "load_resolved",
+    "param_manifest",
     "resolve_run_store",
 ]
 
@@ -45,6 +63,9 @@ def load_config(
     path: str | Path | ConfigLocation,
     runtime_params: dict[str, Any] | None = None,
     project_root: Path | ConfigLocation | None = None,
+    *,
+    strict_params: bool | None = None,
+    fabric_context: dict[str, Any] | None = None,
 ) -> Thread | Weave | Loom | dict[str, Any]:
     """Load and validate a weevr configuration file.
 
@@ -55,8 +76,9 @@ def load_config(
     3. Take the config kind from the document's ``kind`` (checked against a typed
        extension), else from the extension or content
     4. Validate schema with Pydantic
-    5. Build parameter context (runtime > defaults)
-    6. Resolve variable references (${var} and ${var:-default})
+    5. Bind params per scope (pin > runtime > declared default)
+    6. Resolve variable references (``${namespace.name}`` and ``${namespace.name:-default}``);
+       ``${fabric.x}`` without a Fabric context is left in place (``P113``)
     7. Resolve references to child configs (threads, weaves)
     8. Apply inheritance cascade (loom -> weave -> thread)
     9. Validate name against filename stem; set ``qualified_key``
@@ -78,6 +100,21 @@ def load_config(
             omitted, the nearest folder above the file holding ``weevr.yaml``
             is the root; with none, the file's directory is. Accepts a
             :class:`ConfigLocation` or a bare :class:`pathlib.Path`.
+        strict_params: Overrides every document's ``strict_params:``. ``True``
+            fails the load on a ``${param.x}`` no declaration in its chain
+            covers (``P120``) and on a runtime param nothing declares or
+            references (``P121``); ``False`` keeps both warnings even where a
+            document sets ``strict_params: true``. ``None`` (the default)
+            leaves each document's setting, most specific wins, absent is
+            lenient.
+        fabric_context: The Fabric values ``${fabric.x}`` resolves from, keyed
+            ``workspace_id``, ``lakehouse_id`` and ``workspace_name`` (a
+            ``fabric.`` prefix is accepted). ``None`` (the default) means no
+            Fabric context: each ``${fabric.x}`` without a ``:-`` default is
+            left in place and warns ``P113``, an error under strict params. A
+            mapping, even an empty one, is the context: a key it lacks or
+            maps to ``None`` fails ``P110``. ``Context`` always passes the
+            values of its Spark session. Runtime params never supply them.
 
     Returns:
         A frozen, typed domain model instance (Thread, Weave, or Loom) for
@@ -88,7 +125,9 @@ def load_config(
         ConfigVersionError: Unsupported config version
         ConfigSchemaError: Schema validation failures
         ConfigError: Extension or name validation failures
-        VariableResolutionError: Unresolved variables without defaults
+        VariableResolutionError: Unresolved variables without defaults, and
+            undeclared or unused params or deferred ``${fabric.x}`` references
+            under strict params
         ReferenceResolutionError: Missing referenced files, circular dependencies
         ModelValidationError: Semantic validation failures during model hydration
     """
@@ -98,7 +137,13 @@ def load_config(
     else:
         root = LocalConfigLocation(Path(project_root))
     with collecting(), attribute_errors(file_path):
-        resolved = _resolve_config(file_path, runtime_params=runtime_params, project_root=root)
+        resolved = _resolve_config(
+            file_path,
+            runtime_params=runtime_params,
+            project_root=root,
+            fabric_context=fabric_context,
+            strict_params=strict_params,
+        )
         if resolved.config_type not in _COMPONENT_TYPES:
             return resolved.data
         document, warnings = _hydrate_resolved(resolved)

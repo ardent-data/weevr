@@ -1084,7 +1084,7 @@ class TestResolveParams:
             match="bk",  # type: ignore[arg-type]
             pk="id",
             effective={"current": "is_current"},  # type: ignore[arg-type]
-            where="region = ${region_code}",
+            where="region = ${param.region_code}",
         )
         assert p.effective is not None
         assert p.where is not None

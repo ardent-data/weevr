@@ -1,0 +1,91 @@
+{
+  "config_name": "stg_customers_validated",
+  "config_type": "thread",
+  "model": {
+    "assertions": [
+      {
+        "columns": [
+          "customer_id"
+        ],
+        "severity": "error",
+        "type": "unique"
+      },
+      {
+        "columns": [
+          "customer_id",
+          "full_name"
+        ],
+        "severity": "error",
+        "type": "column_not_null"
+      },
+      {
+        "min": 1,
+        "type": "row_count"
+      }
+    ],
+    "config_version": "2.0",
+    "name": "stg_customers_validated",
+    "qualified_key": "stg_customers_validated.thread",
+    "sources": {
+      "customers": {
+        "options": {
+          "header": true,
+          "inferSchema": true
+        },
+        "path": "<root>/data/customers.csv",
+        "type": "csv"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "status = 'active'"
+        }
+      },
+      {
+        "derive": {
+          "columns": {
+            "full_name": "concat(first_name, ' ', last_name)"
+          }
+        }
+      },
+      {
+        "select": {
+          "columns": [
+            "customer_id",
+            "first_name",
+            "last_name",
+            "full_name",
+            "email",
+            "signup_date"
+          ]
+        }
+      },
+      {
+        "cast": {
+          "columns": {
+            "customer_id": "int",
+            "signup_date": "date"
+          }
+        }
+      }
+    ],
+    "target": {
+      "alias": "staging.stg_customers"
+    },
+    "validations": [
+      {
+        "name": "email_not_null",
+        "rule": "email IS NOT NULL"
+      },
+      {
+        "name": "customer_id_positive",
+        "rule": "customer_id > 0",
+        "severity": "fatal"
+      }
+    ],
+    "write": {}
+  },
+  "threads": {},
+  "weaves": {}
+}

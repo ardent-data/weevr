@@ -488,6 +488,54 @@ A date or timestamp parameter is not in the expected ISO format.
 
 A ${...} variable has no value and no default.
 
+### P111
+
+`bare-variable-reference` · error · stable
+
+A ${...} reference names no namespace: ${x} instead of ${param.x}.
+
+### P112
+
+`unknown-variable-namespace` · error · stable
+
+A ${...} reference starts with an unknown namespace, or names an unknown key of a thread, weave,
+loom or fabric namespace.
+
+### P113
+
+`fabric-reference-deferred` · warning · stable
+
+A ${fabric.x} reference is left unresolved because the load has no Fabric context: a core loader
+given no fabric_context. An error under strict_params.
+
+### P120
+
+`undeclared-parameter` · warning · stable
+
+A ${param.x} reference is bound, but no params: declaration in its scope chain covers it. An error
+under strict_params.
+
+### P121
+
+`unused-supplied-parameter` · warning · stable
+
+A runtime parameter is supplied that nothing in the loaded tree declares or references. An error
+under strict_params.
+
+### P122
+
+`pin-ignored-by-upstream-asset` · warning · stable
+
+A weave or thread entry pins a parameter that a registry asset declared above the entry reads; the
+asset resolved in its own scope, so the pin does not retarget it. Never an error, even under
+strict_params.
+
+### P123
+
+`unconsumed-pin` · warning · stable
+
+A weave or thread entry pins a parameter that nothing beneath the entry reads or declares.
+
 ## R1xx — Lookups and column sets
 
 ### R101

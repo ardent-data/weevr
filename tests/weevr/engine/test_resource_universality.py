@@ -6,7 +6,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from spark_helpers import create_delta_table
-from weevr.config.resolver import resolve_variables
+from weevr.config.interpolation import resolve_variables
 from weevr.engine import build_plan, execute_loom, execute_weave
 from weevr.engine.executor import execute_thread
 from weevr.model.lookup import Lookup
@@ -25,29 +25,29 @@ class TestWholeValueIntegration:
     """Whole-value parameter resolution integration tests."""
 
     def test_match_keys_resolves_to_list(self):
-        config = {"write": {"match_keys": "${pk_columns}"}}
-        context = {"pk_columns": ["mandt", "color"]}
+        config = {"write": {"match_keys": "${param.pk_columns}"}}
+        context = {"param": {"pk_columns": ["mandt", "color"]}}
         result = resolve_variables(config, context)
         assert result["write"]["match_keys"] == ["mandt", "color"]
         assert isinstance(result["write"]["match_keys"], list)
 
     def test_business_key_resolves_to_list(self):
-        config = {"keys": {"business_key": "${pk_columns}"}}
-        context = {"pk_columns": ["mandt", "color"]}
+        config = {"keys": {"business_key": "${param.pk_columns}"}}
+        context = {"param": {"pk_columns": ["mandt", "color"]}}
         result = resolve_variables(config, context)
         assert result["keys"]["business_key"] == ["mandt", "color"]
         assert isinstance(result["keys"]["business_key"], list)
 
     def test_embedded_param_resolves_to_string(self):
-        config = {"target": {"alias": "SAP.${table_name}"}}
-        context = {"table_name": "MARA"}
+        config = {"target": {"alias": "SAP.${param.table_name}"}}
+        context = {"param": {"table_name": "MARA"}}
         result = resolve_variables(config, context)
         assert result["target"]["alias"] == "SAP.MARA"
         assert isinstance(result["target"]["alias"], str)
 
     def test_whole_value_none_resolves_to_null(self):
-        config = {"flag": "${opt}"}
-        context = {"opt": None}
+        config = {"flag": "${param.opt}"}
+        context = {"param": {"opt": None}}
         result = resolve_variables(config, context)
         assert result["flag"] is None
 
@@ -56,9 +56,9 @@ class TestWholeValueIntegration:
         config = {
             "threads": ["dim_customer"],
             "params": {"env": {"type": "string"}},
-            "defaults": {"tags": ["${env}"]},
+            "defaults": {"tags": ["${param.env}"]},
         }
-        context = {"env": "prod"}
+        context = {"param": {"env": "prod"}}
         result = resolve_variables(config, context)
         assert result["defaults"]["tags"] == ["prod"]
 

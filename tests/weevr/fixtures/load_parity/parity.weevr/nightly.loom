@@ -18,7 +18,7 @@ weaves:
         sources:
           audit:
             type: delta
-            alias: "${audit_table}"
+            alias: "${param.audit_table:-ops.audit}"
         target:
           alias: ops.audit_summary
         dependencies:

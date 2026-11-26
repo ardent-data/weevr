@@ -8,6 +8,7 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.config.param_types import param_text
 from weevr.delta import delta_table_exists, read_delta
 from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.weave import ConditionSpec
@@ -49,7 +50,10 @@ _BUILTIN_FUNCS: dict[str, Any] = {
 
 
 def _resolve_params(expr: str, params: dict[str, Any]) -> str:
-    """Replace ${param.name} references with parameter values."""
+    """Replace ${param.name} references with parameter values.
+
+    A value renders by :func:`~weevr.config.param_types.param_text`.
+    """
 
     def _replace(match: re.Match[str]) -> str:
         param_name = match.group(1)
@@ -58,7 +62,7 @@ def _resolve_params(expr: str, params: dict[str, Any]) -> str:
                 f"Unresolved parameter reference '${{param.{param_name}}}' in condition",
                 config_key="condition",
             )
-        return str(params[param_name])
+        return param_text(params[param_name])
 
     return _PARAM_REF.sub(_replace, expr)
 

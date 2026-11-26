@@ -216,6 +216,22 @@ def test_load_config_without_pyspark() -> None:
         assert getattr(result, "name", None) == "lock_thread"
 
 
+def test_param_manifest_without_pyspark() -> None:
+    """``param_manifest`` reads a config's params with PySpark blocked."""
+    with _block_pyspark():
+        config_module = importlib.import_module("weevr.config")
+        manifest = config_module.param_manifest(FIXTURE_PATH)
+        assert manifest.executable == "lock_thread"
+
+
+def test_param_manifest_without_engine_wheel() -> None:
+    """``param_manifest`` reads a config's params in a core-only install."""
+    with _block_engine_wheel():
+        manifest_module = importlib.import_module("weevr.config.manifest")
+        manifest = manifest_module.param_manifest(FIXTURE_PATH)
+        assert manifest.kind == "thread"
+
+
 def test_validate_rename_strategy_without_engine_wheel() -> None:
     """``ReservedWordConfig(strategy="rename")`` must validate in a core-only install.
 

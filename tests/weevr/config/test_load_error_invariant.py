@@ -146,7 +146,9 @@ MUTATIONS = [
     Mutation("template-ref-twice-no-as", CORE, _drop("threads", "2", "as")),
     Mutation("as-not-string", CORE, _set("threads", "1", "as", value=5)),
     Mutation("params-not-mapping", CORE, _set("threads", "1", "params", value="a")),
-    Mutation("params-unresolved", CORE, _set("threads", "1", "params", "suffix", value="${x}")),
+    Mutation(
+        "params-unresolved", CORE, _set("threads", "1", "params", "suffix", value="${param.x}")
+    ),
     Mutation("param-wrong-type", "forms.loom", _set("params", "env", "type", value="blob")),
     # Bad foreach
     Mutation("foreach-no-values", BASE, _drop("steps", "0", "foreach", "values")),

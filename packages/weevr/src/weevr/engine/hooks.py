@@ -7,6 +7,7 @@ import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
+from weevr.config.param_types import param_text
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import ExecutionError, HookError
 from weevr.model.base import FrozenBase
@@ -69,13 +70,14 @@ def _resolve_params(text: str, params: dict[str, Any]) -> str:
         params: Parameter mapping to resolve against.
 
     Returns:
-        String with resolved parameter references. Unmatched refs left as-is.
+        String with resolved parameter references, each rendered by
+        :func:`~weevr.config.param_types.param_text`. Unmatched refs left as-is.
     """
 
     def _replacer(match: re.Match[str]) -> str:
         name = match.group(1)
         if name in params:
-            return str(params[name])
+            return param_text(params[name])
         return match.group(0)
 
     return _PARAM_PATTERN.sub(_replacer, text)

@@ -50,9 +50,9 @@ config_version: "2.0"
 sources:
   data:
     type: delta
-    alias: ${lakehouse}.customers
+    alias: ${param.lakehouse}.customers
 target:
-  path: /data/${env}_output
+  path: /data/${param.env}_output
 """,
             kind="thread",
         )
@@ -106,9 +106,9 @@ config_version: "2.0"
 sources:
   data:
     type: delta
-    alias: ${lakehouse}.customers
+    alias: ${param.lakehouse}.customers
 target:
-  path: /data/${env}_output
+  path: /data/${param.env}_output
 """,
             kind="thread",
         )
@@ -120,20 +120,23 @@ target:
         assert result.target.path == "/data/dev_output"
 
     def test_runtime_params_override_defaults(self, tmp_path):
-        """Runtime params override config default values."""
+        """Runtime params override declared param defaults."""
         thread_file = tmp_path / "thread.yaml"
         write_document(
             thread_file,
             """
 config_version: "2.0"
-defaults:
-  env: dev
+params:
+  env:
+    name: env
+    type: string
+    default: dev
 sources:
   data:
     type: delta
     alias: lakehouse
 target:
-  path: /data/output_${env}
+  path: /data/output_${param.env}
 """,
             kind="thread",
         )
@@ -158,7 +161,7 @@ sources:
     type: delta
     alias: lakehouse
 target:
-  path: ${output_table:-default_output}
+  path: ${param.output_table:-default_output}
 """,
             kind="thread",
         )
@@ -291,7 +294,7 @@ config_version: "2.0"
 sources:
   data:
     type: delta
-    alias: ${missing_var}.customers
+    alias: ${param.missing_var}.customers
 target:
   alias: test
 """,
@@ -428,7 +431,7 @@ config_version: "2.0"
 sources:
   data:
     type: delta
-    alias: ${schema}.customers
+    alias: ${param.schema}.customers
 target:
   alias: test
 steps:
@@ -695,8 +698,8 @@ connections:
         assert result.connections is not None
         assert result.connections["bronze"].workspace == "eastus"
 
-    def test_defaults_and_params_coexist(self, tmp_path):
-        """``defaults:`` (top-level) and ``params:`` (declared) both honored."""
+    def test_defaults_scalar_is_not_a_variable(self, tmp_path):
+        """A bare reference to a ``defaults:`` scalar fails ``P111`` with its rewrite."""
         project = write_project(tmp_path / "p.weevr")
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
@@ -724,16 +727,10 @@ connections:
     lakehouse: "${env}"
 """,
         )
-        result = load_config(
-            loom_file,
-            runtime_params={"workspace_id": "ws-1"},
-            project_root=project,
-        )
-        assert isinstance(result, Loom)
-        assert result.connections is not None
-        bronze = result.connections["bronze"]
-        assert bronze.workspace == "ws-1"
-        assert bronze.lakehouse == "dev"
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(loom_file, runtime_params={"workspace_id": "ws-1"}, project_root=project)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P111"]
+        assert exc_info.value.diagnostics[0].expected == ("${param.env}",)
 
     def test_param_typo_lists_available_names(self, tmp_path):
         """Typo on ``${param.x}`` raises with available declared param names."""
@@ -977,11 +974,11 @@ class TestLoadConfigErrorFileAttribution:
     def test_variable_error_names_file_and_keeps_key(self, tmp_path):
         """An unresolved variable carries the file's path and its config key."""
         thread = tmp_path / "vars.thread"
-        write_document(thread, _VALID_THREAD.replace("raw.customers", "${env.missing}"))
+        write_document(thread, _VALID_THREAD.replace("raw.customers", "${param.env.missing}"))
         with pytest.raises(VariableResolutionError) as exc_info:
             load_config(thread)
         assert exc_info.value.file_path == str(thread)
-        assert exc_info.value.config_key == "env.missing"
+        assert exc_info.value.config_key == "param.env.missing"
 
     def test_foreach_error_names_file(self, tmp_path):
         """A malformed foreach block carries the loaded file's path."""
@@ -1029,7 +1026,7 @@ class TestLoadConfigReferencedFileAttribution:
     def test_referenced_thread_variable_error_names_thread(self, tmp_path):
         """An unresolved variable in a ref'd thread names the thread."""
         thread = self._write(
-            tmp_path, "vars.thread", _VALID_THREAD.replace("raw.customers", "${env.missing}")
+            tmp_path, "vars.thread", _VALID_THREAD.replace("raw.customers", "${param.env.missing}")
         )
         weave = self._weave_of(tmp_path, "w.weave", "ref: vars.thread")
         with pytest.raises(VariableResolutionError) as exc_info:
@@ -1047,7 +1044,7 @@ class TestLoadConfigReferencedFileAttribution:
     def test_loom_weave_thread_error_names_thread(self, tmp_path):
         """Two levels down, the thread's error still names the thread."""
         thread = self._write(
-            tmp_path, "vars.thread", _VALID_THREAD.replace("raw.customers", "${env.missing}")
+            tmp_path, "vars.thread", _VALID_THREAD.replace("raw.customers", "${param.env.missing}")
         )
         self._weave_of(tmp_path, "w.weave", "ref: vars.thread")
         loom = self._loom_of(tmp_path, "ref: w.weave")
@@ -1074,7 +1071,9 @@ class TestLoadConfigReferencedFileAttribution:
     def test_entry_params_error_names_weave(self, tmp_path):
         """An unresolvable entry params expression belongs to the weave."""
         self._write(tmp_path, "t.thread", _VALID_THREAD)
-        weave = self._weave_of(tmp_path, "w.weave", "ref: t.thread\n    params:\n      x: ${nope}")
+        weave = self._weave_of(
+            tmp_path, "w.weave", "ref: t.thread\n    params:\n      x: ${param.nope}"
+        )
         loom = self._loom_of(tmp_path, "ref: w.weave")
         with pytest.raises(VariableResolutionError) as exc_info:
             load_config(loom, project_root=tmp_path)
@@ -1370,8 +1369,8 @@ class TestLoadConfigInlineWeaves:
             load_config(loom, project_root=tmp_path)
         assert exc_info.value.file_path == str(loom)
 
-    def test_inline_weave_defaults_resolve_variables(self, tmp_path):
-        """A ${var} defined in the inline weave's own defaults resolves."""
+    def test_inline_weave_defaults_are_not_variables(self, tmp_path):
+        """A bare reference to the inline weave's own defaults fails ``P111``."""
         loom = self._loom(
             tmp_path,
             '  - name: inline_ops\n    config_version: "2.0"\n'
@@ -1381,7 +1380,10 @@ class TestLoadConfigInlineWeaves:
             "            alias: raw.events\n        target:\n"
             '          alias: "${tbl}"\n',
         )
-        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P111"]
+        assert exc_info.value.diagnostics[0].expected == ("${param.tbl}",)
 
     def test_name_only_weave_without_file_raises(self, tmp_path):
         """A name-only weave entry with no file and no body fails as name-only."""

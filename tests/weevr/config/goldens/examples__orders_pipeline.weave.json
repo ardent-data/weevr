@@ -1,0 +1,115 @@
+{
+  "config_name": "orders_pipeline",
+  "config_type": "weave",
+  "model": {
+    "config_version": "2.0",
+    "execution": {
+      "log_level": "verbose"
+    },
+    "name": "orders_pipeline",
+    "post_steps": [
+      {
+        "check": "row_count_delta",
+        "max_decrease_pct": 10.0,
+        "name": "check_row_delta",
+        "on_failure": "warn",
+        "target": "curated.fact_orders",
+        "type": "quality_gate"
+      },
+      {
+        "check": "row_count",
+        "min_count": 1,
+        "name": "check_min_rows",
+        "on_failure": "warn",
+        "target": "curated.fact_orders",
+        "type": "quality_gate"
+      },
+      {
+        "check": "expression",
+        "name": "verify_expression",
+        "on_failure": "warn",
+        "sql": "SELECT COUNT(*) > 0 FROM curated.fact_orders WHERE order_date IS NOT NULL",
+        "type": "quality_gate"
+      },
+      {
+        "message": "Orders pipeline complete at ${var.batch_ts}",
+        "name": "pipeline_summary",
+        "type": "log_message"
+      }
+    ],
+    "pre_steps": [
+      {
+        "check": "table_exists",
+        "name": "check_source_exists",
+        "source": "raw.orders",
+        "type": "quality_gate"
+      },
+      {
+        "check": "source_freshness",
+        "max_age": "24h",
+        "name": "check_freshness",
+        "source": "raw.orders",
+        "type": "quality_gate"
+      },
+      {
+        "name": "capture_batch_ts",
+        "set_var": "batch_ts",
+        "sql": "SELECT current_timestamp()",
+        "type": "sql_statement"
+      }
+    ],
+    "qualified_key": "orders_pipeline.weave",
+    "threads": [
+      {
+        "name": "staging_orders"
+      },
+      {
+        "dependencies": [
+          "staging_orders"
+        ],
+        "name": "fact_orders"
+      }
+    ],
+    "variables": {
+      "batch_ts": {
+        "type": "timestamp"
+      },
+      "record_count": {
+        "type": "int"
+      }
+    }
+  },
+  "threads": {
+    "orders_pipeline": {
+      "fact_orders": {
+        "config_version": "2.0",
+        "name": "fact_orders",
+        "qualified_key": "fact_orders",
+        "sources": {
+          "orders": {
+            "alias": "staging.orders",
+            "type": "delta"
+          }
+        },
+        "target": {
+          "alias": "curated.fact_orders"
+        }
+      },
+      "staging_orders": {
+        "config_version": "2.0",
+        "name": "staging_orders",
+        "qualified_key": "staging_orders",
+        "sources": {
+          "raw_orders": {
+            "alias": "raw.orders",
+            "type": "delta"
+          }
+        },
+        "target": {
+          "alias": "staging.orders"
+        }
+      }
+    }
+  },
+  "weaves": {}
+}

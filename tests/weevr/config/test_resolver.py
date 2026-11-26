@@ -12,211 +12,119 @@ from weevr.config.audit_templates import (
     AuditContext,
     resolve_context_variables,
 )
-from weevr.config.resolver import (
-    build_param_context,
-    resolve_declared_params,
-    resolve_variables,
-    validate_params,
-)
+from weevr.config.interpolation import resolve_variables
+from weevr.config.interpolation_errors import ReferenceScope
+from weevr.config.params import ParamScope
+from weevr.config.scoping import scope_context
+from weevr.diagnostics import Diagnostic
 from weevr.errors import ConfigSchemaError, VariableResolutionError
-from weevr.model.params import ParamSpec
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-class TestBuildParamContext:
-    """Test build_param_context function."""
+class TestScopeContext:
+    """The load-time namespaces: the scope's bound params and the Fabric context."""
 
-    def test_runtime_params_only(self):
-        """Build context with only runtime params."""
+    def test_runtime_params_bind_under_param(self):
+        """Runtime params reach ``${param.x}`` as the root scope's bindings, not flat."""
         runtime = {"env": "prod", "lakehouse": "gold"}
-        context = build_param_context(runtime_params=runtime)
-        assert context["env"] == "prod"
-        assert context["lakehouse"] == "gold"
-
-    def test_config_defaults_only(self):
-        """Build context with only config defaults."""
-        defaults = {"env": "dev", "mode": "test"}
-        context = build_param_context(config_defaults=defaults)
-        assert context["env"] == "dev"
-        assert context["mode"] == "test"
-
-    def test_runtime_overrides_defaults(self):
-        """Runtime params should override config defaults."""
-        runtime = {"env": "prod"}
-        defaults = {"env": "dev", "lakehouse": "bronze"}
-        context = build_param_context(runtime, defaults)
-        assert context["env"] == "prod"  # Runtime wins
-        assert context["lakehouse"] == "bronze"  # From defaults
-
-    def test_full_priority_chain(self):
-        """Test full priority: runtime > defaults."""
-        runtime = {"env": "prod"}
-        defaults = {"env": "dev", "lakehouse": "bronze", "mode": "test"}
-        context = build_param_context(runtime, defaults)
-        assert context["env"] == "prod"  # Runtime wins
-        assert context["lakehouse"] == "bronze"  # Defaults (no override)
-        assert context["mode"] == "test"  # Defaults (no override)
+        context = scope_context(ParamScope.root(runtime))
+        assert context == {"param": runtime}
 
     def test_fabric_context_workspace_id(self):
         """Fabric context provides workspace_id as nested dict under 'fabric'."""
         fabric = {"fabric.workspace_id": "ws-abc-123"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-abc-123"
 
     def test_fabric_context_lakehouse_id(self):
         """Fabric context provides lakehouse_id as nested dict under 'fabric'."""
         fabric = {"fabric.lakehouse_id": "lh-xyz-456"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         assert context["fabric"]["lakehouse_id"] == "lh-xyz-456"
 
     def test_fabric_context_none_values_excluded(self):
         """Fabric context keys with None values are excluded from context."""
         fabric = {"fabric.workspace_id": "ws-abc-123", "fabric.lakehouse_id": None}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         assert context["fabric"]["workspace_id"] == "ws-abc-123"
         assert "lakehouse_id" not in context["fabric"]
 
-    def test_fabric_context_all_none_excluded(self):
-        """Fabric context with all None values produces no 'fabric' key."""
+    def test_fabric_context_all_none_is_an_empty_namespace(self):
+        """A context with only None values is still a context, with no values."""
         fabric = {"fabric.workspace_id": None, "fabric.lakehouse_id": None}
-        context = build_param_context(fabric_context=fabric)
-        assert "fabric" not in context
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
+        assert context["fabric"] == {}
 
-    def test_runtime_param_overrides_fabric_context(self):
-        """Explicit runtime param overrides fabric context value."""
+    def test_runtime_fabric_key_binds_as_a_param(self):
+        """A runtime ``fabric`` key is a param binding, never the fabric namespace."""
         fabric = {"fabric.workspace_id": "ws-from-spark"}
         runtime = {"fabric": {"workspace_id": "ws-override"}}
-        context = build_param_context(runtime_params=runtime, fabric_context=fabric)
-        assert context["fabric"]["workspace_id"] == "ws-override"
-
-    def test_config_default_overrides_fabric_context(self):
-        """Config default overrides fabric context value."""
-        fabric = {"fabric.workspace_id": "ws-from-spark"}
-        defaults = {"fabric": {"workspace_id": "ws-from-config"}}
-        context = build_param_context(config_defaults=defaults, fabric_context=fabric)
-        assert context["fabric"]["workspace_id"] == "ws-from-config"
-
-    def test_full_priority_chain_with_fabric(self):
-        """Full priority: runtime > config_defaults > fabric_context."""
-        fabric = {
-            "fabric.workspace_id": "ws-spark",
-            "fabric.lakehouse_id": "lh-spark",
-            "fabric.workspace_name": "wks-spark",
-        }
-        defaults = {"fabric": {"workspace_id": "ws-config"}, "env": "dev"}
-        runtime = {"fabric": {"workspace_id": "ws-runtime"}, "env": "prod"}
-        context = build_param_context(
-            runtime_params=runtime,
-            config_defaults=defaults,
-            fabric_context=fabric,
-        )
-        assert context["fabric"]["workspace_id"] == "ws-runtime"  # Runtime wins
-        assert context["env"] == "prod"  # Runtime wins
+        context = scope_context(ParamScope.root(runtime), fabric_context=fabric)
+        assert context["fabric"] == {"workspace_id": "ws-from-spark"}
+        assert context["param"] == runtime
 
     def test_fabric_context_none_param_no_error(self):
         """Passing None for fabric_context is valid and produces no fabric key."""
-        context = build_param_context(fabric_context=None)
+        context = scope_context(ParamScope.root(), fabric_context=None)
         assert "fabric" not in context
 
+    def test_scope_bindings_nest_under_param_key(self):
+        """A scope's bound values nest under context['param'] and resolve dotted."""
+        scope = ParamScope.root().child(None, pins={"table": "ADR6"})
+        context = scope_context(scope)
+        assert context == {"param": {"table": "ADR6"}}
+        assert resolve_variables({"x": "${param.table}"}, context) == {"x": "ADR6"}
 
-class TestEntryParams:
-    """Test entry_params layer in build_param_context (M121 Task 3)."""
+    def test_empty_scope_adds_no_param_key(self):
+        """A scope with no bindings adds no 'param' key."""
+        assert "param" not in scope_context(ParamScope.root())
 
-    def test_entry_params_nested_under_param_key(self):
-        """entry_params values nest under context['param']."""
-        context = build_param_context(entry_params={"table": "ADR6"})
+    def test_runtime_param_named_param_does_not_replace_namespace(self):
+        """A runtime param named 'param' is one binding, not the namespace."""
+        runtime = {"param": {"table": "OVERRIDE"}}
+        scope = ParamScope.root(runtime).child(None, pins={"table": "ADR6"})
+        context = scope_context(scope)
         assert context["param"]["table"] == "ADR6"
 
-    def test_entry_params_resolve_via_dotted_access(self):
-        """${param.table} resolves via dotted key access."""
-        context = build_param_context(entry_params={"table": "ADR6"})
-        result = resolve_variables({"x": "${param.table}"}, context)
-        assert result["x"] == "ADR6"
 
-    def test_entry_params_no_interference_with_flat(self):
-        """entry_params doesn't interfere with flat runtime_params."""
-        context = build_param_context(
-            runtime_params={"env": "prod"},
-            entry_params={"table": "ADR6"},
-        )
-        assert context["env"] == "prod"
-        assert context["param"]["table"] == "ADR6"
-        result = resolve_variables({"a": "${env}", "b": "${param.table}"}, context)
-        assert result == {"a": "prod", "b": "ADR6"}
-
-    def test_entry_params_none_no_effect(self):
-        """entry_params=None adds no 'param' key (backwards compat)."""
-        context = build_param_context(entry_params=None)
-        assert "param" not in context
-
-    def test_runtime_overrides_entry_params(self):
-        """runtime_params with 'param' key overrides entry_params."""
-        context = build_param_context(
-            runtime_params={"param": {"table": "OVERRIDE"}},
-            entry_params={"table": "ADR6"},
-        )
-        assert context["param"]["table"] == "OVERRIDE"
-
-
-class TestConsumedKeysTracking:
-    """Test consumed_keys param tracking in resolve_variables (M121 Task 12)."""
+class TestReadAtTracking:
+    """``read_at`` records each resolved key and where it was first read."""
 
     def test_param_keys_tracked(self):
-        """${param.x} and ${param.y} usage tracked in consumed_keys."""
-        context = build_param_context(entry_params={"x": 1, "y": 2})
-        consumed: set[str] = set()
-        resolve_variables(
-            {"a": "${param.x}", "b": "${param.y}"},
-            context,
-            consumed_keys=consumed,
-        )
-        assert consumed == {"param.x", "param.y"}
+        """${param.x} and ${param.y} reads are recorded at their values."""
+        context = {"param": {"x": 1, "y": 2}}
+        read_at: dict[str, str] = {}
+        resolve_variables({"a": "${param.x}", "b": "${param.y}"}, context, read_at=read_at)
+        assert read_at == {"param.x": "/a", "param.y": "/b"}
 
-    def test_duplicate_usage_idempotent(self):
-        """Same param used twice produces single entry in consumed_keys."""
-        context = build_param_context(entry_params={"x": 1})
-        consumed: set[str] = set()
-        resolve_variables(
-            {"a": "${param.x}", "b": "${param.x}"},
-            context,
-            consumed_keys=consumed,
-        )
-        assert consumed == {"param.x"}
-
-    def test_no_param_refs_empty_set(self):
-        """Config with no param references yields empty consumed_keys."""
-        context = {"env": "prod"}
-        consumed: set[str] = set()
-        resolve_variables({"a": "${env}"}, context, consumed_keys=consumed)
-        assert consumed == {"env"}
+    def test_duplicate_usage_records_first_read(self):
+        """A param read twice is recorded once, at its first read."""
+        context = {"param": {"x": 1}}
+        read_at: dict[str, str] = {}
+        resolve_variables({"a": "${param.x}", "b": "${param.x}"}, context, read_at=read_at)
+        assert read_at == {"param.x": "/a"}
 
     def test_var_namespace_not_tracked(self):
         """${var.x} references are runtime-deferred, not tracked."""
-        context = {"env": "prod"}
-        consumed: set[str] = set()
-        resolve_variables(
-            {"a": "${env}", "b": "${var.x}"},
-            context,
-            consumed_keys=consumed,
-        )
-        assert consumed == {"env"}
+        context = {"param": {"env": "prod"}}
+        read_at: dict[str, str] = {}
+        resolve_variables({"a": "${param.env}", "b": "${var.x}"}, context, read_at=read_at)
+        assert read_at == {"param.env": "/a"}
 
-    def test_consumed_keys_none_no_error(self):
-        """consumed_keys=None (default) causes no tracking or error."""
-        context = {"env": "prod"}
-        result = resolve_variables({"a": "${env}"}, context)
+    def test_untracked_resolution(self):
+        """Without ``read_at`` nothing is tracked and the value still resolves."""
+        context = {"param": {"env": "prod"}}
+        result = resolve_variables({"a": "${param.env}"}, context)
         assert result == {"a": "prod"}
 
 
 class TestUnusedParamWarnings:
-    """Test unused-param telemetry warnings (M121 Task 13)."""
+    """An entry pin the referenced thread never reads warns ``P123``."""
 
-    def test_unused_entry_param_warns(self, tmp_path, caplog):
-        """Entry param not consumed by thread emits warning."""
-        import logging
-
-        from weevr.config.resolver import resolve_references
+    def test_unused_entry_param_warns(self, tmp_path):
+        """Entry param not consumed by thread emits P123 at the entry."""
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "simple.thread"
         write_document(
@@ -236,15 +144,13 @@ class TestUnusedParamWarnings:
                 },
             ],
         }
-        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
-            resolve_references(weave_config, "weave", tmp_path)
-        assert any("unused_key" in r.message for r in caplog.records)
+        warnings: list = []
+        resolve_tree(weave_config, "weave", tmp_path, warnings=warnings)
+        assert [(d.code, d.pointer) for d in warnings] == [("P123", "/threads/0/params/unused_key")]
 
-    def test_all_params_consumed_no_warning(self, tmp_path, caplog):
+    def test_all_params_consumed_no_warning(self, tmp_path):
         """All entry params consumed by thread emits no warning."""
-        import logging
-
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "parameterized.thread"
         write_document(
@@ -265,23 +171,20 @@ class TestUnusedParamWarnings:
                 },
             ],
         }
-        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
-            resolve_references(weave_config, "weave", tmp_path)
-        assert not any("unused" in r.message.lower() for r in caplog.records)
+        warnings: list = []
+        resolve_tree(weave_config, "weave", tmp_path, warnings=warnings)
+        assert warnings == []
 
-    def test_shadowed_default_no_warning(self, tmp_path, caplog):
-        """Entry param that shadows a thread default emits no warning."""
-        import logging
-
-        from weevr.config.resolver import resolve_references
+    def test_shadowed_default_no_warning(self, tmp_path):
+        """A thread with no entry pins emits no warning."""
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "with_default.thread"
         write_document(
             thread_file,
             'config_version: "2.0"\n'
-            "defaults:\n  env: dev\n"
             "sources:\n  data:\n    type: delta\n"
-            "    alias: ${env}\n"
+            "    alias: ${param.env:-dev}\n"
             "target: {}\n",
         )
 
@@ -291,10 +194,9 @@ class TestUnusedParamWarnings:
                 {"ref": "with_default.thread"},
             ],
         }
-        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
-            resolve_references(weave_config, "weave", tmp_path)
-        # env is consumed, no warning expected
-        assert not any("unused" in r.message.lower() for r in caplog.records)
+        warnings: list = []
+        resolve_tree(weave_config, "weave", tmp_path, warnings=warnings)
+        assert warnings == []
 
 
 class TestStandaloneTemplateErrors:
@@ -302,14 +204,14 @@ class TestStandaloneTemplateErrors:
 
     def test_standalone_unresolved_param_hints_template(self):
         """Standalone thread with ${param.x} raises with param.table in msg."""
-        context = build_param_context()
+        context = {}
         config = {"alias": "${param.table}"}
         with pytest.raises(VariableResolutionError, match="param.table"):
             resolve_variables(config, context)
 
     def test_ref_loaded_thread_unresolved_param_shows_ref(self, tmp_path):
         """Thread loaded via ref with unresolved ${param.x} raises with ref."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "template.thread"
         write_document(
@@ -325,7 +227,7 @@ class TestStandaloneTemplateErrors:
             "threads": [{"ref": "template.thread"}],
         }
         with pytest.raises(VariableResolutionError, match="param.table"):
-            resolve_references(weave_config, "weave", tmp_path)
+            resolve_tree(weave_config, "weave", tmp_path)
 
 
 class TestFabricVariableResolution:
@@ -334,7 +236,7 @@ class TestFabricVariableResolution:
     def test_fabric_workspace_id_resolves(self):
         """${fabric.workspace_id} resolves from fabric context."""
         fabric = {"fabric.workspace_id": "ws-abc-123"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         config = {"workspace": "${fabric.workspace_id}"}
         result = resolve_variables(config, context)
         assert result["workspace"] == "ws-abc-123"
@@ -342,22 +244,29 @@ class TestFabricVariableResolution:
     def test_fabric_lakehouse_id_resolves(self):
         """${fabric.lakehouse_id} resolves from fabric context."""
         fabric = {"fabric.lakehouse_id": "lh-xyz-456"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         config = {"lakehouse": "${fabric.lakehouse_id}"}
         result = resolve_variables(config, context)
         assert result["lakehouse"] == "lh-xyz-456"
 
     def test_fabric_workspace_id_missing_raises(self):
-        """${fabric.workspace_id} with no fabric context raises VariableResolutionError."""
-        context = build_param_context()
+        """${fabric.workspace_id} a supplied fabric context lacks raises ``P110``."""
+        context = {"fabric": {}}
         config = {"workspace": "${fabric.workspace_id}"}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
-        assert "fabric.workspace_id" in str(exc_info.value)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P110"]
+
+    def test_fabric_reference_without_context_is_deferred(self):
+        """With no fabric namespace the reference stays in place, noted as ``P113``."""
+        deferred: list[Diagnostic] = []
+        config = {"workspace": "${fabric.workspace_id}"}
+        assert resolve_variables(config, {}, deferred=deferred) == config
+        assert [(d.code, d.pointer) for d in deferred] == [("P113", "/workspace")]
 
     def test_fabric_workspace_id_with_default_fallback(self):
         """${fabric.workspace_id:-fallback} uses default when fabric context absent."""
-        context = build_param_context()
+        context = {}
         config = {"workspace": "${fabric.workspace_id:-local-ws}"}
         result = resolve_variables(config, context)
         assert result["workspace"] == "local-ws"
@@ -365,7 +274,7 @@ class TestFabricVariableResolution:
     def test_fabric_context_in_embedded_string(self):
         """${fabric.workspace_id} embedded in longer string resolves correctly."""
         fabric = {"fabric.workspace_id": "ws-abc-123"}
-        context = build_param_context(fabric_context=fabric)
+        context = scope_context(ParamScope.root(), fabric_context=fabric)
         config = {"path": "abfss://data@storage/${fabric.workspace_id}/files"}
         result = resolve_variables(config, context)
         assert result["path"] == "abfss://data@storage/ws-abc-123/files"
@@ -376,61 +285,61 @@ class TestResolveVariables:
 
     def test_simple_variable(self):
         """Resolve simple variable reference."""
-        config = {"path": "${base_path}/data"}
-        context = {"base_path": "/mnt/storage"}
+        config = {"path": "${param.base_path}/data"}
+        context = {"param": {"base_path": "/mnt/storage"}}
         result = resolve_variables(config, context)
         assert result["path"] == "/mnt/storage/data"
 
     def test_variable_with_default_not_used(self):
         """Variable with default should use context value when present."""
-        config = {"env": "${environment:-dev}"}
-        context = {"environment": "prod"}
+        config = {"env": "${param.environment:-dev}"}
+        context = {"param": {"environment": "prod"}}
         result = resolve_variables(config, context)
         assert result["env"] == "prod"  # Context value used
 
     def test_variable_with_default_used(self):
         """Variable with default should use default when not in context."""
-        config = {"env": "${missing_var:-dev}"}
+        config = {"env": "${param.missing_var:-dev}"}
         context = {}
         result = resolve_variables(config, context)
         assert result["env"] == "dev"  # Default used
 
     def test_dotted_key_access(self):
         """Resolve variable with dotted key access."""
-        config = {"host": "${database.host}"}
-        context = {"database": {"host": "localhost", "port": 5432}}
+        config = {"host": "${param.database.host}"}
+        context = {"param": {"database": {"host": "localhost", "port": 5432}}}
         result = resolve_variables(config, context)
         assert result["host"] == "localhost"
 
     def test_nested_dict_resolution(self):
         """Recursively resolve variables in nested dict."""
         config = {
-            "source": {"path": "${base_path}/input"},
-            "target": {"path": "${base_path}/output"},
+            "source": {"path": "${param.base_path}/input"},
+            "target": {"path": "${param.base_path}/output"},
         }
-        context = {"base_path": "/data"}
+        context = {"param": {"base_path": "/data"}}
         result = resolve_variables(config, context)
         assert result["source"]["path"] == "/data/input"
         assert result["target"]["path"] == "/data/output"
 
     def test_list_resolution(self):
         """Recursively resolve variables in list."""
-        config = {"paths": ["${base}/input", "${base}/output"]}
-        context = {"base": "/data"}
+        config = {"paths": ["${param.base}/input", "${param.base}/output"]}
+        context = {"param": {"base": "/data"}}
         result = resolve_variables(config, context)
         assert result["paths"][0] == "/data/input"
         assert result["paths"][1] == "/data/output"
 
     def test_multiple_variables_in_string(self):
         """Resolve multiple variables in one string."""
-        config = {"url": "${protocol}://${host}:${port}"}
-        context = {"protocol": "https", "host": "api.example.com", "port": "443"}
+        config = {"url": "${param.protocol}://${param.host}:${param.port}"}
+        context = {"param": {"protocol": "https", "host": "api.example.com", "port": "443"}}
         result = resolve_variables(config, context)
         assert result["url"] == "https://api.example.com:443"
 
     def test_unresolved_variable_no_default(self):
         """Raise VariableResolutionError for missing variable without default."""
-        config = {"path": "${missing_var}"}
+        config = {"path": "${param.missing_var}"}
         context = {}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
@@ -461,273 +370,17 @@ class TestResolveVariables:
 
     def test_empty_context(self):
         """Variables with defaults should work with empty context."""
-        config = {"env": "${missing:-dev}"}
+        config = {"env": "${param.missing:-dev}"}
         context = {}
         result = resolve_variables(config, context)
         assert result["env"] == "dev"
 
 
-class TestValidateParams:
-    """Test validate_params function."""
-
-    def test_string_type_valid(self):
-        """Validate string parameter."""
-        specs = {"env": {"type": "string", "required": True}}
-        context = {"env": "dev"}
-        validate_params(specs, context)  # Should not raise
-
-    def test_string_type_invalid(self):
-        """Reject non-string for string type."""
-        specs = {"env": {"type": "string", "required": True}}
-        context = {"env": 123}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected string" in str(exc_info.value).lower()
-
-    def test_int_type_valid(self):
-        """Validate int parameter."""
-        specs = {"port": {"type": "int", "required": True}}
-        context = {"port": 5432}
-        validate_params(specs, context)  # Should not raise
-
-    def test_int_type_invalid(self):
-        """Reject non-int for int type."""
-        specs = {"port": {"type": "int", "required": True}}
-        context = {"port": "5432"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected int" in str(exc_info.value).lower()
-
-    def test_float_type_valid(self):
-        """Validate float parameter."""
-        specs = {"ratio": {"type": "float", "required": True}}
-        context = {"ratio": 3.14}
-        validate_params(specs, context)  # Should not raise
-
-    def test_float_accepts_int(self):
-        """Float type should accept int values."""
-        specs = {"ratio": {"type": "float", "required": True}}
-        context = {"ratio": 3}
-        validate_params(specs, context)  # Should not raise
-
-    def test_bool_type_valid(self):
-        """Validate bool parameter."""
-        specs = {"enabled": {"type": "bool", "required": True}}
-        context = {"enabled": True}
-        validate_params(specs, context)  # Should not raise
-
-    def test_bool_type_invalid(self):
-        """Reject non-bool for bool type."""
-        specs = {"enabled": {"type": "bool", "required": True}}
-        context = {"enabled": "true"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected bool" in str(exc_info.value).lower()
-
-    def test_date_type_valid_string(self):
-        """Validate date parameter as ISO string."""
-        specs = {"start_date": {"type": "date", "required": True}}
-        context = {"start_date": "2024-01-15"}
-        validate_params(specs, context)  # Should not raise
-
-    def test_date_type_invalid_format(self):
-        """Reject invalid date format."""
-        specs = {"start_date": {"type": "date", "required": True}}
-        context = {"start_date": "01/15/2024"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "date format" in str(exc_info.value).lower()
-
-    def test_timestamp_type_valid_string(self):
-        """Validate timestamp parameter as ISO string."""
-        specs = {"created_at": {"type": "timestamp", "required": True}}
-        context = {"created_at": "2024-01-15T10:30:00"}
-        validate_params(specs, context)  # Should not raise
-
-    def test_timestamp_type_invalid_format(self):
-        """Reject invalid timestamp format."""
-        specs = {"created_at": {"type": "timestamp", "required": True}}
-        context = {"created_at": "invalid-timestamp"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "timestamp format" in str(exc_info.value).lower()
-
-    def test_list_string_type_valid(self):
-        """Validate list[string] parameter."""
-        specs = {"tags": {"type": "list[string]", "required": True}}
-        context = {"tags": ["dev", "critical"]}
-        validate_params(specs, context)  # Should not raise
-
-    def test_list_string_type_not_list(self):
-        """Reject non-list for list[string] type."""
-        specs = {"tags": {"type": "list[string]", "required": True}}
-        context = {"tags": "dev"}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "expected list" in str(exc_info.value).lower()
-
-    def test_list_string_type_non_string_items(self):
-        """Reject list with non-string items."""
-        specs = {"tags": {"type": "list[string]", "required": True}}
-        context = {"tags": ["dev", 123]}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "list of strings" in str(exc_info.value).lower()
-
-    def test_required_param_missing(self):
-        """Raise error for missing required parameter."""
-        specs = {"env": {"type": "string", "required": True}}
-        context = {}
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(specs, context)
-        assert "Required parameter" in str(exc_info.value)
-        assert "env" in str(exc_info.value)
-
-    def test_required_param_with_default(self):
-        """Use default for required param when missing."""
-        specs = {"env": {"type": "string", "required": True, "default": "dev"}}
-        context = {}
-        validate_params(specs, context)
-        assert context["env"] == "dev"  # Default applied
-
-    def test_optional_param_missing(self):
-        """Optional param missing should not raise."""
-        specs = {"optional": {"type": "string", "required": False}}
-        context = {}
-        validate_params(specs, context)  # Should not raise
-
-    def test_none_param_specs(self):
-        """None param specs should not raise."""
-        validate_params(None, {"env": "dev"})  # Should not raise
-
-    def test_empty_param_specs(self):
-        """Empty param specs should not raise."""
-        validate_params({}, {"env": "dev"})  # Should not raise
-
-
-class TestResolveDeclaredParams:
-    """Test loom/weave-level declared param resolution under the param.* namespace."""
-
-    def test_runtime_override_wins_over_declared_default(self):
-        """Runtime value beats the spec's declared default."""
-        specs = {
-            "workspace_id": {
-                "name": "workspace_id",
-                "type": "string",
-                "required": True,
-                "default": "default-ws",
-            }
-        }
-        result = resolve_declared_params(specs, {"workspace_id": "runtime-ws"})
-        assert result == {"workspace_id": "runtime-ws"}
-
-    def test_declared_default_used_when_runtime_omits(self):
-        """Spec default applied when runtime supplies no value."""
-        specs = {
-            "region": {
-                "name": "region",
-                "type": "string",
-                "required": False,
-                "default": "eastus",
-            }
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert result == {"region": "eastus"}
-
-    def test_required_missing_raises_with_file_context(self):
-        """Required param with no default and no runtime value raises with file path."""
-        specs = {
-            "workspace_id": {
-                "name": "workspace_id",
-                "type": "string",
-                "required": True,
-            }
-        }
-        with pytest.raises(ConfigSchemaError) as exc_info:
-            resolve_declared_params(specs, runtime_params=None, file_path="silver.loom")
-        msg = str(exc_info.value)
-        assert "workspace_id" in msg
-        assert "silver.loom" in msg
-
-    def test_optional_param_no_default_omitted(self):
-        """Non-required param with no default and no runtime value is omitted."""
-        specs = {
-            "region": {"name": "region", "type": "string", "required": False},
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert "region" not in result
-
-    def test_works_with_paramspec_objects(self):
-        """Helper accepts ParamSpec instances directly (pre-dump)."""
-        specs = {
-            "workspace_id": ParamSpec(
-                name="workspace_id", type="string", required=True, default="ws-default"
-            )
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert result == {"workspace_id": "ws-default"}
-
-    def test_works_with_dict_specs(self):
-        """Helper accepts model_dump'd dict specs (post-pydantic)."""
-        specs = {
-            "max_rows": {
-                "name": "max_rows",
-                "type": "int",
-                "required": False,
-                "default": 1000,
-            }
-        }
-        result = resolve_declared_params(specs, runtime_params=None)
-        assert result == {"max_rows": 1000}
-
-    def test_required_default_not_set_required_implicit_true(self):
-        """`required` defaults to True (matching ParamSpec field default)."""
-        specs = {"x": {"name": "x", "type": "string"}}  # no `required` key
-        with pytest.raises(ConfigSchemaError):
-            resolve_declared_params(specs, runtime_params=None)
-
-    def test_none_specs_returns_empty(self):
-        """None or empty specs returns empty dict."""
-        assert resolve_declared_params(None, {"x": 1}) == {}
-        assert resolve_declared_params({}, {"x": 1}) == {}
-
-    def test_only_declared_keys_consumed(self):
-        """Runtime keys not declared in specs are ignored (declared scope only)."""
-        specs = {"declared": {"name": "declared", "type": "string", "required": True}}
-        result = resolve_declared_params(
-            specs, runtime_params={"declared": "v", "extra": "ignored"}
-        )
-        assert result == {"declared": "v"}
-
-    def test_type_mismatch_via_validate_params(self):
-        """Type-mismatched runtime value is rejected by the paired validate_params call."""
-        specs = {"max_rows": {"name": "max_rows", "type": "int", "required": True}}
-        resolved = resolve_declared_params(specs, runtime_params={"max_rows": "abc"})
-        with pytest.raises(ConfigSchemaError, match="expected int"):
-            validate_params(specs, resolved)
-
-    def test_none_runtime_value_treated_as_absent(self):
-        """Runtime ``None`` value is ignored so default + required checks apply."""
-        # With a default: default is used.
-        with_default = {"region": {"name": "region", "type": "string", "default": "eastus"}}
-        result = resolve_declared_params(with_default, runtime_params={"region": None})
-        assert result == {"region": "eastus"}
-
-        # Without a default and required: raises required-missing, not type-mismatch.
-        required = {
-            "workspace_id": {
-                "name": "workspace_id",
-                "type": "string",
-                "required": True,
-            }
-        }
-        with pytest.raises(ConfigSchemaError, match="missing"):
-            resolve_declared_params(
-                required, runtime_params={"workspace_id": None}, file_path="x.loom"
-            )
+class TestDeclaredParamsAndDefaults:
+    """Declared params bind in the scope; ``defaults`` stay out of the variables."""
 
     def test_defaults_and_declared_params_independent(self):
-        """``defaults`` (top-level) and declared ``params`` resolve through separate paths."""
+        """``defaults`` are not variables: a bare reference to one fails ``P111``."""
         param_specs = {
             "workspace_id": {
                 "name": "workspace_id",
@@ -736,21 +389,18 @@ class TestResolveDeclaredParams:
             }
         }
         config_defaults = {"env": "dev"}
-        resolved_params = resolve_declared_params(
-            param_specs, runtime_params={"workspace_id": "ws-1"}
+        runtime = {"workspace_id": "ws-1"}
+        scope = ParamScope.root(runtime).child(param_specs)
+        context = scope_context(scope)
+        assert resolve_variables({"w": "${param.workspace_id}"}, context) == {"w": "ws-1"}
+        ref_scope = ReferenceScope(
+            declared={n: s.declaration(n) for n, s in scope.specs.items()},
+            defaults=config_defaults,
         )
-        context = build_param_context(
-            runtime_params={"workspace_id": "ws-1"},
-            config_defaults=config_defaults,
-            entry_params=resolved_params,
-        )
-        config = {
-            "workspace": "${param.workspace_id}",
-            "lakehouse": "${env}",
-        }
-        result = resolve_variables(config, context)
-        assert result["workspace"] == "ws-1"
-        assert result["lakehouse"] == "dev"
+        with pytest.raises(VariableResolutionError) as exc_info:
+            resolve_variables({"lakehouse": "${env}"}, context, scope=ref_scope)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P111"]
+        assert exc_info.value.diagnostics[0].expected == ("${param.env}",)
 
 
 class TestUnresolvedParamHints:
@@ -759,7 +409,7 @@ class TestUnresolvedParamHints:
     def test_unresolved_param_lists_available_names(self):
         """Error message lists declared param names for typo detection."""
         # Loom declares `workspace_id`; YAML mistypes as `workspaceid`.
-        context = build_param_context(entry_params={"workspace_id": "ws-1"})
+        context = {"param": {"workspace_id": "ws-1"}}
         config = {"workspace": "${param.workspaceid}"}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
@@ -841,7 +491,7 @@ class TestReferenceResolution:
 
     def test_resolve_references_loom_to_weave_to_thread(self, tmp_path):
         """Resolve full hierarchy via ref entries: loom -> weave -> thread."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         # Create thread file
         thread_file = tmp_path / "dim_customer.thread"
@@ -862,7 +512,7 @@ class TestReferenceResolution:
             "weaves": [{"ref": "dimensions.weave"}],
         }
 
-        result = resolve_references(loom_config, "loom", tmp_path)
+        result = resolve_tree(loom_config, "loom", tmp_path)
 
         assert len(result) == 1
         weave = result[0]
@@ -873,7 +523,7 @@ class TestReferenceResolution:
 
     def test_resolve_references_missing_file(self, tmp_path):
         """Raise ReferenceResolutionError for missing referenced file."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
         from weevr.errors import ReferenceResolutionError
 
         config = {
@@ -882,7 +532,7 @@ class TestReferenceResolution:
         }
 
         with pytest.raises(ReferenceResolutionError) as exc_info:
-            resolve_references(config, "loom", tmp_path)
+            resolve_tree(config, "loom", tmp_path)
         assert "not found" in str(exc_info.value)
 
     def test_resolve_variables_var_namespace_passthrough(self):
@@ -894,14 +544,14 @@ class TestReferenceResolution:
 
     def test_resolve_variables_var_namespace_mixed(self):
         """var.* references coexist with resolved variables."""
-        config = {"path": "${base_path}/${var.filename}"}
-        context = {"base_path": "/data"}
+        config = {"path": "${param.base_path}/${var.filename}"}
+        context = {"param": {"base_path": "/data"}}
         result = resolve_variables(config, context)
         assert result["path"] == "/data/${var.filename}"
 
     def test_ref_loom_weave_resolution(self, tmp_path):
         """Loom ref weave entries resolve the referenced file."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         # Create a weave file at the project root
         weave_file = tmp_path / "dimensions.weave"
@@ -912,7 +562,7 @@ class TestReferenceResolution:
             "weaves": [{"ref": "dimensions.weave"}],
         }
 
-        result = resolve_references(loom_config, "loom", tmp_path)
+        result = resolve_tree(loom_config, "loom", tmp_path)
 
         assert len(result) == 1
         assert result[0].data["name"] == "dimensions"
@@ -924,7 +574,7 @@ class TestEntryStashPattern:
 
     def test_ref_entry_with_as_stashed(self, tmp_path):
         """A ref entry's 'as' is on the child's entry; the dict carries no stash key."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -938,14 +588,14 @@ class TestEntryStashPattern:
             "config_version": "2.0",
             "threads": [{"ref": "sap_table.thread", "as": "sap_adr6"}],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert result[0].entry["as"] == "sap_adr6"
         assert result[0].source_path == str(thread_file)
         assert not any(key.startswith("_") for key in result[0].data)
 
     def test_ref_entry_with_params_stashed(self, tmp_path):
         """A ref entry's 'params' are on the child's entry."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -961,12 +611,12 @@ class TestEntryStashPattern:
                 {"ref": "sap_table.thread", "params": {"table": "ADR6"}},
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert result[0].entry["params"] == {"table": "ADR6"}
 
     def test_ref_entry_without_as_no_stash(self, tmp_path):
         """A ref entry without 'as' or 'params' has neither on its entry."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -980,13 +630,13 @@ class TestEntryStashPattern:
             "config_version": "2.0",
             "threads": [{"ref": "sap_table.thread"}],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert "as" not in result[0].entry
         assert "params" not in result[0].entry
 
     def test_ref_entry_params_resolve_in_thread(self, tmp_path):
         """ThreadEntry params are injected and resolve ${param.x} in thread."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -1007,13 +657,13 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "ADR6"
 
     def test_two_phase_param_expression_resolution(self, tmp_path):
         """ThreadEntry param values with ${param.x} resolve against parent."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -1026,22 +676,21 @@ class TestEntryStashPattern:
 
         weave_config = {
             "config_version": "2.0",
-            "defaults": {"env": "prod"},
             "threads": [
                 {
                     "ref": "sap_table.thread",
                     "as": "sap_adr6",
-                    "params": {"target_schema": "${env}_silver"},
+                    "params": {"target_schema": "${param.env}_silver"},
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path, runtime_params={"env": "prod"})
+        result = resolve_tree(weave_config, "weave", tmp_path, runtime_params={"env": "prod"})
         resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "prod_silver"
 
     def test_literal_params_pass_through(self, tmp_path):
         """ThreadEntry params with literal values pass through unchanged."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -1062,13 +711,13 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "ADR6"
 
     def test_sibling_refs_same_file_no_cycle_error(self, tmp_path):
         """Two ThreadEntry objects with same ref and different aliases resolve."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -1094,7 +743,7 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = [child.data for child in result]
         assert len(resolved) == 2
         assert resolved[0]["sources"]["data"]["alias"] == "ADR6"
@@ -1102,7 +751,7 @@ class TestEntryStashPattern:
 
     def test_duplicate_ref_without_alias_raises(self, tmp_path):
         """Same ref twice without 'as' raises ConfigError."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
         from weevr.errors import ConfigError
 
         thread_file = tmp_path / "sap_table.thread"
@@ -1121,11 +770,11 @@ class TestEntryStashPattern:
             ],
         }
         with pytest.raises(ConfigError, match="appears multiple times"):
-            resolve_references(weave_config, "weave", tmp_path)
+            resolve_tree(weave_config, "weave", tmp_path)
 
     def test_duplicate_ref_with_aliases_succeeds(self, tmp_path):
         """Same ref twice with different aliases resolves successfully."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "sap_table.thread"
         write_document(
@@ -1142,12 +791,12 @@ class TestEntryStashPattern:
                 {"ref": "sap_table.thread", "as": "instance_b"},
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert len(result) == 2
 
     def test_duplicate_effective_name_raises(self, tmp_path):
         """Two entries with same effective name raise ConfigError."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
         from weevr.errors import ConfigError
 
         thread_a = tmp_path / "a.thread"
@@ -1173,11 +822,11 @@ class TestEntryStashPattern:
             ],
         }
         with pytest.raises(ConfigError, match="same_name"):
-            resolve_references(weave_config, "weave", tmp_path)
+            resolve_tree(weave_config, "weave", tmp_path)
 
     def test_inline_entry_with_as_stashed(self):
         """An inline entry's 'as' is on the child's entry, which has no own file."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         weave_config = {
             "config_version": "2.0",
@@ -1191,65 +840,65 @@ class TestEntryStashPattern:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", Path("/tmp"))
+        result = resolve_tree(weave_config, "weave", Path("/tmp"))
         assert result[0].entry["as"] == "my_alias"
         assert result[0].source_path is None
 
 
 class TestWholeValueResolution:
-    """Test that whole-value ${param} references return native Python types."""
+    """Test that whole-value ${param.x} references return native Python types."""
 
     def test_whole_value_list(self):
-        """${param} resolving to list returns list, not string."""
-        config = {"match_keys": "${pk_columns}"}
-        context = {"pk_columns": ["mandt", "color"]}
+        """${param.param} resolving to list returns list, not string."""
+        config = {"match_keys": "${param.pk_columns}"}
+        context = {"param": {"pk_columns": ["mandt", "color"]}}
         result = resolve_variables(config, context)
         assert result["match_keys"] == ["mandt", "color"]
         assert isinstance(result["match_keys"], list)
 
     def test_whole_value_int(self):
-        """${param} resolving to int returns int."""
-        config = {"page_size": "${batch_size}"}
-        context = {"batch_size": 1000}
+        """${param.param} resolving to int returns int."""
+        config = {"page_size": "${param.batch_size}"}
+        context = {"param": {"batch_size": 1000}}
         result = resolve_variables(config, context)
         assert result["page_size"] == 1000
         assert isinstance(result["page_size"], int)
 
     def test_whole_value_bool_true(self):
-        """${param} resolving to bool True returns bool."""
-        config = {"enabled": "${flag_enabled}"}
-        context = {"flag_enabled": True}
+        """${param.param} resolving to bool True returns bool."""
+        config = {"enabled": "${param.flag_enabled}"}
+        context = {"param": {"flag_enabled": True}}
         result = resolve_variables(config, context)
         assert result["enabled"] is True
         assert isinstance(result["enabled"], bool)
 
     def test_whole_value_bool_false(self):
-        """${param} resolving to bool False returns bool."""
-        config = {"debug": "${flag_debug}"}
-        context = {"flag_debug": False}
+        """${param.param} resolving to bool False returns bool."""
+        config = {"debug": "${param.flag_debug}"}
+        context = {"param": {"flag_debug": False}}
         result = resolve_variables(config, context)
         assert result["debug"] is False
         assert isinstance(result["debug"], bool)
 
     def test_whole_value_none(self):
-        """${param} resolving to None returns None, not string 'None'."""
-        config = {"filter": "${optional_filter}"}
-        context = {"optional_filter": None}
+        """${param.param} resolving to None returns None, not string 'None'."""
+        config = {"filter": "${param.optional_filter}"}
+        context = {"param": {"optional_filter": None}}
         result = resolve_variables(config, context)
         assert result["filter"] is None
 
     def test_whole_value_with_default_returns_string(self):
-        """${param:-default} where param missing returns default as string."""
-        config = {"mode": "${missing_param:-batch}"}
+        """${param.param:-default} where param missing returns default as string."""
+        config = {"mode": "${param.missing_param:-batch}"}
         context = {}
         result = resolve_variables(config, context)
         assert result["mode"] == "batch"
         assert isinstance(result["mode"], str)
 
     def test_embedded_ref_still_returns_string(self):
-        """Embedded ${param} in a longer string always returns string."""
-        config = {"alias": "SAP.${table_name}"}
-        context = {"table_name": "MARA"}
+        """Embedded ${param.param} in a longer string always returns string."""
+        config = {"alias": "SAP.${param.table_name}"}
+        context = {"param": {"table_name": "MARA"}}
         result = resolve_variables(config, context)
         assert result["alias"] == "SAP.MARA"
         assert isinstance(result["alias"], str)
@@ -1269,8 +918,8 @@ class TestWholeValueResolution:
         assert result["ts"] == "${run.timestamp}"
 
     def test_whole_value_missing_no_default_raises(self):
-        """${param} where param missing and no default raises VariableResolutionError."""
-        config = {"keys": "${undefined_param}"}
+        """${param.param} where param missing and no default raises VariableResolutionError."""
+        config = {"keys": "${param.undefined_param}"}
         context = {}
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables(config, context)
@@ -1429,7 +1078,7 @@ class TestStandaloneThreadResources:
         assert thread.post_steps is not None and len(thread.post_steps) == 1
 
     def test_param_validation_required_param_missing_raises(self):
-        """validate_params raises ConfigSchemaError when a required thread param is absent."""
+        """A required thread param with no value fails P101 when its scope binds."""
         from weevr.model.thread import Thread
 
         data = {
@@ -1438,18 +1087,12 @@ class TestStandaloneThreadResources:
         }
         thread = Thread.model_validate(data)
 
-        # Build param specs dict from thread.params (as validate_params expects)
-        assert thread.params is not None
-        param_specs = {k: v for k, v in thread.params.items()}
-        context: dict = {}
-
         with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(param_specs, context)
-        assert "Required parameter" in str(exc_info.value)
-        assert "env" in str(exc_info.value)
+            ParamScope.root().child(thread.params)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P101"]
 
     def test_param_validation_type_mismatch_raises(self):
-        """validate_params raises ConfigSchemaError when a thread param has wrong type."""
+        """A thread param value its type rejects fails P102 when its scope binds."""
         from weevr.model.thread import Thread
 
         data = {
@@ -1458,16 +1101,12 @@ class TestStandaloneThreadResources:
         }
         thread = Thread.model_validate(data)
 
-        assert thread.params is not None
-        param_specs = {k: v for k, v in thread.params.items()}
-        context = {"count": "not_an_int"}
-
         with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_params(param_specs, context)
-        assert "expected int" in str(exc_info.value).lower()
+            ParamScope.root({"count": "not_an_int"}).child(thread.params)
+        assert [d.code for d in exc_info.value.diagnostics] == ["P102"]
 
     def test_param_validation_with_defaults_passes(self):
-        """validate_params uses default when required param is absent but has a default."""
+        """A required thread param with a default binds the default."""
         from weevr.model.thread import Thread
 
         data = {
@@ -1483,25 +1122,20 @@ class TestStandaloneThreadResources:
         }
         thread = Thread.model_validate(data)
 
-        assert thread.params is not None
-        param_specs = {k: v for k, v in thread.params.items()}
-        context: dict = {}
-
-        validate_params(param_specs, context)  # Should not raise
-        assert context["mode"] == "batch"
+        assert ParamScope.root().child(thread.params).values() == {"mode": "batch"}
 
     def test_variable_resolution_within_standalone_thread(self):
-        """${param} references inside a standalone thread config resolve correctly."""
+        """${param.param} references inside a standalone thread config resolve correctly."""
         config = {
             "sources": {
                 "data": {
                     "type": "delta",
-                    "alias": "${lakehouse}.customers",
+                    "alias": "${param.lakehouse}.customers",
                 }
             },
-            "target": {"alias": "${lakehouse}.output"},
+            "target": {"alias": "${param.lakehouse}.output"},
         }
-        context = {"lakehouse": "silver"}
+        context = {"param": {"lakehouse": "silver"}}
         resolved = resolve_variables(config, context)
 
         assert resolved["sources"]["data"]["alias"] == "silver.customers"
@@ -1509,8 +1143,8 @@ class TestStandaloneThreadResources:
 
     def test_whole_value_whitespace_stripped(self):
         """Whole-value match works even when value has surrounding whitespace."""
-        config = {"keys": "  ${pk_columns}  "}
-        context = {"pk_columns": ["id", "code"]}
+        config = {"keys": "  ${param.pk_columns}  "}
+        context = {"param": {"pk_columns": ["id", "code"]}}
         result = resolve_variables(config, context)
         assert result["keys"] == ["id", "code"]
         assert isinstance(result["keys"], list)
@@ -1544,8 +1178,8 @@ class TestRunVariableSkip:
 
     def test_run_and_regular_vars_mixed(self):
         """${run.*} preserved while regular vars are resolved."""
-        config = {"path": "/lakehouse/${env}/${run.timestamp}"}
-        result = resolve_variables(config, {"env": "prod"})
+        config = {"path": "/lakehouse/${param.env}/${run.timestamp}"}
+        result = resolve_variables(config, {"param": {"env": "prod"}})
         assert result["path"] == "/lakehouse/prod/${run.timestamp}"
 
 
@@ -1583,24 +1217,25 @@ class TestHierarchyVariableDeferral:
         assert resolve_variables(config, {}) == config
 
     def test_mixed_with_params_and_run_vars(self) -> None:
-        config = {"path": "/${env}/${loom.name}/${thread.name}/${run.timestamp}"}
-        result = resolve_variables(config, {"env": "prod"})
+        config = {"path": "/${param.env}/${loom.name}/${thread.name}/${run.timestamp}"}
+        result = resolve_variables(config, {"param": {"env": "prod"}})
         assert result["path"] == "/prod/${loom.name}/${thread.name}/${run.timestamp}"
 
     def test_unknown_property_still_raises(self) -> None:
-        with pytest.raises(VariableResolutionError, match="thread.nme"):
+        with pytest.raises(VariableResolutionError) as exc_info:
             resolve_variables({"path": "/archive/${thread.nme}"}, {})
+        assert [d.code for d in exc_info.value.diagnostics] == ["P112"]
 
     def test_default_still_resolves_at_load(self) -> None:
         config = {"path": "/archive/${thread.name:-fallback}", "label": "${weave.name:-w}"}
         result = resolve_variables(config, {})
         assert result == {"path": "/archive/fallback", "label": "w"}
 
-    def test_load_context_value_still_wins(self) -> None:
-        """A context that supplies the name resolves it at load, as before."""
+    def test_load_context_never_supplies_it(self) -> None:
+        """A load context never supplies a hierarchy name: it stays for execution."""
         config = {"path": "/archive/${thread.name}", "label": "${thread.name}"}
         result = resolve_variables(config, {"thread": {"name": "from_params"}})
-        assert result == {"path": "/archive/from_params", "label": "from_params"}
+        assert result == config
 
     def test_every_deferred_name_resolves_at_execution(self) -> None:
         """Nothing deferred at load is left unresolved by the execution-time resolver."""
@@ -1640,7 +1275,7 @@ class TestThreadParameterizationE2E:
 
     def test_two_instances_resolve_independently(self, tmp_path):
         """Two instances of same ref with different params resolve independently."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         self._write_template(tmp_path)
 
@@ -1659,7 +1294,7 @@ class TestThreadParameterizationE2E:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = [child.data for child in result]
 
         assert len(resolved) == 2
@@ -1672,7 +1307,7 @@ class TestThreadParameterizationE2E:
 
     def test_three_instances_same_ref(self, tmp_path):
         """Three instances of same ref all resolve independently."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         self._write_template(tmp_path)
 
@@ -1696,14 +1331,14 @@ class TestThreadParameterizationE2E:
                 },
             ],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         resolved = [child.data for child in result]
         assert len(resolved) == 3
         assert resolved[2]["sources"]["data"]["alias"] == "stg.C"
 
     def test_nested_param_expression(self, tmp_path):
-        """ThreadEntry param values with ${env} resolve against parent."""
-        from weevr.config.resolver import resolve_references
+        """ThreadEntry param values with ${param.env} resolve against parent."""
+        from resolving import resolve_tree
 
         f = tmp_path / "schema_thread.thread"
         write_document(
@@ -1723,11 +1358,11 @@ class TestThreadParameterizationE2E:
                 {
                     "ref": "schema_thread.thread",
                     "as": "dim_cust",
-                    "params": {"target_schema": "${env}_silver"},
+                    "params": {"target_schema": "${param.env}_silver"},
                 },
             ],
         }
-        result = resolve_references(
+        result = resolve_tree(
             weave_config,
             "weave",
             tmp_path,
@@ -1739,7 +1374,7 @@ class TestThreadParameterizationE2E:
 
     def test_loom_with_aliased_threads_in_weave(self, tmp_path):
         """Loom resolves weave with aliased thread instances."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         self._write_template(tmp_path)
 
@@ -1764,7 +1399,7 @@ class TestThreadParameterizationE2E:
             "config_version": "2.0",
             "weaves": [{"ref": "silver.weave"}],
         }
-        result = resolve_references(loom_config, "loom", tmp_path)
+        result = resolve_tree(loom_config, "loom", tmp_path)
         threads = result[0].children
         assert len(threads) == 2
         assert threads[0].entry["as"] == "sap_adr6"
@@ -1777,13 +1412,13 @@ class TestThreadParameterizationE2E:
             "sources": {"d": {"type": "delta", "alias": "${param.table}"}},
             "target": {},
         }
-        context = build_param_context()
+        context = {}
         with pytest.raises(VariableResolutionError, match="param.table"):
             resolve_variables(config, context)
 
     def test_backwards_compat_no_as_no_params(self, tmp_path):
         """Existing weave configs without as/params still work."""
-        from weevr.config.resolver import resolve_references
+        from resolving import resolve_tree
 
         thread_file = tmp_path / "simple.thread"
         write_document(
@@ -1797,7 +1432,7 @@ class TestThreadParameterizationE2E:
             "config_version": "2.0",
             "threads": [{"ref": "simple.thread"}],
         }
-        result = resolve_references(weave_config, "weave", tmp_path)
+        result = resolve_tree(weave_config, "weave", tmp_path)
         assert len(result) == 1
         assert "as" not in result[0].entry
         assert "params" not in result[0].entry
