@@ -1,4 +1,4 @@
-"""Loading ``weevr.yaml``: schema, reserved V-012 blocks and the engine floor."""
+"""Loading ``weevr.yaml``: schema, reserved project-scope blocks and the engine floor."""
 
 from __future__ import annotations
 
@@ -75,15 +75,15 @@ class TestLoad:
 
 
 class TestReservedBlocks:
-    """V-012's project-scope blocks are reserved until V-012 lands."""
+    """Project-scope blocks not yet supported in weevr.yaml are reserved (C210)."""
 
-    @pytest.mark.parametrize("key", ["connections", "params", "defaults", "audit_templates"])
+    @pytest.mark.parametrize("key", ["connections", "defaults", "audit_templates"])
     def test_reserved_block(self, tmp_path: Path, key: str) -> None:
         assert _diagnostics(tmp_path, _body(**{key: {}})) == [("C210", f"/{key}")]
 
     def test_every_reserved_block_is_reported(self, tmp_path: Path) -> None:
-        codes = _diagnostics(tmp_path, _body(params={}, connections={}))
-        assert sorted(codes) == [("C210", "/connections"), ("C210", "/params")]
+        codes = _diagnostics(tmp_path, _body(defaults={}, connections={}))
+        assert sorted(codes) == [("C210", "/connections"), ("C210", "/defaults")]
 
     def test_reserved_and_shape_errors_together(self, tmp_path: Path) -> None:
         codes = _diagnostics(tmp_path, _body(defaults={}, owner="team"))

@@ -31,6 +31,7 @@ from weevr.config.params import (
 )
 from weevr.diagnostics import Diagnostic
 from weevr.errors import VariableResolutionError
+from weevr.model.project import Project
 
 # Keys an entry carries about its place in the parent, not about the child's body.
 WEAVE_ENTRY_KEYS = frozenset({"name", "params", "condition"})
@@ -61,7 +62,8 @@ def strictness(document: Mapping[str, Any], inherited: bool, override: bool | No
 
     Args:
         document: The document (or inline body) opening the scope.
-        inherited: The enclosing scope's setting; ``False`` at the root.
+        inherited: The enclosing scope's setting; at the root, the project's
+            ``strict_params`` (``False`` when unset or there is no project).
         override: The load's ``strict_params`` argument; ``None`` when not given.
 
     Returns:
@@ -177,8 +179,13 @@ class WalkState:
         runtime_params: Mapping[str, Any] | None = None,
         fabric_context: Mapping[str, Any] | None = None,
         strict_override: bool | None = None,
+        project: Project | None = None,
+        project_file: str | None = None,
     ) -> "WalkState":
         """The state at the root of a load: the root config's scope opened.
+
+        The project's params are the outermost tier of the root scope's
+        specs, and its ``strict_params`` is what the root inherits.
 
         Args:
             document: The root config; its ``params:`` declare the root scope
@@ -188,6 +195,8 @@ class WalkState:
             runtime_params: The invoker's runtime params, bound above the root.
             fabric_context: Fabric environment values.
             strict_override: The load's ``strict_params`` argument.
+            project: The project document; ``None`` when the load has none.
+            project_file: The project's ``weevr.yaml``.
 
         Returns:
             The root state, with fresh shared records.
@@ -196,13 +205,20 @@ class WalkState:
             ConfigSchemaError: See :meth:`ParamScope.child`.
         """
         reads = BindingReads()
-        scope = ParamScope.root(runtime_params).open_child(
-            document.get("params"), file=file, reads=reads, tier=param_tier(kind)
-        )
+        project_specs = None if project is None else project.params
+        scope = ParamScope.root(
+            runtime_params, project_specs, project_file=project_file
+        ).open_child(document.get("params"), file=file, reads=reads, tier=param_tier(kind))
+        # A project declaration counts as use of its binding, as a document's does.
+        for name in project_specs or {}:
+            binding = scope.bindings.get(name)
+            if binding is not None:
+                reads.note(name, binding)
+        project_strict = project is not None and project.strict_params is True
         return cls(
             scope=scope,
             file=file,
-            strict=strictness(document, False, strict_override),
+            strict=strictness(document, project_strict, strict_override),
             strict_override=strict_override,
             runtime_params=runtime_params,
             fabric_context=fabric_context,

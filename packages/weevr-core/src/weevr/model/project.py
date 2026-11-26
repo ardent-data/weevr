@@ -10,6 +10,7 @@ from pydantic import ConfigDict, Field, field_validator
 
 from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
+from weevr.model.params import ParamSpec
 
 SCHEMA_SAFE_NAME = r"^[A-Za-z][A-Za-z0-9_]*$"
 """A name usable as a SQL schema name or part of one: a letter, then letters, digits or ``_``."""
@@ -57,9 +58,12 @@ class Project(FrozenBase):
     """A project's root document, ``weevr.yaml``.
 
     Identifies the project, optionally pins the weevr versions it runs on,
-    and says where its run store is. The project-scope blocks
-    (``connections``, ``params``, ``defaults``, ``audit_templates``) are
-    reserved for a later release and rejected at load.
+    says where its run store is, and declares the params every config in the
+    project sees. Its ``params`` are the outermost tier of the spec cascade:
+    runtime params bind over their defaults, and a loom, weave or thread
+    declaring the same name shadows them. The other project-scope blocks
+    (``connections``, ``defaults``, ``audit_templates``) are reserved for a
+    later release and rejected at load.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -89,6 +93,21 @@ class Project(FrozenBase):
     run_store: RunStore | None = Field(
         default=None,
         description="Run-store settings; omitted means the container's default.",
+    )
+    params: dict[str, ParamSpec] | None = Field(
+        default=None,
+        description=(
+            "Typed parameter declarations every loom, weave and thread in the project sees; "
+            "a declaration of the same name in a document shadows the project's."
+        ),
+    )
+    strict_params: bool | None = Field(
+        default=None,
+        description=(
+            "Enforce the params contract project-wide: a ${param.x} reference must be "
+            "declared (P120) and every runtime param declared or referenced (P121). A "
+            "document's own strict_params, or the load's, overrides it; unset is lenient."
+        ),
     )
 
     @field_validator("requires_weevr")

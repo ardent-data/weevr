@@ -20,7 +20,7 @@ from weevr.diagnostics.positions import json_pointer
 from weevr.errors import ConfigError
 from weevr.model.project import Project
 
-RESERVED_PROJECT_BLOCKS: tuple[str, ...] = ("connections", "params", "defaults", "audit_templates")
+RESERVED_PROJECT_BLOCKS: tuple[str, ...] = ("connections", "defaults", "audit_templates")
 """Root keys of ``weevr.yaml`` reserved for project scope."""
 
 

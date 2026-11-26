@@ -80,6 +80,7 @@ class TestDeclared:
                 description="Sales region",
                 file=str(path),
                 pointer="/params/region",
+                tier="thread",
             ),
             ManifestParam(
                 name="limit",
@@ -89,6 +90,7 @@ class TestDeclared:
                 description=None,
                 file=str(path),
                 pointer="/params/limit",
+                tier="thread",
             ),
         )
 

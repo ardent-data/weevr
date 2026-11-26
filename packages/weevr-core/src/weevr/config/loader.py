@@ -43,7 +43,7 @@ from weevr.config.resolver import (
     ResolvedChild,
     resolve_references,
 )
-from weevr.config.root import find_project_root, read_project
+from weevr.config.root import PROJECT_FILE, find_project_root, read_project
 from weevr.config.scoping import WalkState, param_use_diagnostics, resolve_config_variables
 from weevr.config.validation import (
     dimension_override_diagnostics,
@@ -194,6 +194,8 @@ def resolve_config(
         runtime_params=runtime_params,
         fabric_context=fabric_context,
         strict_override=strict_params,
+        project=project,
+        project_file=None if project is None else str(root.join(PROJECT_FILE)),
     )
 
     inline_scopes: ScopePositions = {}
@@ -643,12 +645,14 @@ def load_resolved(
             omitted, the nearest folder above the file holding ``weevr.yaml``
             is the root; with none, the file's directory is, and the result's
             ``project`` is ``None``.
-        strict_params: Overrides every document's ``strict_params:``. ``True``
-            fails the load on a ``${param.x}`` no declaration in its chain
-            covers (``P120``) and on a runtime param nothing declares or
-            references (``P121``); ``False`` keeps both warnings even where a
-            document sets ``strict_params: true``. ``None`` (the default)
-            leaves each document's setting, most specific wins, absent is
+        strict_params: Overrides every document's ``strict_params:`` and the
+            project's. ``True`` fails the load on a ``${param.x}`` no
+            declaration in its chain covers (``P120``) and on a runtime param
+            nothing declares or references (``P121``); ``False`` keeps both
+            warnings even where a document sets ``strict_params: true``.
+            ``None`` (the default) leaves each document's setting, most
+            specific wins; a document that sets none inherits, at the root
+            from ``weevr.yaml``'s ``strict_params``, and absent everywhere is
             lenient.
         fabric_context: The Fabric values ``${fabric.x}`` resolves from, keyed
             ``workspace_id``, ``lakehouse_id`` and ``workspace_name`` (a

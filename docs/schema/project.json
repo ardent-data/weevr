@@ -1,5 +1,52 @@
 {
   "$defs": {
+    "ParamSpec": {
+      "description": "Typed parameter specification for config-level param declarations.",
+      "properties": {
+        "name": {
+          "description": "Unique name of the parameter as referenced in config.",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Expected type of the parameter value.",
+          "enum": [
+            "string",
+            "int",
+            "float",
+            "bool",
+            "date",
+            "timestamp",
+            "list[string]"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "description": "Whether the parameter must be supplied at runtime.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "default": {
+          "default": null,
+          "description": "Default value used when the parameter is not supplied and required is false.",
+          "title": "Default"
+        },
+        "description": {
+          "default": "",
+          "description": "Human-readable description of the parameter's purpose.",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ParamSpec",
+      "type": "object"
+    },
     "RunStore": {
       "additionalProperties": false,
       "description": "Where runs write their output, and in which layout.\n\nEvery field applies to both layouts: ``connection`` moves the store's\nbase in either, and ``schema`` names the shared schema or overrides the\nper-project one.",
@@ -50,7 +97,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "A project's root document, ``weevr.yaml``.\n\nIdentifies the project, optionally pins the weevr versions it runs on,\nand says where its run store is. The project-scope blocks\n(``connections``, ``params``, ``defaults``, ``audit_templates``) are\nreserved for a later release and rejected at load.",
+  "description": "A project's root document, ``weevr.yaml``.\n\nIdentifies the project, optionally pins the weevr versions it runs on,\nsays where its run store is, and declares the params every config in the\nproject sees. Its ``params`` are the outermost tier of the spec cascade:\nruntime params bind over their defaults, and a loom, weave or thread\ndeclaring the same name shadows them. The other project-scope blocks\n(``connections``, ``defaults``, ``audit_templates``) are reserved for a\nlater release and rejected at load.",
   "properties": {
     "kind": {
       "const": "project",
@@ -115,6 +162,35 @@
       ],
       "default": null,
       "description": "Run-store settings; omitted means the container's default."
+    },
+    "params": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/ParamSpec"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Typed parameter declarations every loom, weave and thread in the project sees; a declaration of the same name in a document shadows the project's.",
+      "title": "Params"
+    },
+    "strict_params": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Enforce the params contract project-wide: a ${param.x} reference must be declared (P120) and every runtime param declared or referenced (P121). A document's own strict_params, or the load's, overrides it; unset is lenient.",
+      "title": "Strict Params"
     }
   },
   "required": [

@@ -10,8 +10,9 @@ entry's ``params:`` pins satisfy the child's names for that subtree, and
 substituted or coerced, so a config whose required params nobody supplied
 still yields its manifest.
 
+The project's ``weevr.yaml`` params are the outermost tier, as in a load.
 The manifest is one aggregate for the file being run: the declarations
-anywhere in its tree, the names the invoker must supply, and the names used
+anywhere in its tree and in the project, the names the invoker must supply, and the names used
 without a declaration. Per-child manifests are not reported.
 """
 
@@ -28,15 +29,20 @@ from weevr.config.interpolation import param_references
 from weevr.config.loader import COMPONENT_TYPES, resolve_project_root
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.config.manifest_types import ManifestParam, ParamManifest
+from weevr.config.param_provenance import ParamTier
 from weevr.config.params import DeclaredSpec
 from weevr.config.resolver import resolve_ref_path
+from weevr.config.root import PROJECT_FILE
 from weevr.config.scoping import (
     CHILD_LISTS,
     entry_pins,
     is_inline_thread,
     is_inline_weave,
+    param_tier,
 )
 from weevr.diagnostics.positions import json_pointer
+from weevr.model.params import ParamSpec
+from weevr.model.project import Project
 
 __all__ = ["param_manifest"]
 
@@ -70,7 +76,7 @@ class _Walk:
         trail: tuple[str, ...] = (),
     ) -> None:
         """Walk one document (in its own file or inline) and its children."""
-        scope = self._open(document.get("params"), parent, file, at)
+        scope = self._open(document.get("params"), parent, file, at, param_tier(kind))
         key, child_kind, entry_keys = CHILD_LISTS.get(kind, ("", "", frozenset()))
         entries = document.get(key) if key else None
         if not isinstance(entries, list):
@@ -123,11 +129,24 @@ class _Walk:
             trail=(*trail, ref),
         )
 
-    def _open(self, specs: Any, parent: _Scope, file: str, at: tuple[str | int, ...]) -> _Scope:
+    def project(self, project: Project | None, file: str) -> _Scope:
+        """Open the project's scope, the outermost tier: record its declarations."""
+        if project is None or not project.params:
+            return _Scope()
+        return self._open(project.params, _Scope(), file, (), "project")
+
+    def _open(
+        self,
+        specs: Any,
+        parent: _Scope,
+        file: str,
+        at: tuple[str | int, ...],
+        tier: ParamTier | None,
+    ) -> _Scope:
         """Open a document's scope: record its declarations and what they leave unbound."""
         declared: dict[str, DeclaredSpec] = {}
         for name, spec in (specs if isinstance(specs, dict) else {}).items():
-            declared[name] = DeclaredSpec.read(name, spec, file, at)
+            declared[name] = DeclaredSpec.read(name, spec, file, at, tier)
             self._declare(name, spec, declared[name], file, at)
         effective = {**parent.specs, **declared}
         for name, spec in effective.items():
@@ -140,6 +159,8 @@ class _Walk:
     ) -> None:
         """Record one declaration, once per place it is written."""
         pointer = json_pointer((*at, "params", name))
+        if isinstance(spec, ParamSpec):
+            spec = spec.model_dump(exclude_unset=True)
         description = spec.get("description") if isinstance(spec, dict) else None
         self.declared.setdefault(
             (name, file, pointer),
@@ -151,6 +172,7 @@ class _Walk:
                 description=description if isinstance(description, str) else None,
                 file=file,
                 pointer=pointer,
+                tier=read.tier,
             ),
         )
 
@@ -195,14 +217,15 @@ def param_manifest(
     else:
         given = LocalConfigLocation(Path(project_root))
     with attribute_errors(location):
-        root, _ = resolve_project_root(location, given)
+        root, project = resolve_project_root(location, given)
         kind, model = load_document(location)
     document = model.model_dump(exclude_unset=True)
     name = document.get("name") or location.stem
     if kind not in COMPONENT_TYPES:
         return ParamManifest(executable=name, kind=kind, file=str(location))
     walk = _Walk(root)
-    walk.document(document, kind, _Scope(), file=str(location))
+    outermost = walk.project(project, str(root.join(PROJECT_FILE)))
+    walk.document(document, kind, outermost, file=str(location))
     return ParamManifest(
         executable=name,
         kind=kind,

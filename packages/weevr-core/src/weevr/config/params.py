@@ -270,8 +270,19 @@ class ParamScope:
         object.__setattr__(self, "sources", _frozen(self.sources))
 
     @classmethod
-    def root(cls, runtime_params: Mapping[str, Any] | None = None) -> ParamScope:
-        """The scope above the run root, binding the invoker's runtime params.
+    def root(
+        cls,
+        runtime_params: Mapping[str, Any] | None = None,
+        project_specs: Mapping[str, Any] | None = None,
+        *,
+        project_file: str | None = None,
+    ) -> ParamScope:
+        """The scope above the run root: the invoker's runtime params over the project's specs.
+
+        The project's specs are the outermost tier of the cascade. They are
+        only recorded here; the run root's scope (:meth:`child`) checks,
+        coerces and defaults them with its own, so a runtime value keeps its
+        ``runtime`` source and beats a project default there.
 
         An explicit ``None`` value is treated as absent, so the declared
         default and the required check still apply: a literal ``None``
@@ -279,16 +290,29 @@ class ParamScope:
 
         Args:
             runtime_params: Caller-supplied values keyed by param name.
+            project_specs: The project's ``params:`` (name to ``ParamSpec``
+                or its mapping); ``None`` when there is no project or it
+                declares none.
+            project_file: The project's ``weevr.yaml``, named by any error at
+                a project declaration.
 
         Returns:
-            A scope with no specs, binding each non-``None`` runtime value.
+            A scope with the project's specs, binding each non-``None``
+            runtime value.
+
+        Raises:
+            ConfigSchemaError: A project spec is not a mapping (``C102``).
         """
         return cls(
             bindings={
                 name: Binding(value, "runtime")
                 for name, value in (runtime_params or {}).items()
                 if value is not None
-            }
+            },
+            specs={
+                name: DeclaredSpec.read(name, spec, project_file, tier="project")
+                for name, spec in (project_specs or {}).items()
+            },
         )
 
     def child(
