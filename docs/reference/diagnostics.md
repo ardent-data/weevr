@@ -194,8 +194,7 @@ The Context's project directory holds no weevr.yaml; expected lists every locati
 
 `reserved-project-block` · error · stable
 
-weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is
-reserved and not yet supported.
+weevr.yaml declares a project-scope variables block, which is reserved and not yet supported.
 
 ## C3xx — References and entry forms
 

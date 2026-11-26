@@ -191,8 +191,8 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     _config(
         "C210",
         "reserved-project-block",
-        "weevr.yaml declares a project-scope block (connections, params, defaults, "
-        "audit_templates) that is reserved and not yet supported.",
+        "weevr.yaml declares a project-scope variables block, which is reserved and not "
+        "yet supported.",
     ),
     # C3xx — references and entry forms (config/resolver.py, macros.py, warp.py)
     _config(

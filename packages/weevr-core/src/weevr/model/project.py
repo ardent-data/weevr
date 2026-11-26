@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from pydantic import ConfigDict, Field, field_validator
 
 from weevr.diagnostics.rules import rule_error
+from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
+from weevr.model.connection import OneLakeConnection
 from weevr.model.params import ParamSpec
 
 SCHEMA_SAFE_NAME = r"^[A-Za-z][A-Za-z0-9_]*$"
@@ -58,12 +60,15 @@ class Project(FrozenBase):
     """A project's root document, ``weevr.yaml``.
 
     Identifies the project, optionally pins the weevr versions it runs on,
-    says where its run store is, and declares the params every config in the
+    says where its run store is, and declares what every config in the
     project sees. Its ``params`` are the outermost tier of the spec cascade:
     runtime params bind over their defaults, and a loom, weave or thread
-    declaring the same name shadows them. The other project-scope blocks
-    (``connections``, ``defaults``, ``audit_templates``) are reserved for a
-    later release and rejected at load.
+    declaring the same name shadows them. Its ``connections``,
+    ``audit_templates`` and ``defaults`` are the outermost tier of the load
+    cascade, in the shapes a loom declares them: connections and audit
+    templates merge by name (the nearest declaration wins), and a lower
+    ``defaults:`` block replaces the project's key by key. ``variables`` is
+    reserved and rejected at load.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -107,6 +112,27 @@ class Project(FrozenBase):
             "Enforce the params contract project-wide: a ${param.x} reference must be "
             "declared (P120) and every runtime param declared or referenced (P121). A "
             "document's own strict_params, or the load's, overrides it; unset is lenient."
+        ),
+    )
+    defaults: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Default values inherited by every loom, weave and thread in the project; "
+            "a lower tier's defaults block replaces a key the project sets."
+        ),
+    )
+    audit_templates: dict[str, AuditTemplate] | None = Field(
+        default=None,
+        description=(
+            "Named audit column templates every loom, weave and thread in the project sees; "
+            "a template of the same name declared lower down shadows the project's."
+        ),
+    )
+    connections: dict[str, OneLakeConnection] | None = Field(
+        default=None,
+        description=(
+            "Named connection definitions every loom, weave and thread in the project sees; "
+            "a connection of the same name declared lower down shadows the project's."
         ),
     )
 

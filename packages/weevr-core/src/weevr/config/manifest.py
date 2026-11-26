@@ -39,6 +39,7 @@ from weevr.config.scoping import (
     is_inline_thread,
     is_inline_weave,
     param_tier,
+    project_blocks,
 )
 from weevr.diagnostics.positions import json_pointer
 from weevr.model.params import ParamSpec
@@ -130,10 +131,15 @@ class _Walk:
         )
 
     def project(self, project: Project | None, file: str) -> _Scope:
-        """Open the project's scope, the outermost tier: record its declarations."""
-        if project is None or not project.params:
+        """Open the project's scope, the outermost tier: record its declarations.
+
+        The references in the project's cascading blocks read this scope.
+        """
+        if project is None:
             return _Scope()
-        return self._open(project.params, _Scope(), file, (), "project")
+        scope = self._open(project.params, _Scope(), file, (), "project")
+        self._scan(project_blocks(project), scope)
+        return scope
 
     def _open(
         self,

@@ -20,6 +20,7 @@ from weevr.config.manifest import param_manifest
 from weevr.config.manifest_types import ParamManifest
 from weevr.config.onelake import resolve_connection_path
 from weevr.config.parser import TYPED_EXTENSIONS, declared_kind
+from weevr.config.project import resolve_project_connections
 from weevr.config.root import PROJECT_FILE, project_root_not_found, read_project
 from weevr.config.run_store import RunStoreLocation, resolve_run_store
 from weevr.config.validation import (
@@ -264,10 +265,11 @@ class Context:
         Resolved on each access by
         :func:`weevr.config.run_store.resolve_run_store` from the project
         root and ``weevr.yaml``'s ``run_store`` block, which the
-        ``run_store`` argument replaces whole. The project-scope connection
-        registry is reserved, so ``run_store.connection`` is looked up in the
-        top-level connections of the config this Context loaded last; before
-        any load, or when that config doesn't declare it, access raises
+        ``run_store`` argument replaces whole. ``run_store.connection`` is
+        looked up by name in the top-level connections of the config this
+        Context loaded last, then in ``weevr.yaml``'s ``connections``,
+        resolved with this Context's params (over the project's defaults)
+        and Fabric context. A name neither declares raises
         :class:`~weevr.errors.ConfigLocationError` (``R201``). ``None`` means
         the root implies no store and no connection names one; persistence is
         then skipped.
@@ -276,8 +278,32 @@ class Context:
             self._project,
             self._project_root,
             self._run_store_override,
-            connections=self._connections,
+            connections=self._run_store_connections(),
         )
+
+    def _run_store_connections(self) -> dict[str, OneLakeConnection] | None:
+        """The connections ``run_store.connection`` is looked up in, nearest first by name.
+
+        The project's connection of that name is resolved only when the
+        loaded config doesn't declare it; the project's others are not
+        resolved at all.
+        """
+        loaded = dict(self._connections or {})
+        settings = self._run_store_override or self._project.run_store
+        name = settings.connection if settings is not None else None
+        if name is None or name in loaded:
+            return loaded or None
+        from weevr.config.fabric import build_fabric_context
+
+        project = resolve_project_connections(
+            self._project,
+            str(self._project_root.join(PROJECT_FILE)),
+            runtime_params=self._params,
+            fabric_context=build_fabric_context(self._spark),
+            strict_params=self._strict_params,
+            names={name},
+        )
+        return {**(project or {}), **loaded} or None
 
     # ------------------------------------------------------------------
     # Public API

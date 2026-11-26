@@ -26,7 +26,7 @@ from weevr.config.hydration import (
     hydrate_children,
     hydrate_model,
 )
-from weevr.config.inheritance import apply_inheritance, check_defaults_shape
+from weevr.config.inheritance import CascadeTier, apply_tiers, check_defaults_shape
 from weevr.config.interpolation import check_fabric_context
 from weevr.config.locations import (
     ConfigLocation,
@@ -187,6 +187,7 @@ def resolve_config(
     config_dict = validated.model_dump(exclude_unset=True)
 
     errors_before = errors_recorded()
+    project_file = None if project is None else root.join(PROJECT_FILE)
     walk = WalkState.start(
         config_dict,
         file=str(location),
@@ -195,8 +196,9 @@ def resolve_config(
         fabric_context=fabric_context,
         strict_override=strict_params,
         project=project,
-        project_file=None if project is None else str(root.join(PROJECT_FILE)),
+        project_file=None if project_file is None else str(project_file),
     )
+    project_tier = _project_tier(project, project_file, walk)
 
     inline_scopes: ScopePositions = {}
     try:
@@ -236,12 +238,14 @@ def resolve_config(
     if config_type in COMPONENT_TYPES:
         walk_complete = errors_recorded() == errors_before
         warnings.extend(param_use_diagnostics(walk, walk_complete=walk_complete))
-        warnings.extend(collect_execution_warnings(config_type, data, children))
+        warnings.extend(
+            collect_execution_warnings(config_type, data, children, project_tier=project_tier)
+        )
     # Dimension override rules apply to what each thread declares itself, so
     # they also run before the cascade adds loom/weave write and keys defaults.
     if config_type in COMPONENT_TYPES:
         check_dimension_overrides(config_type, data, children, location)
-    _apply_cascade(config_type, data, children)
+    data = _apply_cascade(config_type, data, children, project_tier)
 
     if config_type == "thread":
         reject_foreach_in_with(data)
@@ -693,37 +697,73 @@ def load_resolved(
     return LoadedConfig.from_document(document, warnings)
 
 
-def _apply_cascade(config_type: str, data: dict[str, Any], children: list[ResolvedChild]) -> None:
-    """Cascade loom and weave defaults into each child thread's dict.
+def _project_tier(
+    project: Project | None, project_file: ConfigLocation | None, walk: WalkState
+) -> CascadeTier | None:
+    """The project's cascade tier, its blocks resolved in its own scope; ``None`` without one.
+
+    Its ``defaults`` are checked under ``weevr.yaml``, so a malformed block is
+    reported there rather than against the config being loaded.
+    """
+    if project is None or project_file is None:
+        return None
+    with attribute_errors(project_file):
+        blocks = walk.project_tier(project, str(project_file))
+        if not blocks:
+            return None
+        check_defaults_shape(blocks.get("defaults"), "project")
+    return CascadeTier(
+        "project",
+        defaults=blocks.get("defaults"),
+        audit_templates=blocks.get("audit_templates"),
+        connections=blocks.get("connections"),
+    )
+
+
+def _tier(level: str, data: dict[str, Any]) -> CascadeTier:
+    """The cascade tier a loom's or weave's resolved dict contributes."""
+    return CascadeTier(
+        level,
+        defaults=data.get("defaults"),
+        audit_templates=data.get("audit_templates"),
+        connections=data.get("connections"),
+    )
+
+
+def _apply_cascade(
+    config_type: str,
+    data: dict[str, Any],
+    children: list[ResolvedChild],
+    project_tier: CascadeTier | None = None,
+) -> dict[str, Any]:
+    """Cascade project, loom and weave defaults and registries into each thread's dict.
 
     A referenced weave's ``defaults`` are checked under its own file, so a
-    malformed block is reported there rather than against the loom.
+    malformed block is reported there rather than against the loom. A
+    standalone thread is cascaded under the project's tier alone, or under
+    none, so its own audit settings apply the same either way.
+
+    Returns:
+        ``data``, cascaded itself when it is a thread.
     """
+    outer = [] if project_tier is None else [project_tier]
     if config_type == "loom":
         for weave in children:
             if weave.source_path is not None:
                 with attribute_errors(weave.source_path):
                     check_defaults_shape(weave.data.get("defaults"), "weave")
+            tiers = [*outer, _tier("loom", data), _tier("weave", weave.data)]
             for thread in weave.children:
-                thread.data = apply_inheritance(
-                    data.get("defaults"),
-                    weave.data.get("defaults"),
-                    thread.data,
-                    loom_audit_templates=data.get("audit_templates"),
-                    weave_audit_templates=weave.data.get("audit_templates"),
-                    loom_connections=data.get("connections"),
-                    weave_connections=weave.data.get("connections"),
-                )
+                thread.data = apply_tiers(tiers, thread.data)
 
     elif config_type == "weave":
+        tiers = [*outer, _tier("weave", data)]
         for thread in children:
-            thread.data = apply_inheritance(
-                None,
-                data.get("defaults"),
-                thread.data,
-                weave_audit_templates=data.get("audit_templates"),
-                weave_connections=data.get("connections"),
-            )
+            thread.data = apply_tiers(tiers, thread.data)
+
+    elif config_type == "thread":
+        return apply_tiers(outer, data)
+    return data
 
 
 def check_dimension_overrides(
@@ -763,10 +803,16 @@ def check_dimension_overrides(
 
 
 def collect_execution_warnings(
-    config_type: str, resolved: dict[str, Any], children: list[ResolvedChild]
+    config_type: str,
+    resolved: dict[str, Any],
+    children: list[ResolvedChild],
+    *,
+    project_tier: CascadeTier | None = None,
 ) -> list[Diagnostic]:
-    """Gather thread-scope execution warnings from pre-cascade dicts."""
+    """Gather thread-scope execution warnings from pre-cascade dicts and the project's defaults."""
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
+    if project_tier is not None:
+        defaults_by_scope.append(("project", project_tier.defaults))
     if config_type == "loom":
         loom_label = f"loom '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((loom_label, resolved.get("defaults")))

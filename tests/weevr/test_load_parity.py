@@ -403,7 +403,7 @@ _LOAD_STEPS = (
     "resolve_config_variables",
     "resolve_variables",
     "resolve_references",
-    "apply_inheritance",
+    "apply_tiers",
     "expand_foreach",
     "hydrate_children",
     "hydrate_model",

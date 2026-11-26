@@ -1,12 +1,13 @@
 """Config inheritance cascade logic."""
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
-from weevr.config.audit_templates import merge_audit_columns_with_templates
+from weevr.config.audit_templates import AuditTier, merge_tiered_audit_columns
 from weevr.diagnostics import diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import InheritanceError
@@ -89,72 +90,60 @@ def cascade(parent: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def apply_inheritance(
-    loom_defaults: dict[str, Any] | None,
-    weave_defaults: dict[str, Any] | None,
-    thread_config: dict[str, Any],
-    *,
-    loom_audit_templates: dict[str, Any] | None = None,
-    weave_audit_templates: dict[str, Any] | None = None,
-    loom_connections: dict[str, Any] | None = None,
-    weave_connections: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Apply multi-level inheritance cascade.
+@dataclass(frozen=True)
+class CascadeTier:
+    """What one enclosing config contributes to a thread's cascade.
 
-    Cascade order (lowest to highest priority):
-    1. loom_defaults (lowest)
-    2. weave_defaults
-    3. thread_config (highest)
+    Attributes:
+        level: The tier's kind (``"project"``, ``"loom"``, ``"weave"``), for
+            error messages.
+        defaults: Its ``defaults:`` block.
+        audit_templates: Its top-level audit template definitions.
+        connections: Its top-level connection definitions.
+    """
+
+    level: str
+    defaults: dict[str, Any] | None = None
+    audit_templates: dict[str, Any] | None = None
+    connections: dict[str, Any] | None = None
+
+
+def apply_tiers(tiers: Sequence[CascadeTier], thread_config: dict[str, Any]) -> dict[str, Any]:
+    """Cascade the enclosing tiers into a thread's config, outermost first.
+
+    ``defaults:`` keys replace whole-value, the nearest tier winning and the
+    thread's own keys beating every tier, except for the keys merged by their
+    own rule: ``naming`` (the nearest block, into the target), audit columns
+    (additive, with the thread's inherit and exclude controls), ``exports``
+    (by name) and the target policies (key by key). Connection and audit
+    template definitions merge by name, the nearest winning.
 
     Args:
-        loom_defaults: Defaults from loom level
-        weave_defaults: Defaults from weave level
-        thread_config: Thread-specific config
-        loom_audit_templates: User-defined audit template definitions from loom
-        weave_audit_templates: User-defined audit template definitions from weave
-        loom_connections: Named connection definitions from loom top-level
-        weave_connections: Named connection definitions from weave top-level
+        tiers: The enclosing tiers, outermost first (project, loom, weave);
+            a tier may declare nothing.
+        thread_config: The thread's config.
 
     Returns:
-        Fully merged config with thread values taking precedence
+        The cascaded config.
 
     Raises:
         InheritanceError: If a ``defaults`` block holds a key the cascade
             merges with the wrong shape.
     """
-    check_defaults_shape(loom_defaults, "loom")
-    check_defaults_shape(weave_defaults, "weave")
-    result = {}
+    for tier in tiers:
+        check_defaults_shape(tier.defaults, tier.level)
+    defaults = [tier.defaults for tier in tiers if tier.defaults]
 
-    # Start with loom defaults
-    if loom_defaults:
-        result = loom_defaults.copy()
-
-    # Cascade weave defaults over loom
-    if weave_defaults:
-        result = cascade(result, weave_defaults) if result else weave_defaults.copy()
-
-    # Cascade thread config over everything
+    result: dict[str, Any] = {}
+    for block in defaults:
+        result = cascade(result, block)
     result = cascade(result, thread_config) if result else thread_config.copy()
 
-    # Naming config cascade: loom.naming → weave.naming → thread.target.naming
-    # The most specific (thread-level) wins entirely.
-    _cascade_naming(loom_defaults, weave_defaults, result)
-
-    # Audit cascade: templates, inline columns, inherit flag, and exclusions.
-    _cascade_audit(
-        loom_defaults, weave_defaults, result, loom_audit_templates, weave_audit_templates
-    )
-
-    # Exports cascade: loom → weave → thread with additive merge by name.
-    _cascade_exports(loom_defaults, weave_defaults, result)
-
-    # Connections cascade: loom → weave → thread with additive merge by name.
-    _cascade_connections(loom_connections, weave_connections, result)
-
-    # Target policy cascade: schema_drift, on_drift, warp_enforcement.
-    _cascade_target_policies(loom_defaults, weave_defaults, result)
-
+    _cascade_naming(defaults, result)
+    _cascade_audit(tiers, result)
+    _cascade_exports(defaults, result)
+    _cascade_connections([tier.connections for tier in tiers], result)
+    _cascade_target_policies(defaults, result)
     return result
 
 
@@ -205,27 +194,20 @@ def check_defaults_shape(defaults: dict[str, Any] | None, scope: str) -> None:
                 fail("exports[]", "a mapping", export, ("exports", index))
 
 
-def _cascade_naming(
-    loom_defaults: dict[str, Any] | None,
-    weave_defaults: dict[str, Any] | None,
-    thread_config: dict[str, Any],
-) -> None:
-    """Cascade naming config from loom/weave defaults into thread target.
+def _cascade_naming(defaults: Sequence[dict[str, Any]], thread_config: dict[str, Any]) -> None:
+    """Cascade the nearest tier's ``defaults.naming`` into the thread's target.
 
-    Naming config inheritance: loom.naming → weave.naming → thread.target.naming.
-    The most specific non-None value wins entirely (no field-by-field merge).
+    The most specific block wins entirely (no field-by-field merge), and a
+    thread whose target sets ``naming`` keeps its own.
     """
-    # Resolve effective naming from parent levels
     parent_naming = None
-    if loom_defaults and "naming" in loom_defaults:
-        parent_naming = loom_defaults["naming"]
-    if weave_defaults and "naming" in weave_defaults:
-        parent_naming = weave_defaults["naming"]
+    for block in defaults:
+        if "naming" in block:
+            parent_naming = block["naming"]
 
     if parent_naming is None:
         return
 
-    # Apply to thread's target block if thread doesn't already have naming
     target = thread_config.get("target")
     if isinstance(target, dict) and "naming" not in target:
         target["naming"] = parent_naming
@@ -268,117 +250,62 @@ def _to_template_refs(val: Any) -> list[str] | None:
     return val if isinstance(val, list) else [val]
 
 
-def _cascade_audit(
-    loom_defaults: dict[str, Any] | None,
-    weave_defaults: dict[str, Any] | None,
-    thread_config: dict[str, Any],
-    loom_audit_templates: dict[str, Any] | None = None,
-    weave_audit_templates: dict[str, Any] | None = None,
-) -> None:
+def _tier_inline_columns(defaults: dict[str, Any] | None) -> dict[str, str]:
+    """A tier's inline audit columns: ``defaults.target.audit_columns`` over the legacy key."""
+    inline: dict[str, str] = {}
+    if not defaults:
+        return inline
+    legacy = defaults.get("audit_columns")
+    if legacy:
+        logger.warning(
+            "defaults.audit_columns is deprecated; use defaults.target.audit_columns instead"
+        )
+        inline.update(legacy)
+    new_path = defaults.get("target", {}).get("audit_columns")
+    if new_path:
+        inline.update(new_path)
+    return inline
+
+
+def _cascade_audit(tiers: Sequence[CascadeTier], thread_config: dict[str, Any]) -> None:
     """Cascade audit columns with template resolution, inheritance, and exclusion.
 
     Handles both the new path (``defaults.target.audit_columns``,
     ``defaults.target.audit_template``) and the legacy path
-    (``defaults.audit_columns``). The legacy path is still supported but
-    triggers a deprecation warning. When both are present, the new path wins
-    on key collision.
+    (``defaults.audit_columns``) at every tier. The legacy path is still
+    supported but triggers a deprecation warning. When both are present, the
+    new path wins on key collision.
 
     Args:
-        loom_defaults: Defaults dict from loom level.
-        weave_defaults: Defaults dict from weave level.
+        tiers: The enclosing tiers, outermost first.
         thread_config: Fully cascaded thread config (mutated in place).
-        loom_audit_templates: User-defined template definitions from loom top-level.
-        weave_audit_templates: User-defined template definitions from weave top-level.
     """
-    # --- template definitions ---
-    loom_templates = _extract_audit_templates(loom_audit_templates)
-    weave_templates = _extract_audit_templates(weave_audit_templates)
-    thread_templates = _extract_audit_templates(thread_config.get("audit_templates"))
-
-    # --- template refs ---
-    loom_target = (loom_defaults or {}).get("target", {})
-    weave_target = (weave_defaults or {}).get("target", {})
-    thread_target = thread_config.get("target") or {}
-
-    loom_template_ref = loom_target.get("audit_template")
-    weave_template_ref = weave_target.get("audit_template")
-    thread_template_ref = (
-        thread_target.get("audit_template") if isinstance(thread_target, dict) else None
+    outer = [
+        AuditTier(
+            _extract_audit_templates(tier.audit_templates),
+            _to_template_refs((tier.defaults or {}).get("target", {}).get("audit_template")),
+            _tier_inline_columns(tier.defaults) or None,
+        )
+        for tier in tiers
+    ]
+    raw_target = thread_config.get("target")
+    target: dict[str, Any] = raw_target if isinstance(raw_target, dict) else {}
+    thread = AuditTier(
+        _extract_audit_templates(thread_config.get("audit_templates")),
+        _to_template_refs(target.get("audit_template")),
+        target.get("audit_columns"),
     )
-
-    loom_template_refs = _to_template_refs(loom_template_ref)
-    weave_template_refs = _to_template_refs(weave_template_ref)
-    thread_template_refs = _to_template_refs(thread_template_ref)
-
-    # --- inherit flag ---
-    thread_inherit = True
-    if isinstance(thread_target, dict):
-        thread_inherit = thread_target.get("audit_template_inherit", True)
-
-    # --- inline audit_columns: legacy and new paths ---
-    loom_inline: dict[str, str] = {}
-    if loom_defaults:
-        legacy = loom_defaults.get("audit_columns")
-        if legacy:
-            logger.warning(
-                "defaults.audit_columns is deprecated; use defaults.target.audit_columns instead"
-            )
-            loom_inline.update(legacy)
-        new_path = loom_target.get("audit_columns")
-        if new_path:
-            loom_inline.update(new_path)
-
-    weave_inline: dict[str, str] = {}
-    if weave_defaults:
-        legacy = weave_defaults.get("audit_columns")
-        if legacy:
-            logger.warning(
-                "defaults.audit_columns is deprecated; use defaults.target.audit_columns instead"
-            )
-            weave_inline.update(legacy)
-        new_path = weave_target.get("audit_columns")
-        if new_path:
-            weave_inline.update(new_path)
-
-    thread_inline: dict[str, str] | None = None
-    if isinstance(thread_target, dict):
-        thread_inline = thread_target.get("audit_columns")
-
-    # --- exclude ---
-    thread_exclude: list[str] | None = None
-    if isinstance(thread_target, dict):
-        thread_exclude = thread_target.get("audit_columns_exclude")
 
     # Skip entirely if nothing is defined at any level
-    has_anything = any(
-        [
-            loom_templates,
-            weave_templates,
-            thread_templates,
-            loom_template_refs,
-            weave_template_refs,
-            thread_template_refs,
-            loom_inline,
-            weave_inline,
-            thread_inline,
-        ]
-    )
-    if not has_anything:
+    if not any(tier.templates or tier.template_refs or tier.inline for tier in (*outer, thread)):
         thread_config.pop("audit_columns", None)
         return
 
-    merged = merge_audit_columns_with_templates(
-        loom_templates=loom_templates,
-        loom_template_refs=loom_template_refs,
-        loom_inline=loom_inline or None,
-        weave_templates=weave_templates,
-        weave_template_refs=weave_template_refs,
-        weave_inline=weave_inline or None,
-        thread_templates=thread_templates,
-        thread_template_refs=thread_template_refs,
-        thread_inline=thread_inline,
-        thread_inherit=thread_inherit,
-        thread_exclude=thread_exclude,
+    merged = merge_tiered_audit_columns(
+        outer,
+        thread,
+        thread_inherit=target.get("audit_template_inherit", True),
+        thread_exclude=target.get("audit_columns_exclude"),
     )
 
     # Write result into thread's target block
@@ -404,34 +331,26 @@ _TARGET_POLICY_KEYS = ("schema_drift", "on_drift", "warp_enforcement")
 
 
 def _cascade_target_policies(
-    loom_defaults: dict[str, Any] | None,
-    weave_defaults: dict[str, Any] | None,
-    thread_config: dict[str, Any],
+    defaults: Sequence[dict[str, Any]], thread_config: dict[str, Any]
 ) -> None:
-    """Cascade target-boundary policies from defaults.target.* into thread target.
+    """Cascade target-boundary policies from each tier's ``defaults.target`` into the thread.
 
-    Handles schema_drift, on_drift, and warp_enforcement keys. These
-    cascade from loom → weave → thread target with child-wins semantics.
+    Handles schema_drift, on_drift, and warp_enforcement keys, key by key:
+    the nearest tier setting a key wins, and the thread's own target beats
+    every tier.
 
     Args:
-        loom_defaults: Defaults dict from loom level.
-        weave_defaults: Defaults dict from weave level.
+        defaults: The enclosing tiers' ``defaults:`` blocks, outermost first.
         thread_config: Fully cascaded thread config (mutated in place).
     """
-    # Build cascaded policy values: loom < weave < thread
     effective: dict[str, Any] = {}
-
-    loom_target = (loom_defaults or {}).get("target", {})
-    weave_target = (weave_defaults or {}).get("target", {})
-    thread_target = thread_config.get("target") or {}
-
-    for key in _TARGET_POLICY_KEYS:
-        if isinstance(loom_target, dict) and key in loom_target:
-            effective[key] = loom_target[key]
-        if isinstance(weave_target, dict) and key in weave_target:
-            effective[key] = weave_target[key]
-        if isinstance(thread_target, dict) and key in thread_target:
-            effective[key] = thread_target[key]
+    targets = [block.get("target", {}) for block in defaults]
+    for target in (*targets, thread_config.get("target") or {}):
+        if not isinstance(target, dict):
+            continue
+        for key in _TARGET_POLICY_KEYS:
+            if key in target:
+                effective[key] = target[key]
 
     if not effective:
         return
@@ -444,12 +363,8 @@ def _cascade_target_policies(
         thread_config["target"][key] = value
 
 
-def _cascade_exports(
-    loom_defaults: dict[str, Any] | None,
-    weave_defaults: dict[str, Any] | None,
-    thread_config: dict[str, Any],
-) -> None:
-    """Cascade exports from loom/weave defaults into thread config.
+def _cascade_exports(defaults: Sequence[dict[str, Any]], thread_config: dict[str, Any]) -> None:
+    """Cascade exports from each tier's defaults into thread config.
 
     Like audit columns, exports use additive merge: each level extends the
     export set. Same-named exports at a lower level override the definition
@@ -457,12 +372,12 @@ def _cascade_exports(
     (``false``, ``"no"``, ``0``, ...) are removed from the final list, so a
     name-only override can switch off an inherited export.
 
-    Cascade order: loom defaults → weave defaults → thread config.
+    Cascade order: each tier's defaults, outermost first, then the thread.
     """
     merged: dict[str, dict[str, Any]] = {}
 
-    for level in (loom_defaults, weave_defaults):
-        if level and "exports" in level:
+    for level in defaults:
+        if "exports" in level:
             for export in level["exports"]:
                 name = export.get("name")
                 if name:
@@ -496,29 +411,22 @@ def _export_disabled(export: dict[str, Any]) -> bool:
 
 
 def _cascade_connections(
-    loom_connections: dict[str, Any] | None,
-    weave_connections: dict[str, Any] | None,
-    thread_config: dict[str, Any],
+    tiers: Sequence[dict[str, Any] | None], thread_config: dict[str, Any]
 ) -> None:
-    """Cascade connections from loom/weave into thread config.
+    """Cascade connections from each tier into thread config.
 
-    Additive merge: each level extends the connections dict.
-    Same-named connections at a lower level override the definition
-    from a higher level (child wins).
+    Additive merge: each tier extends the connections dict. Same-named
+    connections at a lower tier override the definition from a higher one
+    (child wins); the thread's own are the lowest of all.
 
-    Cascade order: loom → weave → thread.
+    Args:
+        tiers: The enclosing tiers' connections, outermost first.
+        thread_config: Fully cascaded thread config (mutated in place).
     """
     merged: dict[str, Any] = {}
-
-    if loom_connections:
-        merged.update(loom_connections)
-    if weave_connections:
-        merged.update(weave_connections)
-
-    # Thread-level connections (highest priority)
-    thread_connections = thread_config.get("connections")
-    if thread_connections:
-        merged.update(thread_connections)
+    for connections in (*tiers, thread_config.get("connections")):
+        if connections:
+            merged.update(connections)
 
     if merged:
         thread_config["connections"] = merged

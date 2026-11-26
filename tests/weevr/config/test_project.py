@@ -75,19 +75,18 @@ class TestLoad:
 
 
 class TestReservedBlocks:
-    """Project-scope blocks not yet supported in weevr.yaml are reserved (C210)."""
+    """The project-scope ``variables`` block is reserved (C210)."""
+
+    def test_reserved_block(self, tmp_path: Path) -> None:
+        assert _diagnostics(tmp_path, _body(variables={})) == [("C210", "/variables")]
 
     @pytest.mark.parametrize("key", ["connections", "defaults", "audit_templates"])
-    def test_reserved_block(self, tmp_path: Path, key: str) -> None:
-        assert _diagnostics(tmp_path, _body(**{key: {}})) == [("C210", f"/{key}")]
-
-    def test_every_reserved_block_is_reported(self, tmp_path: Path) -> None:
-        codes = _diagnostics(tmp_path, _body(defaults={}, connections={}))
-        assert sorted(codes) == [("C210", "/connections"), ("C210", "/defaults")]
+    def test_project_blocks_are_not_reserved(self, tmp_path: Path, key: str) -> None:
+        assert getattr(_load(tmp_path, _body(**{key: {}})), key) == {}
 
     def test_reserved_and_shape_errors_together(self, tmp_path: Path) -> None:
-        codes = _diagnostics(tmp_path, _body(defaults={}, owner="team"))
-        assert sorted(codes) == [("C110", "/owner"), ("C210", "/defaults")]
+        codes = _diagnostics(tmp_path, _body(variables={}, owner="team"))
+        assert sorted(codes) == [("C110", "/owner"), ("C210", "/variables")]
 
 
 class TestEngineFloor:

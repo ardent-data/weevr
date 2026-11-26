@@ -10,15 +10,26 @@ is the one place a ``ref:`` entry's child scope is opened and its misfiring
 pins reported, for both ``ref:`` weaves and ``ref:`` threads.
 """
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Collection, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Any
 
-from weevr.config.assets import AssetKey, DeclaredAsset, upstream_readers, visible_assets
+from weevr.config.assets import (
+    AssetKey,
+    DeclaredAsset,
+    declared_assets,
+    upstream_readers,
+    visible_assets,
+)
 from weevr.config.collect import errors_recorded, raise_or_record
-from weevr.config.interpolation import fabric_namespace, load_context, resolve_variables
+from weevr.config.interpolation import (
+    fabric_namespace,
+    load_context,
+    param_references,
+    resolve_variables,
+)
 from weevr.config.interpolation_errors import ReferenceScope, param_name
 from weevr.config.param_provenance import ParamProvenance, ParamTier, PinEntry
 from weevr.config.params import (
@@ -36,6 +47,9 @@ from weevr.model.project import Project
 # Keys an entry carries about its place in the parent, not about the child's body.
 WEAVE_ENTRY_KEYS = frozenset({"name", "params", "condition"})
 THREAD_ENTRY_KEYS = frozenset({"name", "as", "params", "dependencies", "condition"})
+
+PROJECT_TIER_BLOCKS = frozenset({"connections", "audit_templates", "defaults"})
+"""The ``weevr.yaml`` blocks that are the outermost tier of the load cascade."""
 
 
 def has_inline_body(entry: Any, entry_keys: frozenset[str]) -> bool:
@@ -215,6 +229,7 @@ class WalkState:
             if binding is not None:
                 reads.note(name, binding)
         project_strict = project is not None and project.strict_params is True
+        written = project_blocks(project)
         return cls(
             scope=scope,
             file=file,
@@ -223,10 +238,60 @@ class WalkState:
             runtime_params=runtime_params,
             fabric_context=fabric_context,
             reads=reads,
-            assets=visible_assets({}, document, file),
+            assets=visible_assets(declared_assets(written, project_file), document, file),
             trail=() if file is None else (file,),
-            defaults=_layered_defaults({}, document),
+            defaults=_layered_defaults(_layered_defaults({}, written), document),
         )
+
+    def project_tier(
+        self,
+        project: Project | None,
+        project_file: str | None,
+        blocks: Collection[str] = PROJECT_TIER_BLOCKS,
+    ) -> dict[str, Any]:
+        """The project's cascading blocks, resolved in the project's own scope.
+
+        A project block is a registry asset declared above the root, so its
+        ``${param.x}`` references read the bindings at the project's scope:
+        a runtime value over the project's default. A declaration of the same
+        name in a document, or a pin on an entry below, never retargets it.
+        Only the project params the blocks read are bound here, so a required
+        one they don't read never fails the load at this scope.
+
+        Args:
+            project: The project document; ``None`` when the load has none.
+            project_file: The project's ``weevr.yaml``.
+            blocks: Which of the cascading blocks to resolve.
+
+        Returns:
+            The project's ``connections``, ``audit_templates`` and
+            ``defaults`` that it declares, resolved; empty with no project.
+
+        Raises:
+            ConfigSchemaError: A required project param has no value, or a
+                value its project spec's type rejects (:meth:`ParamScope.child`).
+            VariableResolutionError: A reference in a block can't resolve.
+        """
+        written = project_blocks(project, blocks)
+        if project is None or not written:
+            return written
+        read = set(param_references(written))
+        specs = {name: spec for name, spec in (project.params or {}).items() if name in read}
+        scope = ParamScope.root(self.runtime_params, specs, project_file=project_file)
+        project_scope = scope.child(None, file=project_file, tier="project")
+        state = replace(
+            self,
+            scope=project_scope,
+            file=project_file,
+            strict=strictness(
+                {"strict_params": project.strict_params}, False, self.strict_override
+            ),
+            assets=declared_assets(written, project_file),
+            trail=() if project_file is None else (project_file,),
+            defaults=_layered_defaults({}, written),
+            at=(),
+        )
+        return substitute(written, state)
 
     @property
     def provenance(self) -> Mapping[str, ParamProvenance]:
@@ -289,6 +354,15 @@ class WalkState:
             defaults=_layered_defaults(self.defaults, document),
             at=(),
         )
+
+
+def project_blocks(
+    project: Project | None, blocks: Collection[str] = PROJECT_TIER_BLOCKS
+) -> dict[str, Any]:
+    """The cascading ``blocks`` the project declares, as written; empty with no project."""
+    if project is None:
+        return {}
+    return project.model_dump(exclude_unset=True, include=set(blocks))
 
 
 def _layered_defaults(above: Mapping[str, Any], document: Mapping[str, Any]) -> dict[str, Any]:

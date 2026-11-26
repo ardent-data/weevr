@@ -258,7 +258,7 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is reserved and not yet supported.",
+      "summary": "weevr.yaml declares a project-scope variables block, which is reserved and not yet supported.",
       "docs_anchor": "c210"
     },
     {

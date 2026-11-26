@@ -11,6 +11,7 @@ from __future__ import annotations
 import fnmatch
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from weevr.diagnostics import diagnostic
@@ -27,7 +28,9 @@ __all__ = [
     "resolve_audit_columns",
     "apply_audit_exclusions",
     "resolve_template_columns",
+    "AuditTier",
     "merge_audit_columns_with_templates",
+    "merge_tiered_audit_columns",
     "resolve_context_variables",
 ]
 
@@ -260,32 +263,72 @@ def merge_audit_columns_with_templates(
     Returns:
         Merged audit column dict. Empty dict if nothing is defined.
     """
-    # Merge all user-defined templates across levels so they are available for
-    # any level's template refs regardless of inheritance setting.
+    return merge_tiered_audit_columns(
+        [
+            AuditTier(loom_templates, loom_template_refs, loom_inline),
+            AuditTier(weave_templates, weave_template_refs, weave_inline),
+        ],
+        AuditTier(thread_templates, thread_template_refs, thread_inline),
+        thread_inherit=thread_inherit,
+        thread_exclude=thread_exclude,
+    )
+
+
+@dataclass(frozen=True)
+class AuditTier:
+    """What one cascade tier declares about audit columns.
+
+    Attributes:
+        templates: User-defined templates the tier declares, by name.
+        template_refs: Template names the tier applies.
+        inline: Audit columns the tier defines inline.
+    """
+
+    templates: dict[str, dict[str, str]] | None = None
+    template_refs: list[str] | None = None
+    inline: dict[str, str] | None = None
+
+
+def merge_tiered_audit_columns(
+    outer: Sequence[AuditTier],
+    thread: AuditTier,
+    *,
+    thread_inherit: bool = True,
+    thread_exclude: list[str] | None = None,
+) -> dict[str, str]:
+    """Merge audit columns down a list of tiers into a thread's.
+
+    Template definitions from every tier are available to every tier's refs,
+    a nearer tier's definition winning by name, whatever ``thread_inherit``
+    says. Columns merge outermost first, each tier's template columns then its
+    inline columns, the thread's last; ``thread_inherit=False`` drops what the
+    outer tiers apply. ``thread_exclude`` is applied to the result.
+
+    Args:
+        outer: The enclosing tiers, outermost first (project, loom, weave).
+        thread: The thread's own declarations.
+        thread_inherit: When False, the outer tiers' refs and inline columns
+            are left out.
+        thread_exclude: Glob patterns removing matching columns at the end.
+
+    Returns:
+        The merged audit columns; empty when nothing is defined.
+
+    Raises:
+        ConfigError: A ref names no user-defined or built-in template (``R140``).
+    """
     all_user_templates: dict[str, dict[str, str]] = {}
-    if loom_templates:
-        all_user_templates.update(loom_templates)
-    if weave_templates:
-        all_user_templates.update(weave_templates)
-    if thread_templates:
-        all_user_templates.update(thread_templates)
+    for tier in (*outer, thread):
+        if tier.templates:
+            all_user_templates.update(tier.templates)
 
+    applied = [*outer, thread] if thread_inherit else [thread]
     merged: dict[str, str] = {}
-
-    if thread_inherit:
-        if loom_template_refs:
-            merged.update(resolve_template_columns(loom_template_refs, all_user_templates))
-        if loom_inline:
-            merged.update(loom_inline)
-        if weave_template_refs:
-            merged.update(resolve_template_columns(weave_template_refs, all_user_templates))
-        if weave_inline:
-            merged.update(weave_inline)
-
-    if thread_template_refs:
-        merged.update(resolve_template_columns(thread_template_refs, all_user_templates))
-    if thread_inline:
-        merged.update(thread_inline)
+    for tier in applied:
+        if tier.template_refs:
+            merged.update(resolve_template_columns(tier.template_refs, all_user_templates))
+        if tier.inline:
+            merged.update(tier.inline)
 
     return apply_audit_exclusions(merged, thread_exclude)
 

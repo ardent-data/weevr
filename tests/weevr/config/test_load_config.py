@@ -1529,6 +1529,10 @@ class TestLoadConfigFlatAuditTemplates:
         )
         files = {"loom": "l.loom", "weave": "w.weave", "thread": "fact.thread"}
         model = load_config(project / files[level], project_root=project)
+        if level == "thread":
+            # A thread's own template is applied at load, like a nested thread's.
+            assert model.target.audit_columns == self.COLUMNS
+            return
         assert model.audit_templates is not None
         assert model.audit_templates["lineage"].columns == self.COLUMNS
 

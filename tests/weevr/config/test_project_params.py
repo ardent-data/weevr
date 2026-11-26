@@ -65,7 +65,7 @@ def _thread_alias(loaded: Any) -> str:
 
 
 class TestProjectDocument:
-    """``params`` and ``strict_params`` are project fields; the other blocks stay reserved."""
+    """``params`` and ``strict_params`` are project fields, not reserved blocks."""
 
     def test_params_and_strict_params_load(self, tmp_path: Path) -> None:
         _write_project(tmp_path, params=_region(default="emea"), strict_params=True)
@@ -77,7 +77,6 @@ class TestProjectDocument:
 
     def test_params_is_not_reserved(self) -> None:
         assert "params" not in RESERVED_PROJECT_BLOCKS
-        assert set(RESERVED_PROJECT_BLOCKS) == {"connections", "defaults", "audit_templates"}
 
 
 class TestDeclareOnce:
