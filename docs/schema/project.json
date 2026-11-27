@@ -93,7 +93,7 @@
       "type": "object"
     },
     "ColumnSetSource": {
-      "description": "Source definition for a named column set.\n\nDescribes where the column mapping data lives \u2014 either a Delta table or a\nYAML file. Delta sources may reference a registered table alias **or** a\nnamed connection plus a table name; YAML sources reference a file path\nrelative to the project root.\n\nAttributes:\n    type: Source kind \u2014 ``\"delta\"`` or ``\"yaml\"``.\n    alias: Registered table alias. One of ``alias`` or ``connection`` is\n        required when ``type=\"delta\"``; mutually exclusive with\n        ``connection``.\n    path: File path to the YAML mapping file. Required for ``type=\"yaml\"``.\n    connection: Reference to a named connection defined at the loom or\n        weave level. When set, the column set is read from\n        ``schema.table`` within the connection's lakehouse. Only valid\n        for ``type=\"delta\"`` and mutually exclusive with ``alias``.\n    schema_override: Schema name within the connection's lakehouse. Only\n        valid alongside ``connection``. Accepts the YAML key ``schema``.\n    table: Table name within the connection's lakehouse. Required when\n        ``connection`` is set; not valid otherwise.\n    from_column: Column name in the source that holds the incoming column\n        names. Defaults to ``\"source_name\"``.\n    to_column: Column name in the source that holds the outgoing (renamed)\n        column names. Defaults to ``\"target_name\"``.\n    filter: SQL WHERE expression applied when reading a Delta source.",
+      "description": "Source definition for a named column set.\n\nDescribes where the column mapping data lives \u2014 either a Delta table or a\nYAML file. Delta sources may reference a registered table alias **or** a\nnamed connection plus a table name; YAML sources reference a file path\nrelative to the project root.\n\nAttributes:\n    type: Source kind \u2014 ``\"delta\"`` or ``\"yaml\"``.\n    alias: Registered table alias. One of ``alias`` or ``connection`` is\n        required when ``type=\"delta\"``; mutually exclusive with\n        ``connection``.\n    path: File path to the YAML mapping file. Required for ``type=\"yaml\"``.\n    connection: Reference to a named connection defined at the\n        project, loom, or weave level. When set, the column set is read from\n        ``schema.table`` within the connection's lakehouse. Only valid\n        for ``type=\"delta\"`` and mutually exclusive with ``alias``.\n    schema_override: Schema name within the connection's lakehouse. Only\n        valid alongside ``connection``. Accepts the YAML key ``schema``.\n    table: Table name within the connection's lakehouse. Required when\n        ``connection`` is set; not valid otherwise.\n    from_column: Column name in the source that holds the incoming column\n        names. Defaults to ``\"source_name\"``.\n    to_column: Column name in the source that holds the outgoing (renamed)\n        column names. Defaults to ``\"target_name\"``.\n    filter: SQL WHERE expression applied when reading a Delta source.",
       "properties": {
         "type": {
           "description": "Source kind \u2014 ``delta`` for a registered Delta table or ``yaml`` for a file.",
@@ -140,7 +140,7 @@
             }
           ],
           "default": null,
-          "description": "Reference to a named connection defined at the loom or weave level. When set, the column set is read from ``schema.table`` within the connection's lakehouse. Only valid for ``type='delta'`` and mutually exclusive with ``alias``.",
+          "description": "Reference to a named connection defined at the project, loom, or weave level. When set, the column set is read from ``schema.table`` within the connection's lakehouse. Only valid for ``type='delta'`` and mutually exclusive with ``alias``.",
           "title": "Connection"
         },
         "schema": {
@@ -233,7 +233,7 @@
       "type": "object"
     },
     "Lookup": {
-      "description": "A weave-level named data definition that can be referenced by threads.\n\nLookups define small reference datasets shared across threads in a weave.\nWhen ``materialize`` is true, the data is read once and cached (or broadcast)\nbefore threads execute.\n\nNarrow lookup fields (``key``, ``values``, ``filter``) control projection\nand filtering applied during materialization or on-demand reads.  When set,\nonly the declared key and value columns are retained, reducing memory and\nimproving join performance.\n\nAttributes:\n    source: Source definition for the lookup data.\n    materialize: Whether to pre-read and cache/broadcast the data before\n        thread execution.\n    strategy: Materialization strategy. Only meaningful when ``materialize``\n        is true. ``\"broadcast\"`` uses Spark broadcast join hints;\n        ``\"cache\"`` uses DataFrame caching.\n    key: Column(s) used for matching (join key). Kept in the cached\n        projection alongside ``values``.\n    values: Payload column(s) to retrieve. When set, only ``key`` + ``values``\n        columns are retained in the cached DataFrame.\n    filter: SQL WHERE expression applied to the source before projection.\n    unique_key: When true, validate that ``key`` columns form a unique key\n        after filtering and projection.\n    on_failure: Behavior when ``unique_key`` check finds duplicates.\n        Only meaningful when ``unique_key`` is true.",
+      "description": "A named data definition that can be referenced by threads.\n\nLookups define small reference datasets shared across threads in a project, loom or weave.\nWhen ``materialize`` is true, the data is read once and cached (or broadcast)\nbefore threads execute.\n\nNarrow lookup fields (``key``, ``values``, ``filter``) control projection\nand filtering applied during materialization or on-demand reads.  When set,\nonly the declared key and value columns are retained, reducing memory and\nimproving join performance.\n\nAttributes:\n    source: Source definition for the lookup data.\n    materialize: Whether to pre-read and cache/broadcast the data before\n        thread execution.\n    strategy: Materialization strategy. Only meaningful when ``materialize``\n        is true. ``\"broadcast\"`` uses Spark broadcast join hints;\n        ``\"cache\"`` uses DataFrame caching.\n    key: Column(s) used for matching (join key). Kept in the cached\n        projection alongside ``values``.\n    values: Payload column(s) to retrieve. When set, only ``key`` + ``values``\n        columns are retained in the cached DataFrame.\n    filter: SQL WHERE expression applied to the source before projection.\n    unique_key: When true, validate that ``key`` columns form a unique key\n        after filtering and projection.\n    on_failure: Behavior when ``unique_key`` check finds duplicates.\n        Only meaningful when ``unique_key`` is true.",
       "properties": {
         "source": {
           "$ref": "#/$defs/Source",
@@ -529,7 +529,7 @@
             }
           ],
           "default": null,
-          "description": "Reference to a named lookup defined at the weave or loom level. Mutually exclusive with type.",
+          "description": "Reference to a named lookup defined at the project, loom, or weave level. Mutually exclusive with type.",
           "title": "Lookup"
         },
         "connection": {
@@ -542,7 +542,7 @@
             }
           ],
           "default": null,
-          "description": "Reference to a named connection defined at thread, weave, or loom level.",
+          "description": "Named connection defined at thread, weave, loom, or project level.",
           "title": "Connection"
         },
         "schema": {

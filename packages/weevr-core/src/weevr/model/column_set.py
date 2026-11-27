@@ -50,8 +50,8 @@ class ColumnSetSource(FrozenBase):
             required when ``type="delta"``; mutually exclusive with
             ``connection``.
         path: File path to the YAML mapping file. Required for ``type="yaml"``.
-        connection: Reference to a named connection defined at the loom or
-            weave level. When set, the column set is read from
+        connection: Reference to a named connection defined at the
+            project, loom, or weave level. When set, the column set is read from
             ``schema.table`` within the connection's lakehouse. Only valid
             for ``type="delta"`` and mutually exclusive with ``alias``.
         schema_override: Schema name within the connection's lakehouse. Only
@@ -82,7 +82,7 @@ class ColumnSetSource(FrozenBase):
     connection: str | None = Field(
         default=None,
         description=(
-            "Reference to a named connection defined at the loom or weave level. "
+            "Reference to a named connection defined at the project, loom, or weave level. "
             "When set, the column set is read from ``schema.table`` within the "
             "connection's lakehouse. Only valid for ``type='delta'`` and mutually "
             "exclusive with ``alias``."

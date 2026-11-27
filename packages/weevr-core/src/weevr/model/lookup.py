@@ -1,4 +1,4 @@
-"""Lookup model for weave-level named data definitions."""
+"""Lookup model for named data definitions declared at project, loom, weave or thread level."""
 
 from typing import Literal
 
@@ -10,9 +10,9 @@ from weevr.model.source import Source
 
 
 class Lookup(FrozenBase):
-    """A weave-level named data definition that can be referenced by threads.
+    """A named data definition that can be referenced by threads.
 
-    Lookups define small reference datasets shared across threads in a weave.
+    Lookups define small reference datasets shared across threads in a project, loom or weave.
     When ``materialize`` is true, the data is read once and cached (or broadcast)
     before threads execute.
 

@@ -57,7 +57,7 @@ class Export(FrozenBase):
     )
     connection: str | None = Field(
         default=None,
-        description="Reference to a named connection defined at thread, weave, or loom level.",
+        description="Named connection defined at thread, weave, loom, or project level.",
     )
     schema_override: str | None = Field(
         default=None,

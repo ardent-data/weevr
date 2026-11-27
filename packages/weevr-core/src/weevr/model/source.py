@@ -85,13 +85,13 @@ class Source(FrozenBase):
     lookup: str | None = Field(
         default=None,
         description=(
-            "Reference to a named lookup defined at the weave or loom level. "
+            "Reference to a named lookup defined at the project, loom, or weave level. "
             "Mutually exclusive with type."
         ),
     )
     connection: str | None = Field(
         default=None,
-        description="Reference to a named connection defined at thread, weave, or loom level.",
+        description="Named connection defined at thread, weave, loom, or project level.",
     )
     schema_override: str | None = Field(
         default=None,

@@ -185,7 +185,7 @@ class ReferenceResolutionError(ConfigError):
 class InheritanceError(ConfigError):
     """Raised when the configuration inheritance cascade fails.
 
-    Reserved for failures during the loom → weave → thread default merging
+    Reserved for failures during the project → loom → weave → thread default merging
     process. Not currently raised in v1.0.
     """
 
