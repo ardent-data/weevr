@@ -275,6 +275,23 @@ related looms. A project is a directory whose root holds a `weevr.yaml` file
 Every document, including `weevr.yaml`, opens with `kind:` and
 `config_version: "2.0"`. See [Project layout](../reference/project-layout.md).
 
+The project deploys; the loom executes. The project holds what every loom
+shares, and a loom is what runs. The project is also the outermost tier of
+the cascade: its `params`, `connections`, `audit_templates`, `defaults`,
+`lookups` and `column_sets` reach every loom, weave and thread.
+
+Two things travel down the tiers in different ways:
+
+- **Values** are params. They bind per scope: a runtime value or a
+  `ref:` entry's pin beats a declared default, and a nearer declaration of
+  the same name shadows an outer one.
+- **Shape** is declarations: connections, audit templates, lookups, column
+  sets and `defaults:`. They cascade by the rule for each key, the nearest
+  tier winning.
+
+The [cascade table](../guides/config-resolution.md#cascade-by-key) gives the
+rule for every key.
+
 See the [YAML Schema Reference](../reference/yaml-schema/thread.md)
 for full details on configuration file structure and reference resolution.
 

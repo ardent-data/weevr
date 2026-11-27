@@ -331,7 +331,9 @@ order is the one above.
 ### 11. Move `defaults.audit_columns` under `defaults.target`
 
 v2 reads inline audit columns from `defaults.target.audit_columns` only;
-`defaults.audit_columns` fails with `C112`. When a document's root `defaults:`
+`defaults.audit_columns` fails with `C112`. See
+[Audit templates](../guides/audit-templates.md#migration-defaultsaudit_columns)
+for how the key cascades in v2. When a document's root `defaults:`
 block has an `audit_columns:` block, its entries move under `target:` in the
 same block, as `defaults.target.audit_columns`:
 

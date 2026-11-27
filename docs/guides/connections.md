@@ -13,13 +13,14 @@ it by a short name.
 | Single-lakehouse thread, tables registered in the metastore | `alias:` |
 | Single-lakehouse thread, raw OneLake path | `alias:` for Delta sources, `path:` for targets and file sources |
 | Reading from or writing to a different workspace or lakehouse | `connections:` |
-| Multiple threads sharing the same remote lakehouse | `connections:` at weave or loom level |
+| Multiple threads sharing the same remote lakehouse | `connections:` at project, loom, or weave level |
+| Connections shared by every loom in the project | `connections:` in `weevr.yaml` |
 | Portability across environments without changing GUIDs | `connections:` with `${fabric.*}` |
 
 ## Connection block structure
 
-Connections are declared in a `connections:` map at the thread, weave, or
-loom level. Each key is a logical name; the value is a connection object.
+Connections are declared in a `connections:` map at the thread, weave, loom,
+or project (`weevr.yaml`) level. Each key is a logical name; the value is a connection object.
 
 ```yaml
 connections:
@@ -34,13 +35,57 @@ connections:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `type` | Yes | Connection type. Only `onelake` is supported in v1. |
+| `type` | Yes | Connection type. Only `onelake` is supported. |
 | `workspace` | Yes | OneLake workspace GUID or `${fabric.workspace_id}`. |
 | `lakehouse` | Yes | OneLake lakehouse GUID or `${fabric.lakehouse_id}`. |
 | `default_schema` | No | Default schema for tables in this connection. |
 
 Once declared, a connection is referenced from a source or target using
 `connection: <name>` together with `table: <table_name>`.
+
+## Project connections and the environment seam
+
+Connections declared in `weevr.yaml` apply to every loom, weave, and thread in
+the project. A connection of the same name declared lower down shadows the
+project's; the nearest declaration wins. Loom and weave lookups see project
+connections too, and `run_store.connection` is resolved against the
+connections in `weevr.yaml` when the loaded config doesn't declare that name.
+
+The project's `params:` are the seam between environments. The project
+declares the connection once, and each environment supplies the values that
+differ. The invoker supplies runtime params; weevr reads no Variable Library
+itself, so a Notebook or pipeline that wants Variable Library values fetches
+them and passes them in (`Context(params=...)`).
+
+```text
+# weevr.yaml
+kind: project
+config_version: "2.0"
+id: 8f9d2c4e-5b1a-4c7e-9a36-2d4f8e1b7c05
+name: sales
+
+params:
+  curated_workspace_id:
+    name: curated_workspace_id
+    type: string
+    required: true
+  env:
+    name: env
+    type: string
+    default: dev
+
+connections:
+  curated:
+    type: onelake
+    workspace: "${param.curated_workspace_id}"
+    lakehouse: "curated_${param.env}"
+```
+
+`${param.x}` in a project connection resolves with the project-scope
+bindings: runtime values over the project's declared defaults. A required
+project param with no value fails every load in the project (`P101`), not just
+loads that use the connection. See the [Params guide](params.md) for binding
+rules.
 
 ## Cross-lakehouse example
 
@@ -183,8 +228,9 @@ exports:
 
 ## Cascade and override
 
-Connections cascade from loom to weave to thread. Define shared connections
-at the loom level to make them available everywhere; override at the thread
+Connections cascade from project to loom to weave to thread, the nearest
+declaration winning. Define shared connections in `weevr.yaml` or at the loom
+level to make them available everywhere; override at the thread
 level when a specific thread needs a different endpoint.
 
 ```yaml
@@ -207,7 +253,7 @@ connections:
 ```
 
 The most specific level always wins. A thread-level connection with the
-same name as a loom-level connection replaces it entirely for that thread.
+same name as an outer connection replaces it entirely for that thread.
 
 ## Migration from manual `abfss://` paths
 
@@ -256,7 +302,7 @@ file.
 
 ## Column sets via connections
 
-Named column sets defined at the loom or weave level can also resolve their
+Named column sets defined at the project, loom, or weave level can also resolve their
 mapping table through a connection. This is the right pattern when the
 mapping data lives in a reference lakehouse that is **not** the attached
 notebook lakehouse — for example, a portable loom that runs against

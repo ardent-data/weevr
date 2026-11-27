@@ -86,10 +86,11 @@ target:
 ### Cascade via defaults.target
 
 All three drift/warp keys cascade through
-`defaults.target.*` at loom, weave, and thread levels:
+`defaults.target.*` at the project, loom, and weave levels. A thread has no
+`defaults` tier; its own `target` wins:
 
 ```yaml
-# Loom-level default
+# Loom-level default (also valid in weevr.yaml or a weave)
 defaults:
   target:
     schema_drift: strict
@@ -97,7 +98,8 @@ defaults:
     warp_enforcement: warn
 ```
 
-Thread-level settings override weave, which overrides loom.
+The thread's own `target` overrides weave, which overrides loom, which
+overrides project.
 
 ## Drift with warps
 

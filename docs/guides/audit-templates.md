@@ -11,11 +11,11 @@ threads grows, maintaining consistent audit metadata across every file becomes
 error-prone. Audit templates address this by separating the column definitions
 from their application points.
 
-Templates are declared under an `audit_templates` key at loom, weave, or
-thread level. A thread then references one or more templates by name using
-`target.audit_template`. The engine resolves the column set at execution time
-and appends the columns after all transformation steps, alongside any inline
-`target.audit_columns` entries.
+Templates are declared under an `audit_templates` key at project
+(`weevr.yaml`), loom, weave, or thread level. A thread then references one or
+more templates by name using `target.audit_template`. The engine resolves the
+column set at execution time and appends the columns after all transformation
+steps, alongside any inline `target.audit_columns` entries.
 
 ## Built-in presets
 
@@ -84,7 +84,8 @@ target:
 
 ### Declaring a custom template
 
-Define templates at loom level to share them across all weaves and threads.
+Define templates in `weevr.yaml` to share them across every loom, or at loom
+level to share them across all weaves and threads.
 Define at weave level to scope them to that weave. Define at thread level for
 thread-local templates.
 
@@ -173,11 +174,11 @@ target:
 
 Template *definitions* (`audit_templates` blocks) from all levels are
 always collected into a single namespace. A thread can reference any
-template defined at loom, weave, or its own level regardless of
+template defined at project, loom, weave, or its own level regardless of
 inheritance settings.
 
 Template *references* (`audit_template` on the target) and inline
-`audit_columns` cascade additively from loom → weave → thread. To
+`audit_columns` cascade additively from project → loom → weave → thread. To
 suppress inherited references and inline columns from parent levels,
 set `audit_template_inherit: false` on the target:
 
@@ -191,7 +192,7 @@ target:
 ```
 
 This suppresses inherited template references and inline columns
-from loom and weave. The thread's own `audit_template` and
+from the project, loom, and weave. The thread's own `audit_template` and
 `audit_columns` still apply. Template definitions from parent
 levels remain available for resolution.
 
@@ -259,7 +260,40 @@ embedded inside a `defaults.target` path. Consider migrating long-running
 configurations to templates when you need to reference the same set from
 multiple looms.
 
-Both mechanisms can coexist. `defaults.target.audit_columns` entries are
-treated as if they were inline `audit_columns` on each thread's target, and
-participate in the same merge order — template columns first, then
-`defaults.target.audit_columns`, then thread-level inline `audit_columns`.
+Both mechanisms can coexist, at every tier from the project down. Each
+tier's `defaults.target.audit_template` references and
+`defaults.target.audit_columns` entries are applied as if they were on each
+thread's target. Tiers merge outermost first (project, loom, weave, thread).
+Within a tier, template columns come first, then that tier's
+`defaults.target.audit_columns`. A nearer tier wins a column-name clash, and
+the thread's own inline `audit_columns` win over everything.
+
+A thread's own `target.audit_template` is applied at load whether the thread
+runs in a weave or standalone.
+
+## Chained threads: `R150`
+
+A thread that reads another thread's target finds that target's audit columns
+already there. When the downstream thread's effective audit columns (after the
+cascade and its exclusions) include a column the upstream target already
+carries, adding it again fails at run time. weevr reports this at load as the
+warning `R150`, on the downstream thread, listing the overlapping columns. It
+is a warning, not an error: a source that projects the columns away still
+triggers it.
+
+Edges across weaves in a loom count: a thread in a later weave that reads an
+earlier weave's target is checked as well.
+
+Fix it with `target.audit_columns_exclude` on the downstream thread:
+
+```yaml
+target:
+  alias: gold.orders_enriched
+  audit_columns_exclude:
+    - _loaded_at
+    - _run_id
+```
+
+Audit columns defined in `defaults:` at any tier, including the project,
+reach every thread, so a chain of threads in one project triggers `R150` often
+until the downstream threads exclude them.
