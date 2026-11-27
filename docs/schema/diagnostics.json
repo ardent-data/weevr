@@ -882,6 +882,16 @@
       "docs_anchor": "r140"
     },
     {
+      "code": "R150",
+      "name": "chained-thread-repeats-audit-columns",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A thread reads another thread's target and would add the audit columns that target already carries.",
+      "docs_anchor": "r150"
+    },
+    {
       "code": "R201",
       "name": "undefined-connection",
       "category": "config",

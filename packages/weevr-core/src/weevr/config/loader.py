@@ -706,7 +706,7 @@ def load_resolved(
     """
     # Imported here, not at module level: weevr.result reaches the engine
     # wheel's weevr.engine package, which needs weevr.config fully imported.
-    from weevr.result import LoadedConfig
+    from weevr.result import LoadedConfig, with_derived_load_warnings
 
     if project_root is None or isinstance(project_root, ConfigLocation):
         root = project_root
@@ -719,6 +719,7 @@ def load_resolved(
         fabric_context=fabric_context,
         strict_params=strict_params,
     )
+    warnings = with_derived_load_warnings(document, warnings)
     for warning in render_diagnostics(warnings):
         logger.warning(warning)
     return LoadedConfig.from_document(document, warnings)

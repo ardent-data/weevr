@@ -327,6 +327,49 @@ summary = {
 print(json.dumps(summary, sort_keys=True).replace(str(root), "<root>"))
 """
 
+_AUDIT_CHAIN = """\
+import sys
+from pathlib import Path
+
+from weevr.config import load_resolved
+
+root = Path(sys.argv[1])
+loaded = load_resolved(root / "w.weave", project_root=root)
+print([d.node for d in loaded.diagnostics if d.code == "R150"], "pyspark" in sys.modules)
+"""
+
+
+@pytest.mark.install_smoke
+def test_core_only_install_warns_about_chained_audit_columns(
+    wheels: tuple[Path, Path],
+    tmp_path: Path,
+    python_version: str,
+) -> None:
+    """The chained-audit-columns warning is raised by a core-only load, with no PySpark."""
+    _, core = wheels
+    python = _make_venv(tmp_path / "core_only_audit_chain", python_version)
+    _pip_install(python, str(core))
+
+    project = write_project(tmp_path / "chain.weevr", name="chain")
+    thread = (
+        'config_version: "2.0"\nsources:\n  main: {{type: delta, alias: "{src}"}}\n'
+        'target: {{alias: "{dst}"}}\n'
+    )
+    write_document(project / "up.thread", thread.format(src="raw.a", dst="silver.a"))
+    write_document(project / "down.thread", thread.format(src="silver.a", dst="gold.a"))
+    write_document(
+        project / "w.weave",
+        'config_version: "2.0"\nthreads: [{ref: up.thread}, {ref: down.thread}]\n'
+        "defaults:\n  target:\n    audit_columns: {_loaded_at: current_timestamp()}\n",
+    )
+
+    result = subprocess.run(
+        [str(python), "-c", _AUDIT_CHAIN, str(project)], capture_output=True, text=True
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.stdout.strip() == "['down'] False"
+
+
 FORMS_PROJECT = REPO_ROOT / "tests" / "weevr" / "fixtures" / "load_parity" / "forms.weevr"
 
 

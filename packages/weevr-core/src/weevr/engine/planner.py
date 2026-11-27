@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
 from weevr.config.onelake import resolve_connection_path
@@ -358,6 +358,42 @@ def _build_target_index(
     return target_index, conditional_writers
 
 
+def _edges_by_source_path(
+    threads: Mapping[str, Thread], producers_of: Callable[[str], list[str]]
+) -> dict[str, list[str]]:
+    """Reader → producers: every thread whose target path one of its sources names.
+
+    ``producers_of`` answers which threads write a path; a thread is never
+    its own producer.
+    """
+    edges: dict[str, list[str]] = {name: [] for name in threads}
+    for name, thread in threads.items():
+        for path in sorted(_extract_source_paths(thread)):
+            for producer in producers_of(path):
+                if producer != name and producer not in edges[name]:
+                    edges[name].append(producer)
+    return edges
+
+
+def infer_thread_edges(threads: Mapping[str, Thread]) -> dict[str, list[str]]:
+    """Map each thread to the threads whose target it reads, by path matching.
+
+    The data-based edges of dependency inference, without building a plan:
+    nothing raises, so a cycle or an unordered shared target is left for the
+    plan to report. Threads may come from several weaves; every writer of a
+    shared target counts as a producer.
+
+    Args:
+        threads: Every thread to relate, by a unique key.
+
+    Returns:
+        Reader key → producer keys, in input order; readers of nothing map
+        to an empty list.
+    """
+    producers = build_producer_map(threads)
+    return _edges_by_source_path(threads, lambda path: producers.get(path, []))
+
+
 def _resolve_producers(
     path: str,
     conditional_writers: dict[str, list[str]],
@@ -397,14 +433,9 @@ def _infer_dependencies(
     Returns:
         A ``dict[thread_name, list[upstream_thread_name]]`` of inferred edges.
     """
-    inferred: dict[str, list[str]] = {name: [] for name in threads}
-    for name, thread in threads.items():
-        source_paths = _extract_source_paths(thread)
-        for src_path in source_paths:
-            for producer in _resolve_producers(src_path, conditional_writers, target_index):
-                if producer != name and producer not in inferred[name]:
-                    inferred[name].append(producer)
-    return inferred
+    return _edges_by_source_path(
+        threads, lambda path: _resolve_producers(path, conditional_writers, target_index)
+    )
 
 
 def _merge_dependencies(

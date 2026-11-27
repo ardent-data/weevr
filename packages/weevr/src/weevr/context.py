@@ -60,7 +60,13 @@ from weevr.model.project import Project, RunStore
 from weevr.model.source import Source
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
-from weevr.result import ExecutionMode, LoadedConfig, PreviewThreadMetadata, RunResult
+from weevr.result import (
+    ExecutionMode,
+    LoadedConfig,
+    PreviewThreadMetadata,
+    RunResult,
+    with_derived_load_warnings,
+)
 from weevr.telemetry.logging import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -1271,6 +1277,7 @@ class Context:
             project=self._project,
             strict_params=self._strict_params,
         )
+        warnings = with_derived_load_warnings(document, warnings)
         for warning in render_diagnostics(warnings):
             logger.warning(warning)
         loaded = LoadedConfig.from_document(document, warnings)
@@ -1313,6 +1320,8 @@ class Context:
             project=self._project,
             strict_params=self._strict_params,
         )
+        if document is not None:
+            warnings = with_derived_load_warnings(document, warnings)
         if log_warnings:
             for warning in render_diagnostics(warnings):
                 logger.warning(warning)

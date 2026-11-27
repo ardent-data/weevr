@@ -585,6 +585,12 @@ A thread loaded on its own has a rename step whose column set it does not define
 
 An audit template name is neither user-defined nor a built-in preset.
 
+### R150
+
+`chained-thread-repeats-audit-columns` · warning · stable
+
+A thread reads another thread's target and would add the audit columns that target already carries.
+
 ## R2xx — Connections
 
 ### R201

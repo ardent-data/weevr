@@ -478,6 +478,12 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unknown-audit-template",
         "An audit template name is neither user-defined nor a built-in preset.",
     ),
+    _config_warning(
+        "R150",
+        "chained-thread-repeats-audit-columns",
+        "A thread reads another thread's target and would add the audit columns "
+        "that target already carries.",
+    ),
     # R2xx — connections
     _config(
         "R201", "undefined-connection", "A source or target names a connection no scope declares."
