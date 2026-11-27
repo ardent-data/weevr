@@ -32,6 +32,7 @@ from weevr.config.validation import (
 from weevr.delta import probe_delta_table_exists
 from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import json_pointer
+from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
 from weevr.engine.planner import (
@@ -39,6 +40,10 @@ from weevr.engine.planner import (
     build_producer_map,
     find_in_run_producers,
     resolve_lookup_names,
+)
+from weevr.engine.project_usage import (
+    used_project_registries,
+    without_unused_project_column_sets,
 )
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
@@ -440,23 +445,22 @@ class Context:
         return result
 
     def _check_standalone_column_sets(self, loaded: LoadedConfig, path: str | Path) -> None:
-        """Fail a thread run on its own whose rename steps name sets it doesn't define.
+        """Fail a thread run on its own whose rename steps name sets it can't see.
 
         Loading a thread file only warns about such a set, since the thread
         may be valid inside the weave or loom that defines it. Run on its
-        own, though, the thread sees only its own column sets, and the
-        rename would silently do nothing.
+        own, though, the thread sees only its own column sets and the
+        project's, and the rename would silently do nothing.
 
         Raises:
-            ConfigError: If a rename step names a set the thread doesn't define.
+            ConfigError: If a rename step names a set the thread can't see.
         """
         model = loaded.model
         if loaded.config_type != "thread" or not isinstance(model, Thread):
             return
+        visible = set(loaded.document.effective.column_sets or {})
         errors, _ = partition_diagnostics(
-            rename_column_set_diagnostics(
-                model.model_dump(), available_column_sets=set(model.column_sets or {})
-            )
+            rename_column_set_diagnostics(model.model_dump(), available_column_sets=visible)
         )
         if errors:
             file = str(self._resolve_config_path(path))
@@ -487,6 +491,18 @@ class Context:
             from weevr.telemetry.span import generate_trace_id
 
             thread_collector = SpanCollector(generate_trace_id())
+            # Project column sets the thread renames with resolve here, where
+            # a weave would resolve them; the thread resolves only its own.
+            project_column_sets = used_project_registries(loaded.document).column_sets
+            resolved_column_sets = None
+            if project_column_sets:
+                resolved_column_sets, _ = materialize_column_sets(
+                    self._spark,
+                    dict(project_column_sets),
+                    self._params or {},
+                    collector=thread_collector,
+                    connections=model.connections,
+                )
             engine_result = execute_thread(
                 self._spark,
                 model,
@@ -494,6 +510,7 @@ class Context:
                 resolved_params=self._params,
                 connections=model.connections,
                 scope=loaded.document.effective,
+                column_sets=resolved_column_sets,
             )
             if engine_result.status not in ("success", "failure"):
                 raise ExecutionError(
@@ -530,7 +547,9 @@ class Context:
                 )
 
             filtered_entries = [e for e in model.threads if e.name in weave_threads]
-            weave_lookups = dict(model.lookups) if model.lookups else None
+            document = loaded.document
+            project_used = used_project_registries(document, {loaded.config_name: weave_threads})
+            weave_lookups = _standalone_weave_lookups(model, project_used)
             plan = build_plan(
                 weave_name=loaded.config_name,
                 threads=weave_threads,
@@ -566,10 +585,16 @@ class Context:
                 params=self._params,
                 pre_steps=list(model.pre_steps) if model.pre_steps else None,
                 post_steps=list(model.post_steps) if model.post_steps else None,
-                lookups=dict(model.lookups) if model.lookups else None,
+                lookups=weave_lookups,
                 variables=registry_as_dict(scope.variables),
-                column_set_defs=registry_as_dict(scope.column_sets),
-                connections=dict(model.connections) if model.connections else None,
+                column_set_defs=without_unused_project_column_sets(
+                    scope.column_sets, document.project_scope, project_used
+                ),
+                connections={
+                    **(document.project_connections or {}),
+                    **(model.connections or {}),
+                }
+                or None,
                 execution=standalone_execution,
                 weave_name=loaded.config_name,
                 effective_lookups=scope.lookups,
@@ -1006,7 +1031,10 @@ class Context:
                         weave_name=loaded.config_name,
                         threads=wt,
                         thread_entries=filtered_entries,
-                        lookups=dict(model.lookups) if model.lookups else None,
+                        lookups=_standalone_weave_lookups(
+                            model,
+                            used_project_registries(loaded.document, {loaded.config_name: wt}),
+                        ),
                     )
                 )
 
@@ -1313,6 +1341,17 @@ def _thread_models(loaded: LoadedConfig) -> dict[str, Thread]:
     for threads in document.weave_threads().values():
         merged.update(threads)
     return merged
+
+
+def _standalone_weave_lookups(
+    weave: Weave, project_used: ScopeRegistries
+) -> dict[str, Lookup] | None:
+    """The lookups a weave run on its own materializes: its own and the project's it uses.
+
+    With no loom above it, the weave is the scope that reads a used project
+    lookup once for the run, as a loom would.
+    """
+    return {**(project_used.lookups or {}), **(weave.lookups or {})} or None
 
 
 def _thread_scopes(loaded: LoadedConfig) -> dict[str, ScopeRegistries]:

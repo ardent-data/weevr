@@ -15,9 +15,17 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from pydantic import TypeAdapter, ValidationError
+
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import collecting, diagnostics_of, errors_recorded
-from weevr.config.document import ConfigKind, EntryMeta, Provenance, ResolvedDocument
+from weevr.config.document import (
+    ConfigKind,
+    EntryMeta,
+    Provenance,
+    ResolvedDocument,
+    ScopeRegistries,
+)
 from weevr.config.document_load import load_document
 from weevr.config.hydration import (
     check_column_set_references,
@@ -56,9 +64,13 @@ from weevr.config.validation import (
 )
 from weevr.config.warp import discover_warp, find_warp
 from weevr.diagnostics import Diagnostic, diagnostic
-from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer
-from weevr.errors import ConfigError, VariableResolutionError
+from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer, place_all
+from weevr.diagnostics.pydantic import from_validation_error
+from weevr.errors import ConfigError, ModelValidationError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
+from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
+from weevr.model.lookup import Lookup
 from weevr.model.project import Project
 from weevr.model.warp import WarpBinding
 
@@ -86,6 +98,11 @@ class ResolvedConfig:
         project: The project document at ``project_root``; ``None`` when it
             has no ``weevr.yaml``.
         provenance: Where each of the config's own params came from.
+        project_scope: The project's lookups and column sets, resolved in
+            its own scope; ``None`` when it declares neither.
+        project_connections: The project's connections, resolved in its own
+            scope, for the lookups and column sets a loom or weave
+            materializes; ``None`` when it declares none.
     """
 
     location: ConfigLocation
@@ -98,6 +115,8 @@ class ResolvedConfig:
     warnings: list[Diagnostic] = field(default_factory=list)
     project: Project | None = None
     provenance: Mapping[str, ParamProvenance] = field(default_factory=dict)
+    project_scope: ScopeRegistries | None = None
+    project_connections: dict[str, OneLakeConnection] | None = None
 
 
 def resolve_project_root(
@@ -198,7 +217,9 @@ def resolve_config(
         project=project,
         project_file=None if project_file is None else str(project_file),
     )
-    project_tier = _project_tier(project, project_file, walk)
+    project_tier, project_scope, project_connections = _project_layers(
+        project, project_file, walk, root
+    )
 
     inline_scopes: ScopePositions = {}
     try:
@@ -292,6 +313,8 @@ def resolve_config(
         warnings=warnings,
         project=project,
         provenance=walk.provenance,
+        project_scope=project_scope,
+        project_connections=project_connections,
     )
 
 
@@ -312,11 +335,12 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[D
         ModelValidationError: If the config or any child fails model validation.
     """
     lookup_warnings: list[Diagnostic] = []
+    project_scope = resolved.project_scope or ScopeRegistries()
     if resolved.config_type == "thread":
-        # A standalone thread sees only its own lookups at run time
+        # A standalone thread sees its own lookups over the project's at run time
         check_resolve_lookups(
             resolved.data,
-            None,
+            project_scope.lookups,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -324,7 +348,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[D
         )
         check_column_set_references(
             resolved.data,
-            None,
+            project_scope.column_sets,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -343,6 +367,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[D
         prepare=lambda child_dict: resolve_source_paths(child_dict, root),
         warnings=lookup_warnings,
         bind=lambda thread, source: bind_thread_warp(thread, location_like(source, root), root),
+        outer=project_scope,
     )
 
     warnings = list(resolved.warnings)
@@ -481,6 +506,8 @@ def _assemble_document(
         source_ref=top_file,
         project=resolved.project,
         project_root=str(resolved.project_root),
+        project_scope=resolved.project_scope,
+        project_connections=resolved.project_connections,
         provenance=Provenance(params=resolved.provenance),
     ).with_scopes()
 
@@ -697,27 +724,77 @@ def load_resolved(
     return LoadedConfig.from_document(document, warnings)
 
 
-def _project_tier(
-    project: Project | None, project_file: ConfigLocation | None, walk: WalkState
-) -> CascadeTier | None:
-    """The project's cascade tier, its blocks resolved in its own scope; ``None`` without one.
+_LOOKUPS: TypeAdapter[dict[str, Lookup]] = TypeAdapter(dict[str, Lookup])
+_COLUMN_SETS: TypeAdapter[dict[str, ColumnSet]] = TypeAdapter(dict[str, ColumnSet])
+_CONNECTIONS: TypeAdapter[dict[str, OneLakeConnection]] = TypeAdapter(dict[str, OneLakeConnection])
+
+
+def _project_layers(
+    project: Project | None,
+    project_file: ConfigLocation | None,
+    walk: WalkState,
+    root: ConfigLocation,
+) -> tuple[CascadeTier | None, ScopeRegistries | None, dict[str, OneLakeConnection] | None]:
+    """The project's cascade tier and registry layer, its blocks resolved in its own scope.
 
     Its ``defaults`` are checked under ``weevr.yaml``, so a malformed block is
-    reported there rather than against the config being loaded.
+    reported there rather than against the config being loaded. Relative
+    file paths in its lookups and column sets join ``root``, as a loom's do.
+
+    Returns:
+        ``(tier, registries, connections)``: the cascade tier from its
+        ``defaults``, ``audit_templates`` and ``connections``; the registry
+        layer from its ``lookups`` and ``column_sets``; and its connections
+        hydrated. Each is ``None`` when the project declares none of its
+        blocks.
     """
     if project is None or project_file is None:
-        return None
+        return None, None, None
+    file = str(project_file)
     with attribute_errors(project_file):
-        blocks = walk.project_tier(project, str(project_file))
-        if not blocks:
-            return None
+        blocks = walk.project_tier(project, file)
         check_defaults_shape(blocks.get("defaults"), "project")
-    return CascadeTier(
-        "project",
-        defaults=blocks.get("defaults"),
-        audit_templates=blocks.get("audit_templates"),
-        connections=blocks.get("connections"),
-    )
+    resolve_source_paths(blocks, root)
+    tier = None
+    if blocks.keys() & {"defaults", "audit_templates", "connections"}:
+        tier = CascadeTier(
+            "project",
+            defaults=blocks.get("defaults"),
+            audit_templates=blocks.get("audit_templates"),
+            connections=blocks.get("connections"),
+        )
+    lookups = _project_block(blocks, "lookups", _LOOKUPS, file)
+    column_sets = _project_block(blocks, "column_sets", _COLUMN_SETS, file)
+    registries = None
+    if lookups or column_sets:
+        registries = ScopeRegistries(lookups=lookups or None, column_sets=column_sets or None)
+    connections = _project_block(blocks, "connections", _CONNECTIONS, file)
+    return tier, registries, connections or None
+
+
+def _project_block[V](
+    blocks: dict[str, Any], block: str, adapter: TypeAdapter[dict[str, V]], file: str
+) -> dict[str, V] | None:
+    """Hydrate one resolved project registry block; ``None`` when the project has none.
+
+    Raises:
+        ModelValidationError: A substituted value the block's model rejects,
+            reported under ``weevr.yaml``.
+    """
+    body = blocks.get(block)
+    if body is None:
+        return None
+    try:
+        return adapter.validate_python(body)
+    except ValidationError as exc:
+        raise ModelValidationError(
+            f"Project {block} failed validation: {exc}",
+            cause=exc,
+            file_path=file,
+            diagnostics=place_all(
+                from_validation_error(exc, body, file=file), file, body, (block,)
+            ),
+        ) from exc
 
 
 def _tier(level: str, data: dict[str, Any]) -> CascadeTier:

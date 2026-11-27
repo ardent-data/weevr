@@ -48,8 +48,10 @@ from weevr.model.project import Project
 WEAVE_ENTRY_KEYS = frozenset({"name", "params", "condition"})
 THREAD_ENTRY_KEYS = frozenset({"name", "as", "params", "dependencies", "condition"})
 
-PROJECT_TIER_BLOCKS = frozenset({"connections", "audit_templates", "defaults"})
-"""The ``weevr.yaml`` blocks that are the outermost tier of the load cascade."""
+PROJECT_TIER_BLOCKS = frozenset(
+    {"connections", "audit_templates", "defaults", "lookups", "column_sets"}
+)
+"""The ``weevr.yaml`` blocks that are the outermost tier of the load cascade and registries."""
 
 
 def has_inline_body(entry: Any, entry_keys: frozenset[str]) -> bool:
@@ -264,8 +266,9 @@ class WalkState:
             blocks: Which of the cascading blocks to resolve.
 
         Returns:
-            The project's ``connections``, ``audit_templates`` and
-            ``defaults`` that it declares, resolved; empty with no project.
+            The project's ``connections``, ``audit_templates``,
+            ``defaults``, ``lookups`` and ``column_sets`` that it declares
+            (of ``blocks``), resolved; empty with no project.
 
         Raises:
             ConfigSchemaError: A required project param has no value, or a

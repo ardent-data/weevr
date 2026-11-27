@@ -11,7 +11,9 @@ from pydantic import ConfigDict, Field, field_validator
 from weevr.diagnostics.rules import rule_error
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
+from weevr.model.column_set import ColumnSet
 from weevr.model.connection import OneLakeConnection
+from weevr.model.lookup import Lookup
 from weevr.model.params import ParamSpec
 
 SCHEMA_SAFE_NAME = r"^[A-Za-z][A-Za-z0-9_]*$"
@@ -67,8 +69,10 @@ class Project(FrozenBase):
     ``audit_templates`` and ``defaults`` are the outermost tier of the load
     cascade, in the shapes a loom declares them: connections and audit
     templates merge by name (the nearest declaration wins), and a lower
-    ``defaults:`` block replaces the project's key by key. ``variables`` is
-    reserved and rejected at load.
+    ``defaults:`` block replaces the project's key by key. Its ``lookups``
+    and ``column_sets`` are the outermost layer of every config's effective
+    registries, shadowed by name below. ``variables`` is reserved and
+    rejected at load.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -133,6 +137,22 @@ class Project(FrozenBase):
         description=(
             "Named connection definitions every loom, weave and thread in the project sees; "
             "a connection of the same name declared lower down shadows the project's."
+        ),
+    )
+
+    lookups: dict[str, Lookup] | None = Field(
+        default=None,
+        description=(
+            "Named lookup definitions every loom, weave and thread in the project sees; "
+            "a lookup of the same name declared lower down shadows the project's. A "
+            "materialized one is read once per run that uses it, and never when unused."
+        ),
+    )
+    column_sets: dict[str, ColumnSet] | None = Field(
+        default=None,
+        description=(
+            "Named column sets every loom, weave and thread in the project sees; "
+            "a column set of the same name declared lower down shadows the project's."
         ),
     )
 

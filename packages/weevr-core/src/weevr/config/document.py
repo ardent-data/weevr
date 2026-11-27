@@ -21,6 +21,7 @@ from weevr.config.inheritance import cascade_registry
 from weevr.config.param_provenance import ParamProvenance
 from weevr.model import Loom, Thread, Weave
 from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
 from weevr.model.loom import WeaveEntry
 from weevr.model.project import Project
@@ -176,14 +177,22 @@ class ResolvedDocument:
         source_ref: The file the config is written in: its own file, or for
             an inline child, the file that holds it.
         effective: The lookups, column sets and variables this config sees:
-            its own merged over every enclosing scope's, its own names
-            winning. Computed at load.
+            its own merged over every enclosing scope's, the project's
+            outermost, its own names winning. Computed at load.
         project: The project the load ran under: the ``weevr.yaml`` at the
             project root; ``None`` when the root has none. Set on the loaded
             file's node only.
         project_root: The project root the load resolved references and
             Source paths against; ``None`` when unknown. Set on the loaded
             file's node only.
+        project_scope: The project's lookups and column sets, resolved in
+            the project's own scope: the outermost layer of every node's
+            ``effective``. ``None`` when the project declares neither (or
+            there is no project). Set on the loaded file's node only.
+        project_connections: The project's connections, resolved in its own
+            scope. A loom or weave materializes lookups and column sets with
+            its own connections over these. ``None`` when the project
+            declares none. Set on the loaded file's node only.
         provenance: Where this config's values came from: per param, its
             value source and winning declaration (:class:`Provenance`).
     """
@@ -197,6 +206,8 @@ class ResolvedDocument:
     effective: ScopeRegistries = field(default_factory=ScopeRegistries)
     project: Project | None = None
     project_root: str | None = None
+    project_scope: ScopeRegistries | None = None
+    project_connections: Mapping[str, OneLakeConnection] | None = None
     provenance: Provenance = field(default_factory=Provenance)
 
     def __post_init__(self) -> None:
@@ -215,12 +226,15 @@ class ResolvedDocument:
 
         Args:
             outer: The enclosing scope's effective registries; ``None`` for
-                the loaded file itself.
+                the loaded file itself, which sits under its
+                ``project_scope`` when it has one.
             outer_level: The enclosing scope's kind, for shadowing logs.
 
         Returns:
             A copy of the tree with ``effective`` set on every node.
         """
+        if outer is None and self.project_scope is not None:
+            outer, outer_level = self.project_scope, "project"
         declared = self.declared
         effective = declared if outer is None else declared.under(outer, outer_level, self.kind)
         children = {
