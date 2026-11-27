@@ -9,20 +9,16 @@ the document loads.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 
-from weevr.config.interpolation import check_fabric_context
-from weevr.config.params import ParamScope
-from weevr.config.scoping import WalkState
 from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import ConfigError
-from weevr.model.connection import OneLakeConnection
 from weevr.model.project import Project
 
 RESERVED_PROJECT_BLOCKS: tuple[str, ...] = ("variables",)
@@ -98,56 +94,3 @@ def check_engine_floor(project: Project) -> None:
             hint="Install a weevr version the specifier allows, or relax requires_weevr.",
         )
     )
-
-
-def resolve_project_connections(
-    project: Project,
-    project_file: str | None,
-    *,
-    runtime_params: Mapping[str, Any] | None = None,
-    fabric_context: Mapping[str, Any] | None = None,
-    strict_params: bool | None = None,
-    names: Collection[str] | None = None,
-) -> dict[str, OneLakeConnection] | None:
-    """The project's ``connections``, resolved in the project's own scope.
-
-    Resolves as a load resolves them (:meth:`WalkState.project_tier`): a
-    ``${param.x}`` reads the runtime value over the project's default, and a
-    ``${fabric.x}`` the Fabric context. Only the connections are resolved,
-    and with ``names`` only those named, with the params they read; the
-    project's other blocks are left for a load. Load warnings are not
-    reported here.
-
-    Args:
-        project: The project document.
-        project_file: The project's ``weevr.yaml``, named by errors.
-        runtime_params: The invoker's runtime params.
-        fabric_context: The Fabric values for ``${fabric.x}``; ``None`` leaves
-            each such reference in place.
-        strict_params: Overrides the project's ``strict_params``.
-        names: The connections to resolve; ``None`` resolves every one.
-
-    Returns:
-        The connections by name, or ``None`` when the project declares none
-        (of ``names``, when given).
-
-    Raises:
-        ConfigError: A reference can't resolve (``P110``), or a project param
-            the connections read has no value (``P101``) or a value its type
-            rejects.
-    """
-    check_fabric_context(fabric_context)
-    if names is not None:
-        wanted = {n: c for n, c in (project.connections or {}).items() if n in names}
-        project = project.model_copy(update={"connections": wanted})
-    walk = WalkState(
-        scope=ParamScope.root(),
-        file=project_file,
-        strict_override=strict_params,
-        runtime_params=runtime_params,
-        fabric_context=fabric_context,
-    )
-    connections = walk.project_tier(project, project_file, {"connections"}).get("connections")
-    if not connections:
-        return None
-    return {name: OneLakeConnection.model_validate(body) for name, body in connections.items()}

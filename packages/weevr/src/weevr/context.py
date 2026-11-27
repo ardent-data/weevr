@@ -21,9 +21,9 @@ from weevr.config.manifest import param_manifest
 from weevr.config.manifest_types import ParamManifest
 from weevr.config.onelake import resolve_connection_path
 from weevr.config.parser import TYPED_EXTENSIONS, declared_kind
-from weevr.config.project import resolve_project_connections
 from weevr.config.root import PROJECT_FILE, project_root_not_found, read_project
 from weevr.config.run_store import RunStoreLocation, resolve_run_store
+from weevr.config.scoping import resolve_project_connections
 from weevr.config.validation import (
     in_thread,
     partition_diagnostics,

@@ -19,8 +19,8 @@ import pytest
 import yaml
 from pyspark.sql import SparkSession
 
+import weevr.context as context
 from documents import project_yaml, write_document
-from weevr.context import Context
 
 pytestmark = pytest.mark.spark
 
@@ -100,7 +100,6 @@ def _labels(spark: SparkSession, path: Path) -> list[str]:
 @pytest.fixture
 def spies(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """Record each lookup and column set read, by scope and name."""
-    import weevr.context as context
     import weevr.engine.executor as executor
     import weevr.engine.runner as runner
     from weevr.engine.column_sets import materialize_column_sets
@@ -153,7 +152,7 @@ class TestUnderALoom:
         _weave(root, "w2", ["t2.thread"])
         _loom(root, ["w1", "w2"])
 
-        result = Context(spark, str(root)).run("l.loom")
+        result = context.Context(spark, str(root)).run("l.loom")
 
         assert result.status == "success"
         assert _labels(spark, tables / "out_t1") == ["project"]
@@ -172,7 +171,7 @@ class TestUnderALoom:
         _weave(root, "w2", ["t2.thread"])
         _loom(root, ["w1", "w2"])
 
-        result = Context(spark, str(root)).run("l.loom")
+        result = context.Context(spark, str(root)).run("l.loom")
 
         assert result.status == "success"
         assert _labels(spark, tables / "out_t1") == ["weave"]
@@ -187,7 +186,7 @@ class TestUnderALoom:
         _weave(root, "w1", ["t1.thread"])
         _loom(root, ["w1"], lookups={"dim": _lookup(tables / "weave_ref")})
 
-        result = Context(spark, str(root)).run("l.loom")
+        result = context.Context(spark, str(root)).run("l.loom")
 
         assert result.status == "success"
         assert _labels(spark, tables / "out_t1") == ["weave"]
@@ -203,7 +202,7 @@ class TestUnderALoom:
         _weave(root, "w1", ["t1.thread"])
         _loom(root, ["w1"])
 
-        result = Context(spark, str(root)).run("l.loom")
+        result = context.Context(spark, str(root)).run("l.loom")
 
         assert result.status == "success"
         assert _labels(spark, tables / "out_t1") == ["weave"]
@@ -221,7 +220,7 @@ class TestUnderALoom:
         _weave(root, "w2", ["t2.thread"])
         _loom(root, ["w1", "w2"])
 
-        result = Context(spark, str(root)).run("l.loom")
+        result = context.Context(spark, str(root)).run("l.loom")
 
         assert result.status != "success"
         assert spies["lookups"] == Counter({("runner", "dim"): 1})
@@ -238,7 +237,7 @@ class TestUnderALoom:
         _weave(root, "w1", ["t1.thread", "t2.thread"])
         _loom(root, ["w1"])
 
-        result = Context(spark, str(root)).run("l.loom", threads=["t2"])
+        result = context.Context(spark, str(root)).run("l.loom", threads=["t2"])
 
         assert result.status == "success"
         assert spies["lookups"] == Counter()
@@ -255,7 +254,7 @@ class TestUnderALoom:
         _weave(root, "w2", ["t2.thread"])
         _loom(root, ["w1", "w2"])
 
-        result = Context(spark, str(root)).run("l.loom")
+        result = context.Context(spark, str(root)).run("l.loom")
 
         assert result.status == "success"
         for out in ("out_t1", "out_t2"):
@@ -274,7 +273,7 @@ class TestStandaloneWeave:
         _write(root / "threads" / "t2.thread", _lookup_thread("t2", tables / "out_t2"))
         _weave(root, "w1", ["t1.thread", "t2.thread"])
 
-        result = Context(spark, str(root)).run("w1.weave")
+        result = context.Context(spark, str(root)).run("w1.weave")
 
         assert result.status == "success"
         assert _labels(spark, tables / "out_t1") == ["project"]
@@ -289,7 +288,7 @@ class TestStandaloneWeave:
         _write(root / "threads" / "t1.thread", _rename_thread("t1", raw, tables / "out_t1"))
         _weave(root, "w1", ["t1.thread"])
 
-        result = Context(spark, str(root)).run("w1.weave")
+        result = context.Context(spark, str(root)).run("w1.weave")
 
         assert result.status == "success"
         assert spies["lookups"] == Counter()
@@ -308,7 +307,7 @@ class TestStandaloneThread:
             root / "threads" / "t2.thread", _rename_thread("t2", tables / "raw", tables / "out_t2")
         )
 
-        ctx = Context(spark, str(root))
+        ctx = context.Context(spark, str(root))
         assert ctx.run("threads/t1.thread").status == "success"
         assert ctx.run("threads/t2.thread").status == "success"
 
@@ -325,6 +324,6 @@ def test_validate_mode_accepts_project_names(spark: SparkSession, project: dict[
     _weave(root, "w1", ["t1.thread", "t2.thread"])
     _loom(root, ["w1"])
 
-    result = Context(spark, str(root)).run("l.loom", mode="validate")
+    result = context.Context(spark, str(root)).run("l.loom", mode="validate")
 
     assert result.status == "success"

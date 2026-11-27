@@ -28,8 +28,9 @@ from resolving import leaf_node, load_at, load_failure, with_code
 from weevr.config.locations import LocalConfigLocation
 from weevr.config.manifest import param_manifest
 from weevr.config.onelake import resolve_connection_path
-from weevr.config.project import RESERVED_PROJECT_BLOCKS, resolve_project_connections
+from weevr.config.project import RESERVED_PROJECT_BLOCKS
 from weevr.config.root import read_project
+from weevr.config.scoping import resolve_project_connections
 from weevr.errors import ConfigError, ConfigLocationError
 from weevr.model import Thread
 
