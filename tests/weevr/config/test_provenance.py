@@ -16,15 +16,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
 from documents import (
-    TEST_PROJECT_ID,
+    delta_column_set,
+    delta_lookup,
+    lake_connection,
     loom_body,
     string_spec,
     thread_body,
     weave_body,
     write_named,
+    write_project,
 )
 from resolving import load_at
 from weevr.config import RegistryDeclaration, load_resolved
@@ -310,41 +312,19 @@ class TestShape:
 # Registry entries and ``defaults`` keys
 
 
-def _write_project(root: Path, **extra: Any) -> str:
-    body = {
-        "kind": "project",
-        "config_version": "2.0",
-        "id": TEST_PROJECT_ID,
-        "name": "test",
-        **extra,
-    }
-    path = root / "weevr.yaml"
-    path.write_text(yaml.safe_dump(body, sort_keys=False))
-    return str(path)
-
-
-def _lake(workspace: str) -> dict[str, Any]:
-    return {"type": "onelake", "workspace": workspace, "lakehouse": "lh"}
-
-
-def _lookup(alias: str) -> dict[str, Any]:
-    return {"source": {"type": "delta", "alias": alias}}
-
-
-def _column_set(alias: str) -> dict[str, Any]:
-    return {"source": {"type": "delta", "alias": alias}}
-
-
 def _blocks(tier: str, *, variables: bool = True) -> dict[str, Any]:
     """One entry of each registry named after ``tier``, plus a shared ``x`` in each."""
     blocks: dict[str, Any] = {
-        "connections": {f"c_{tier}": _lake(tier), "x": _lake(tier)},
+        "connections": {f"c_{tier}": lake_connection(tier), "x": lake_connection(tier)},
         "audit_templates": {
             f"a_{tier}": {"columns": {"_a": "'1'"}},
             "x": {"columns": {"_x": f"'{tier}'"}},
         },
-        "lookups": {f"l_{tier}": _lookup(f"raw.{tier}"), "x": _lookup(f"raw.x_{tier}")},
-        "column_sets": {f"s_{tier}": _column_set(f"raw.{tier}"), "x": _column_set("raw.x")},
+        "lookups": {f"l_{tier}": delta_lookup(f"raw.{tier}"), "x": delta_lookup(f"raw.x_{tier}")},
+        "column_sets": {
+            f"s_{tier}": delta_column_set(f"raw.{tier}"),
+            "x": delta_column_set("raw.x"),
+        },
     }
     if variables:
         blocks["variables"] = {f"v_{tier}": {"type": "string"}, "x": {"type": "string"}}
@@ -369,8 +349,11 @@ def declared(tmp_path: Path) -> dict[str, str]:
     ``defaults:`` blocks declare ``tags`` everywhere, ``cache`` on the project
     and ``exports`` on the loom.
     """
-    project = _write_project(
-        tmp_path, **_blocks("project", variables=False), defaults={"tags": ["p"], "cache": True}
+    project = str(
+        write_project(
+            tmp_path, **_blocks("project", variables=False), defaults={"tags": ["p"], "cache": True}
+        )
+        / "weevr.yaml"
     )
     thread = write_named(tmp_path, "t.thread", thread_body(**_blocks("thread")))
     weave = write_named(
@@ -491,13 +474,13 @@ class TestInlineRegistryDeclarations:
         inline_thread = {
             **thread_body(),
             "name": "it",
-            "connections": {"c": _lake("t")},
-            "lookups": {"l": _lookup("raw.t")},
+            "connections": {"c": lake_connection("t")},
+            "lookups": {"l": delta_lookup("raw.t")},
         }
         inline_weave = {
             "name": "iw",
             **weave_body([inline_thread]),
-            "connections": {"c": _lake("w"), "cw": _lake("w")},
+            "connections": {"c": lake_connection("w"), "cw": lake_connection("w")},
             "defaults": {"tags": ["w"]},
         }
         path = str(write_named(tmp_path, "l.loom", loom_body([inline_weave])))
@@ -520,7 +503,11 @@ class TestInlineRegistryDeclarations:
         }
 
     def test_inline_thread_in_a_ref_weave(self, tmp_path: Path) -> None:
-        inline_thread = {**thread_body(), "name": "it", "column_sets": {"s": _column_set("raw.s")}}
+        inline_thread = {
+            **thread_body(),
+            "name": "it",
+            "column_sets": {"s": delta_column_set("raw.s")},
+        }
         weave = str(write_named(tmp_path, "w.weave", weave_body([inline_thread])))
         path = write_named(tmp_path, "l.loom", loom_body([{"ref": "w.weave"}]))
         thread = load_at(path).document.children["w"].children["it"]
@@ -540,7 +527,9 @@ class TestRegistryShape:
             record.tier = "thread"  # type: ignore[misc]
 
     def test_no_value_appears(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, connections={"c": _lake(SECRET)}, defaults={"tags": [SECRET]})
+        write_project(
+            tmp_path, connections={"c": lake_connection(SECRET)}, defaults={"tags": [SECRET]}
+        )
         path = write_named(tmp_path, "t.thread", thread_body())
         assert SECRET not in repr(load_at(path).document.provenance)
 
@@ -568,10 +557,10 @@ CASES = [
 def _shared(block: str, tier: str) -> dict[str, Any]:
     """``block`` declaring the shared name (``x``, or the ``tags`` key) with ``tier`` as value."""
     entry: dict[str, dict[str, Any]] = {
-        "connections": {"x": _lake(tier)},
+        "connections": {"x": lake_connection(tier)},
         "audit_templates": {"x": {"columns": {"_x": f"'{tier}'"}}},
-        "lookups": {"x": _lookup(f"raw.{tier}")},
-        "column_sets": {"x": _column_set(f"raw.{tier}")},
+        "lookups": {"x": delta_lookup(f"raw.{tier}")},
+        "column_sets": {"x": delta_column_set(f"raw.{tier}")},
         "variables": {"x": {"type": "string", "default": tier}},
         "defaults": {"tags": [tier]},
     }
@@ -618,7 +607,7 @@ class TestProvenanceNamesTheCascadeWinner:
         thread_extra = dict(tiers["thread"])
         if block == "audit_templates":
             thread_extra["target"] = {"alias": "out.t", "audit_template": "x"}
-        project = _write_project(tmp_path, **tiers["project"])
+        project = str(write_project(tmp_path, **tiers["project"]) / "weevr.yaml")
         files = {
             "project": project,
             "thread": str(write_named(tmp_path, "t.thread", thread_body(**thread_extra))),

@@ -14,33 +14,20 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
-from documents import TEST_PROJECT_ID, loom_body, thread_body, weave_body, write_named
-from resolving import collected_at, load_at, load_failure, with_code
+from documents import (
+    delta_column_set,
+    delta_lookup,
+    loom_body,
+    thread_body,
+    weave_body,
+    write_named,
+    write_project,
+)
+from resolving import collected_at, leaf_node, load_at, load_failure, with_code
 from weevr.config.document import ResolvedDocument
 from weevr.config.locations import LocalConfigLocation
 from weevr.config.root import read_project
-
-
-def _write_project(root: Path, **extra: Any) -> None:
-    root.mkdir(parents=True, exist_ok=True)
-    body = {
-        "kind": "project",
-        "config_version": "2.0",
-        "id": TEST_PROJECT_ID,
-        "name": "test",
-        **extra,
-    }
-    (root / "weevr.yaml").write_text(yaml.safe_dump(body, sort_keys=False))
-
-
-def _lookup(alias: str, **extra: Any) -> dict[str, Any]:
-    return {"source": {"type": "delta", "alias": alias}, **extra}
-
-
-def _column_set(alias: str) -> dict[str, Any]:
-    return {"source": {"type": "delta", "alias": alias}}
 
 
 def _tree(
@@ -65,19 +52,12 @@ def _root(root: Path, kind: str, **tiers: Any) -> Path:
     return {"loom": loom, "weave": root / "w.weave", "thread": root / "t.thread"}[kind]
 
 
-def _thread_node(loaded: Any) -> ResolvedDocument:
-    document = loaded.document
-    while document.children:
-        document = next(iter(document.children.values()))
-    return document
-
-
 def _lookups(loaded: Any) -> dict[str, Any]:
-    return dict(_thread_node(loaded).effective.lookups or {})
+    return dict(leaf_node(loaded).effective.lookups or {})
 
 
 def _column_sets(loaded: Any) -> dict[str, Any]:
-    return dict(_thread_node(loaded).effective.column_sets or {})
+    return dict(leaf_node(loaded).effective.column_sets or {})
 
 
 ROOT_KINDS = ["loom", "weave", "thread"]
@@ -94,10 +74,10 @@ class TestProjectDocument:
     """``lookups`` and ``column_sets`` are project fields."""
 
     def test_blocks_load(self, tmp_path: Path) -> None:
-        _write_project(
+        write_project(
             tmp_path,
-            lookups={"dim": _lookup("ref.dim", materialize=True)},
-            column_sets={"cs": _column_set("ref.map")},
+            lookups={"dim": delta_lookup("ref.dim", materialize=True)},
+            column_sets={"cs": delta_column_set("ref.map")},
         )
         project = read_project(LocalConfigLocation(tmp_path))
         assert project is not None
@@ -112,25 +92,25 @@ class TestProjectLayerReachesEveryRoot:
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_lookup(self, tmp_path: Path, kind: str) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.dim")})
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.dim")})
         lookups = _lookups(load_at(_root(tmp_path, kind)))
         assert lookups["dim"].source.alias == "ref.dim"
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_column_set(self, tmp_path: Path, kind: str) -> None:
-        _write_project(tmp_path, column_sets={"cs": _column_set("ref.map")})
+        write_project(tmp_path, column_sets={"cs": delta_column_set("ref.map")})
         column_sets = _column_sets(load_at(_root(tmp_path, kind)))
         assert column_sets["cs"].source.alias == "ref.map"
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_root_node_sees_it(self, tmp_path: Path, kind: str) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.dim")})
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.dim")})
         loaded = load_at(_root(tmp_path, kind))
         assert set(loaded.document.effective.lookups or {}) == {"dim"}
 
     def test_merges_by_name_with_lower_tiers(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.dim")})
-        loaded = load_at(_tree(tmp_path, weave={"lookups": {"other": _lookup("ref.other")}}))
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.dim")})
+        loaded = load_at(_tree(tmp_path, weave={"lookups": {"other": delta_lookup("ref.other")}}))
         assert set(_lookups(loaded)) == {"dim", "other"}
 
 
@@ -139,14 +119,16 @@ class TestLowerTiersShadowByName:
 
     @pytest.mark.parametrize("tier", LOWER_TIERS)
     def test_lookup(self, tmp_path: Path, tier: str) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.project")})
-        loaded = load_at(_tree(tmp_path, **{tier: {"lookups": {"dim": _lookup(f"ref.{tier}")}}}))
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.project")})
+        loaded = load_at(
+            _tree(tmp_path, **{tier: {"lookups": {"dim": delta_lookup(f"ref.{tier}")}}})
+        )
         assert _lookups(loaded)["dim"].source.alias == f"ref.{tier}"
 
     @pytest.mark.parametrize("tier", LOWER_TIERS)
     def test_column_set(self, tmp_path: Path, tier: str) -> None:
-        _write_project(tmp_path, column_sets={"cs": _column_set("ref.project")})
-        own = {"column_sets": {"cs": _column_set(f"ref.{tier}")}}
+        write_project(tmp_path, column_sets={"cs": delta_column_set("ref.project")})
+        own = {"column_sets": {"cs": delta_column_set(f"ref.{tier}")}}
         loaded = load_at(_tree(tmp_path, **{tier: own}))
         assert _column_sets(loaded)["cs"].source.alias == f"ref.{tier}"
 
@@ -162,10 +144,10 @@ class TestWithoutProjectRegistries:
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_project_without_the_blocks(self, tmp_path: Path, kind: str) -> None:
-        own = {"loom": {"lookups": {"x": _lookup("ref.x")}}}
+        own = {"loom": {"lookups": {"x": delta_lookup("ref.x")}}}
         bare = _effective_by_node(load_at(_root(tmp_path / "bare", kind, **own)).document)
         lake = {"type": "onelake", "workspace": "w", "lakehouse": "l"}
-        _write_project(tmp_path / "proj", connections={"lake": lake})
+        write_project(tmp_path / "proj", connections={"lake": lake})
         with_project = load_at(_root(tmp_path / "proj", kind, **own)).document
         assert _effective_by_node(with_project) == bare
 
@@ -182,32 +164,32 @@ class TestReferenceChecksSeeTheProject:
     """``R120``, ``R122`` and ``R124`` accept a project definition at load."""
 
     def test_resolve_step_names_a_project_lookup(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.dim")})
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.dim")})
         loaded = load_at(_tree(tmp_path, thread=RESOLVES_LOOKUP))
         assert with_code(loaded.diagnostics, "R120") == []
 
     def test_resolve_step_naming_nothing_is_still_r120(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"other": _lookup("ref.other")})
+        write_project(tmp_path, lookups={"other": delta_lookup("ref.other")})
         error = load_failure(_tree(tmp_path, thread=RESOLVES_LOOKUP))
         assert with_code(error.diagnostics, "R120")
 
     def test_source_names_a_project_lookup(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.dim")})
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.dim")})
         loaded = load_at(_tree(tmp_path, thread=USES_LOOKUP))
         assert with_code(loaded.diagnostics, "R122") == []
 
     def test_source_naming_nothing_is_still_r122(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"other": _lookup("ref.other")})
+        write_project(tmp_path, lookups={"other": delta_lookup("ref.other")})
         error = load_failure(_tree(tmp_path, thread=USES_LOOKUP))
         assert with_code(error.diagnostics, "R122")
 
     def test_rename_names_a_project_column_set(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, column_sets={"cs": _column_set("ref.map")})
+        write_project(tmp_path, column_sets={"cs": delta_column_set("ref.map")})
         loaded = load_at(_tree(tmp_path, thread=RENAMES))
         assert with_code(loaded.diagnostics, "R124") == []
 
     def test_rename_naming_nothing_is_still_r124(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, column_sets={"other": _column_set("ref.map")})
+        write_project(tmp_path, column_sets={"other": delta_column_set("ref.map")})
         error = load_failure(_tree(tmp_path, thread=RENAMES))
         (undefined,) = with_code(error.diagnostics, "R124")
         assert undefined.expected is not None
@@ -215,10 +197,10 @@ class TestReferenceChecksSeeTheProject:
 
     @pytest.mark.parametrize("kind", ["weave", "thread"])
     def test_other_roots_see_the_project(self, tmp_path: Path, kind: str) -> None:
-        _write_project(
+        write_project(
             tmp_path,
-            lookups={"dim": _lookup("ref.dim")},
-            column_sets={"cs": _column_set("ref.map")},
+            lookups={"dim": delta_lookup("ref.dim")},
+            column_sets={"cs": delta_column_set("ref.map")},
         )
         thread = {**USES_LOOKUP, **RENAMES}
         loaded = load_at(_root(tmp_path, kind, thread=thread))
@@ -226,13 +208,13 @@ class TestReferenceChecksSeeTheProject:
         assert not codes & {"R122", "R123", "R124", "R125"}
 
     def test_standalone_thread_without_the_project_still_warns(self, tmp_path: Path) -> None:
-        _write_project(tmp_path)
+        write_project(tmp_path)
         loaded = load_at(_root(tmp_path, "thread", thread={**USES_LOOKUP, **RENAMES}))
         codes = {d.code for d in loaded.diagnostics}
         assert {"R123", "R125"} <= codes
 
     def test_collecting_load_sees_the_project(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.dim")})
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.dim")})
         document, errors, _ = collected_at(_tree(tmp_path, thread=USES_LOOKUP))
         assert document is not None
         assert errors == []
@@ -244,11 +226,11 @@ class TestProjectRegistryParams:
     WS = {"ws": {"name": "ws", "type": "string", "required": False, "default": "proj_default"}}
 
     def _project(self, root: Path) -> None:
-        _write_project(
+        write_project(
             root,
             params=self.WS,
-            lookups={"dim": _lookup("${param.ws}.dim")},
-            column_sets={"cs": _column_set("${param.ws}.map")},
+            lookups={"dim": delta_lookup("${param.ws}.dim")},
+            column_sets={"cs": delta_column_set("${param.ws}.map")},
         )
 
     def _aliases(self, loaded: Any) -> tuple[str, str]:
@@ -277,7 +259,7 @@ class TestProjectRegistryParams:
         assert with_code(loaded.diagnostics, "P122")
 
     def test_reading_it_counts_as_use_of_a_runtime_param(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("${param.ws}.dim")})
+        write_project(tmp_path, lookups={"dim": delta_lookup("${param.ws}.dim")})
         loaded = load_at(_tree(tmp_path), {"ws": "prod"})
         assert _lookups(loaded)["dim"].source.alias == "prod.dim"
         assert with_code(loaded.diagnostics, "P121") == []
@@ -299,7 +281,7 @@ class TestProjectRegistryPaths:
     """A project lookup's or column set's relative file path joins the project root."""
 
     def test_relative_paths_join_the_root(self, tmp_path: Path) -> None:
-        _write_project(
+        write_project(
             tmp_path,
             lookups={"dim": {"source": {"type": "csv", "path": "ref/dim.csv"}}},
             column_sets={"cs": {"source": {"type": "yaml", "path": "ref/map.yaml"}}},
@@ -315,11 +297,11 @@ class TestProjectConnectionsOnTheDocument:
     def test_resolved_with_the_projects_bindings(self, tmp_path: Path) -> None:
         ws = {"ws": {"name": "ws", "type": "string", "required": False, "default": "dflt"}}
         lake = {"type": "onelake", "workspace": "${param.ws}", "lakehouse": "lh"}
-        _write_project(tmp_path, params=ws, connections={"lake": lake})
+        write_project(tmp_path, params=ws, connections={"lake": lake})
         document = load_at(_tree(tmp_path), {"ws": "prod"}).document
         assert document.project_connections is not None
         assert document.project_connections["lake"].workspace == "prod"
 
     def test_none_without_project_connections(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, lookups={"dim": _lookup("ref.dim")})
+        write_project(tmp_path, lookups={"dim": delta_lookup("ref.dim")})
         assert load_at(_tree(tmp_path)).document.project_connections is None

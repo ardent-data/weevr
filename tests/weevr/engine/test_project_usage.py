@@ -11,34 +11,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
-
-from documents import TEST_PROJECT_ID, loom_body, thread_body, weave_body, write_named
+from documents import (
+    delta_column_set,
+    delta_lookup,
+    loom_body,
+    thread_body,
+    weave_body,
+    write_named,
+    write_project,
+)
 from resolving import load_at
 from weevr.config.document import ScopeRegistries
 from weevr.engine.project_usage import (
     used_project_registries,
     without_unused_project_column_sets,
 )
-
-
-def _write_project(root: Path) -> None:
-    root.mkdir(parents=True, exist_ok=True)
-    body = {
-        "kind": "project",
-        "config_version": "2.0",
-        "id": TEST_PROJECT_ID,
-        "name": "test",
-        "lookups": {
-            "dim": {"source": {"type": "delta", "alias": "ref.dim"}},
-            "other": {"source": {"type": "delta", "alias": "ref.other"}},
-        },
-        "column_sets": {
-            "cs": {"source": {"type": "delta", "alias": "ref.cs"}},
-            "spare": {"source": {"type": "delta", "alias": "ref.spare"}},
-        },
-    }
-    (root / "weevr.yaml").write_text(yaml.safe_dump(body, sort_keys=False))
 
 
 def _tree(
@@ -48,7 +35,11 @@ def _tree(
     weave: dict[str, Any] | None = None,
 ) -> Path:
     """A loom over weave ``w`` over the named threads; returns the loom."""
-    _write_project(root)
+    write_project(
+        root,
+        lookups={"dim": delta_lookup("ref.dim"), "other": delta_lookup("ref.other")},
+        column_sets={"cs": delta_column_set("ref.cs"), "spare": delta_column_set("ref.spare")},
+    )
     for name, extra in threads.items():
         write_named(root, f"{name}.thread", thread_body(alias=f"out.{name}", **extra))
     entries = [{"ref": f"{name}.thread"} for name in threads]

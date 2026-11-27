@@ -15,10 +15,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
-from documents import TEST_PROJECT_ID, loom_body, thread_body, weave_body, write_named
-from resolving import load_at, load_failure, with_code
+from documents import (
+    lake_connection,
+    loom_body,
+    thread_body,
+    weave_body,
+    write_named,
+    write_project,
+)
+from resolving import leaf_node, load_at, load_failure, with_code
 from weevr.config.locations import LocalConfigLocation
 from weevr.config.manifest import param_manifest
 from weevr.config.onelake import resolve_connection_path
@@ -26,23 +32,6 @@ from weevr.config.project import RESERVED_PROJECT_BLOCKS, resolve_project_connec
 from weevr.config.root import read_project
 from weevr.errors import ConfigError, ConfigLocationError
 from weevr.model import Thread
-
-
-def _write_project(root: Path, **extra: Any) -> str:
-    body = {
-        "kind": "project",
-        "config_version": "2.0",
-        "id": TEST_PROJECT_ID,
-        "name": "test",
-        **extra,
-    }
-    path = root / "weevr.yaml"
-    path.write_text(yaml.safe_dump(body, sort_keys=False))
-    return str(path)
-
-
-def _lake(workspace: str, lakehouse: str = "lh") -> dict[str, Any]:
-    return {"type": "onelake", "workspace": workspace, "lakehouse": lakehouse}
 
 
 def _tree(
@@ -62,10 +51,7 @@ def _tree(
 
 def _thread(loaded: Any) -> Thread:
     """The thread model of a load rooted at the loom, weave or thread."""
-    document = loaded.document
-    while document.children:
-        document = next(iter(document.children.values()))
-    model = document.model
+    model = leaf_node(loaded).model
     assert isinstance(model, Thread)
     return model
 
@@ -97,9 +83,9 @@ class TestProjectDocument:
     """The three blocks are project fields; only ``variables`` stays reserved."""
 
     def test_blocks_load(self, tmp_path: Path) -> None:
-        _write_project(
+        write_project(
             tmp_path,
-            connections={"lake": _lake("ws")},
+            connections={"lake": lake_connection("ws")},
             audit_templates={"tpl": {"columns": {"c": "1"}}},
             defaults={"tags": ["a"]},
         )
@@ -115,13 +101,13 @@ class TestProjectDocument:
         assert RESERVED_PROJECT_BLOCKS == ("variables",)
 
     def test_variables_block_is_c210(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, variables={"v": {"type": "string"}})
+        write_project(tmp_path, variables={"v": {"type": "string"}})
         with pytest.raises(ConfigError) as info:
             read_project(LocalConfigLocation(tmp_path))
         assert [(d.code, d.pointer) for d in info.value.diagnostics] == [("C210", "/variables")]
 
     def test_malformed_defaults_names_weevr_yaml(self, tmp_path: Path) -> None:
-        project_file = _write_project(tmp_path, defaults={"exports": {"x": 1}})
+        project_file = str(write_project(tmp_path, defaults={"exports": {"x": 1}}) / "weevr.yaml")
         error = load_failure(_tree(tmp_path))
         (shape,) = with_code(error.diagnostics, "C102")
         assert shape.file == project_file
@@ -133,14 +119,14 @@ class TestProjectReachesEveryRoot:
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_connection(self, tmp_path: Path, kind: str) -> None:
-        _write_project(tmp_path, connections={"lake": _lake("proj_ws")})
+        write_project(tmp_path, connections={"lake": lake_connection("proj_ws")})
         thread = _thread(load_at(_roots(tmp_path)[kind]))
         assert thread.connections is not None
         assert thread.connections["lake"].workspace == "proj_ws"
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_audit_template_and_application(self, tmp_path: Path, kind: str) -> None:
-        _write_project(
+        write_project(
             tmp_path,
             audit_templates={"tpl": {"columns": {"_by": "'proj'"}}},
             defaults={"target": {"audit_template": "tpl"}},
@@ -150,13 +136,13 @@ class TestProjectReachesEveryRoot:
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_value_default(self, tmp_path: Path, kind: str) -> None:
-        _write_project(tmp_path, defaults={"tags": ["proj"]})
+        write_project(tmp_path, defaults={"tags": ["proj"]})
         assert _thread(load_at(_roots(tmp_path)[kind])).tags == ["proj"]
 
     @pytest.mark.parametrize("kind", ROOT_KINDS)
     def test_export(self, tmp_path: Path, kind: str) -> None:
         export = {"name": "archive", "type": "parquet", "path": "/archive"}
-        _write_project(tmp_path, defaults={"exports": [export]})
+        write_project(tmp_path, defaults={"exports": [export]})
         thread = _thread(load_at(_roots(tmp_path)[kind]))
         assert [e.name for e in thread.exports or []] == ["archive"]
 
@@ -166,10 +152,16 @@ class TestRegistriesMergeByName:
 
     @pytest.mark.parametrize("tier", ["loom", "weave", "thread"])
     def test_lower_connection_shadows_by_name(self, tmp_path: Path, tier: str) -> None:
-        _write_project(
-            tmp_path, connections={"lake": _lake("proj_ws"), "other": _lake("proj_other")}
+        write_project(
+            tmp_path,
+            connections={
+                "lake": lake_connection("proj_ws"),
+                "other": lake_connection("proj_other"),
+            },
         )
-        loaded = load_at(_tree(tmp_path, **{tier: {"connections": {"lake": _lake(tier)}}}))
+        loaded = load_at(
+            _tree(tmp_path, **{tier: {"connections": {"lake": lake_connection(tier)}}})
+        )
         connections = _thread(loaded).connections
         assert connections is not None
         assert connections["lake"].workspace == tier
@@ -177,7 +169,7 @@ class TestRegistriesMergeByName:
 
     @pytest.mark.parametrize("tier", ["loom", "weave", "thread"])
     def test_lower_template_shadows_by_name(self, tmp_path: Path, tier: str) -> None:
-        _write_project(
+        write_project(
             tmp_path,
             audit_templates={"tpl": {"columns": {"_by": "'proj'"}}},
             defaults={"target": {"audit_template": "tpl"}},
@@ -187,7 +179,7 @@ class TestRegistriesMergeByName:
         assert thread.target.audit_columns == {"_by": f"'{tier}'"}
 
     def test_a_thread_names_a_project_template(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, audit_templates={"tpl": {"columns": {"_by": "'proj'"}}})
+        write_project(tmp_path, audit_templates={"tpl": {"columns": {"_by": "'proj'"}}})
         target = {"alias": "out.t", "audit_template": "tpl"}
         thread = _thread(load_at(_tree(tmp_path, thread={"target": target})))
         assert thread.target.audit_columns == {"_by": "'proj'"}
@@ -198,26 +190,26 @@ class TestDefaultsCascade:
 
     @pytest.mark.parametrize("tier", LOWER_TIERS)
     def test_lower_block_replaces_the_project_block(self, tmp_path: Path, tier: str) -> None:
-        _write_project(tmp_path, defaults={"tags": ["proj", "wide"]})
+        write_project(tmp_path, defaults={"tags": ["proj", "wide"]})
         loaded = load_at(_tree(tmp_path, **_lower(tier, {"tags": [tier]})))
         assert _thread(loaded).tags == [tier]
 
     def test_unrelated_keys_inherit_side_by_side(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, defaults={"tags": ["proj"]})
+        write_project(tmp_path, defaults={"tags": ["proj"]})
         loaded = load_at(_tree(tmp_path, weave={"defaults": {"cache": False}}))
         thread = _thread(loaded)
         assert thread.tags == ["proj"]
         assert thread.cache is False
 
     def test_naming_from_the_project(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, defaults={"naming": {"columns": "snake_case"}})
+        write_project(tmp_path, defaults={"naming": {"columns": "snake_case"}})
         naming = _thread(load_at(_tree(tmp_path))).target.naming
         assert naming is not None
         assert naming.columns == "snake_case"
 
     @pytest.mark.parametrize("tier", LOWER_TIERS)
     def test_lower_naming_wins_whole(self, tmp_path: Path, tier: str) -> None:
-        _write_project(tmp_path, defaults={"naming": {"columns": "snake_case"}})
+        write_project(tmp_path, defaults={"naming": {"columns": "snake_case"}})
         lower = _lower(tier, {"naming": {"tables": "lowercase"}}, target=True)
         naming = _thread(load_at(_tree(tmp_path, **lower))).target.naming
         assert naming is not None
@@ -225,27 +217,27 @@ class TestDefaultsCascade:
         assert naming.columns is None
 
     def test_audit_columns_are_additive(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, defaults={"target": {"audit_columns": {"_proj": "1"}}})
+        write_project(tmp_path, defaults={"target": {"audit_columns": {"_proj": "1"}}})
         weave = {"defaults": {"target": {"audit_columns": {"_weave": "2"}}}}
         thread = _thread(load_at(_tree(tmp_path, weave=weave)))
         assert thread.target.audit_columns == {"_proj": "1", "_weave": "2"}
 
     def test_audit_inherit_off_drops_project_columns(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, defaults={"target": {"audit_columns": {"_proj": "1"}}})
+        write_project(tmp_path, defaults={"target": {"audit_columns": {"_proj": "1"}}})
         target = {"alias": "out.t", "audit_template_inherit": False}
         thread = _thread(load_at(_tree(tmp_path, thread={"target": target})))
         assert not thread.target.audit_columns
 
     def test_audit_exclude_removes_a_project_column(self, tmp_path: Path) -> None:
         columns = {"_proj": "1", "_keep": "2"}
-        _write_project(tmp_path, defaults={"target": {"audit_columns": columns}})
+        write_project(tmp_path, defaults={"target": {"audit_columns": columns}})
         target = {"alias": "out.t", "audit_columns_exclude": ["_proj"]}
         thread = _thread(load_at(_tree(tmp_path, thread={"target": target})))
         assert thread.target.audit_columns == {"_keep": "2"}
 
     def test_exports_merge_by_name(self, tmp_path: Path) -> None:
         archive = {"name": "archive", "type": "parquet", "path": "/proj"}
-        _write_project(tmp_path, defaults={"exports": [archive]})
+        write_project(tmp_path, defaults={"exports": [archive]})
         loom_export = {"name": "copy", "type": "csv", "path": "/loom"}
         thread_export = {"name": "archive", "type": "parquet", "path": "/thread"}
         loaded = load_at(
@@ -260,15 +252,13 @@ class TestDefaultsCascade:
 
     def test_a_lower_tier_disables_a_project_export(self, tmp_path: Path) -> None:
         archive = {"name": "archive", "type": "parquet", "path": "/proj"}
-        _write_project(tmp_path, defaults={"exports": [archive]})
+        write_project(tmp_path, defaults={"exports": [archive]})
         weave = {"defaults": {"exports": [{"name": "archive", "enabled": False}]}}
         assert not _thread(load_at(_tree(tmp_path, weave=weave))).exports
 
     @pytest.mark.parametrize("tier", LOWER_TIERS)
     def test_target_policies_cascade_per_key(self, tmp_path: Path, tier: str) -> None:
-        _write_project(
-            tmp_path, defaults={"target": {"schema_drift": "strict", "on_drift": "warn"}}
-        )
+        write_project(tmp_path, defaults={"target": {"schema_drift": "strict", "on_drift": "warn"}})
         if tier == "thread":
             lower = {"thread": {"target": {"alias": "out.t", "on_drift": "error"}}}
         else:
@@ -278,7 +268,7 @@ class TestDefaultsCascade:
         assert target.on_drift == "error"
 
     def test_project_execution_default_warns_c490(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, defaults={"execution": {"log_level": "minimal"}})
+        write_project(tmp_path, defaults={"execution": {"log_level": "minimal"}})
         assert len(with_code(load_at(_tree(tmp_path)).diagnostics, "C490")) == 1
 
 
@@ -288,7 +278,7 @@ class TestProjectAssetParams:
     WS = {"ws": {"name": "ws", "type": "string", "required": False, "default": "proj_default"}}
 
     def _project(self, root: Path) -> None:
-        _write_project(root, params=self.WS, connections={"lake": _lake("${param.ws}")})
+        write_project(root, params=self.WS, connections={"lake": lake_connection("${param.ws}")})
 
     def _workspace(self, loaded: Any) -> str:
         connections = _thread(loaded).connections
@@ -318,7 +308,7 @@ class TestProjectAssetParams:
         assert "P123" not in {d.code for d in loaded.diagnostics}
 
     def test_reading_it_counts_as_use_of_a_runtime_param(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, connections={"lake": _lake("${param.ws}")})
+        write_project(tmp_path, connections={"lake": lake_connection("${param.ws}")})
         loaded = load_at(_tree(tmp_path), {"ws": "prod"})
         assert self._workspace(loaded) == "prod"
         assert with_code(loaded.diagnostics, "P121") == []
@@ -328,7 +318,7 @@ class TestNameReferences:
     """``R140`` and ``R201`` see project definitions."""
 
     def test_unknown_template_still_fails_at_load(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, audit_templates={"tpl": {"columns": {"c": "1"}}})
+        write_project(tmp_path, audit_templates={"tpl": {"columns": {"c": "1"}}})
         target = {"alias": "out.t", "audit_template": "nope"}
         error = load_failure(_tree(tmp_path, thread={"target": target}))
         (unknown,) = with_code(error.diagnostics, "R140")
@@ -336,13 +326,13 @@ class TestNameReferences:
         assert "tpl" in unknown.expected
 
     def test_project_connection_resolves(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, connections={"lake": _lake("ws")})
+        write_project(tmp_path, connections={"lake": lake_connection("ws")})
         thread = _thread(load_at(_tree(tmp_path)))
         path = resolve_connection_path("lake", "t", None, dict(thread.connections or {}))
         assert path.startswith("abfss://ws@")
 
     def test_unknown_connection_is_r201(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, connections={"lake": _lake("ws")})
+        write_project(tmp_path, connections={"lake": lake_connection("ws")})
         thread = _thread(load_at(_tree(tmp_path)))
         with pytest.raises(ConfigLocationError) as info:
             resolve_connection_path("nope", "t", None, dict(thread.connections or {}))
@@ -357,14 +347,19 @@ class TestProjectParamsOnlyWhenRead:
     REGION = {"region": {"name": "region", "type": "string"}}
 
     def test_unread_required_param_shadowed_below_still_loads(self, tmp_path: Path) -> None:
-        _write_project(tmp_path, params=self.REGION, connections={"lake": _lake("ws")})
+        write_project(tmp_path, params=self.REGION, connections={"lake": lake_connection("ws")})
         shadow = {"region": {**self.REGION["region"], "required": False, "default": "na"}}
         loaded = load_at(_tree(tmp_path, loom={"params": shadow}))
         assert _thread(loaded).connections is not None
 
     def test_read_required_param_without_value_is_p101(self, tmp_path: Path) -> None:
-        project_file = _write_project(
-            tmp_path, params=self.REGION, connections={"lake": _lake("${param.region}")}
+        project_file = str(
+            write_project(
+                tmp_path,
+                params=self.REGION,
+                connections={"lake": lake_connection("${param.region}")},
+            )
+            / "weevr.yaml"
         )
         shadow = {"region": {**self.REGION["region"], "required": False, "default": "na"}}
         error = load_failure(_tree(tmp_path, loom={"params": shadow}))
@@ -379,7 +374,7 @@ class TestResolveProjectConnections:
     WS = {"ws": {"name": "ws", "type": "string", "required": False, "default": "proj_default"}}
 
     def _project(self, root: Path, **extra: Any) -> Any:
-        _write_project(root, **extra)
+        write_project(root, **extra)
         return read_project(LocalConfigLocation(root))
 
     def test_no_connections_is_none(self, tmp_path: Path) -> None:
@@ -388,7 +383,7 @@ class TestResolveProjectConnections:
 
     def test_project_default(self, tmp_path: Path) -> None:
         project = self._project(
-            tmp_path, params=self.WS, connections={"lake": _lake("${param.ws}")}
+            tmp_path, params=self.WS, connections={"lake": lake_connection("${param.ws}")}
         )
         connections = resolve_project_connections(project, str(tmp_path / "weevr.yaml"))
         assert connections is not None
@@ -396,7 +391,7 @@ class TestResolveProjectConnections:
 
     def test_runtime_beats_the_project_default(self, tmp_path: Path) -> None:
         project = self._project(
-            tmp_path, params=self.WS, connections={"lake": _lake("${param.ws}")}
+            tmp_path, params=self.WS, connections={"lake": lake_connection("${param.ws}")}
         )
         connections = resolve_project_connections(
             project, str(tmp_path / "weevr.yaml"), runtime_params={"ws": "prod"}
@@ -405,7 +400,9 @@ class TestResolveProjectConnections:
         assert connections["lake"].workspace == "prod"
 
     def test_fabric_reference(self, tmp_path: Path) -> None:
-        project = self._project(tmp_path, connections={"lake": _lake("${fabric.workspace_id}")})
+        project = self._project(
+            tmp_path, connections={"lake": lake_connection("${fabric.workspace_id}")}
+        )
         connections = resolve_project_connections(
             project, str(tmp_path / "weevr.yaml"), fabric_context={"workspace_id": "fab-ws"}
         )
@@ -413,7 +410,7 @@ class TestResolveProjectConnections:
         assert connections["lake"].workspace == "fab-ws"
 
     def test_unresolvable_reference_fails(self, tmp_path: Path) -> None:
-        project = self._project(tmp_path, connections={"lake": _lake("${param.ws}")})
+        project = self._project(tmp_path, connections={"lake": lake_connection("${param.ws}")})
         with pytest.raises(ConfigError) as info:
             resolve_project_connections(project, str(tmp_path / "weevr.yaml"))
         assert "P110" in {d.code for d in info.value.diagnostics}
@@ -421,7 +418,10 @@ class TestResolveProjectConnections:
     def test_only_named_connections_are_resolved(self, tmp_path: Path) -> None:
         project = self._project(
             tmp_path,
-            connections={"lake": _lake("ws"), "broken": _lake("${param.missing}")},
+            connections={
+                "lake": lake_connection("ws"),
+                "broken": lake_connection("${param.missing}"),
+            },
         )
         connections = resolve_project_connections(
             project, str(tmp_path / "weevr.yaml"), names={"lake"}
@@ -430,7 +430,7 @@ class TestResolveProjectConnections:
         assert set(connections) == {"lake"}
 
     def test_a_named_connection_the_project_lacks_is_none(self, tmp_path: Path) -> None:
-        project = self._project(tmp_path, connections={"lake": _lake("ws")})
+        project = self._project(tmp_path, connections={"lake": lake_connection("ws")})
         assert (
             resolve_project_connections(project, str(tmp_path / "weevr.yaml"), names={"nope"})
             is None
@@ -439,7 +439,7 @@ class TestResolveProjectConnections:
     def test_other_blocks_are_not_resolved(self, tmp_path: Path) -> None:
         project = self._project(
             tmp_path,
-            connections={"lake": _lake("ws")},
+            connections={"lake": lake_connection("ws")},
             defaults={"tags": ["${param.unbound}"]},
         )
         connections = resolve_project_connections(project, str(tmp_path / "weevr.yaml"))
@@ -451,9 +451,9 @@ class TestManifestReadsProjectBlocks:
     """The param manifest counts references in the project's cascading blocks."""
 
     def test_undeclared_reference_is_listed(self, tmp_path: Path) -> None:
-        _write_project(
+        write_project(
             tmp_path,
-            connections={"lake": _lake("${param.ws}")},
+            connections={"lake": lake_connection("${param.ws}")},
             audit_templates={"tpl": {"columns": {"c": "'${param.tag}'"}}},
             defaults={"tags": ["${param.team}"]},
         )
@@ -462,7 +462,7 @@ class TestManifestReadsProjectBlocks:
 
     def test_declared_reference_is_not(self, tmp_path: Path) -> None:
         ws = {"ws": {"name": "ws", "type": "string", "required": False, "default": "d"}}
-        _write_project(tmp_path, params=ws, connections={"lake": _lake("${param.ws}")})
+        write_project(tmp_path, params=ws, connections={"lake": lake_connection("${param.ws}")})
         manifest = param_manifest(_tree(tmp_path), project_root=tmp_path)
         assert manifest.undeclared_used == ()
 
@@ -479,7 +479,7 @@ class TestStandaloneThreadOwnAudit:
     def _load(self, root: Path, project: str, target: dict[str, Any]) -> Thread:
         extra = self.PROJECTS[project]
         if extra is not None:
-            _write_project(root, **extra)
+            write_project(root, **extra)
         templates = {"tpl": {"columns": {"_by": "'me'", "_at": "'now'"}}}
         body = thread_body(target={"alias": "out.t", **target}, audit_templates=templates)
         loaded = load_at(write_named(root, "t.thread", body))
@@ -502,7 +502,7 @@ class TestStandaloneThreadOwnAudit:
     def test_own_unknown_template_is_r140(self, tmp_path: Path, project: str) -> None:
         extra = self.PROJECTS[project]
         if extra is not None:
-            _write_project(tmp_path, **extra)
+            write_project(tmp_path, **extra)
         target = {"alias": "out.t", "audit_template": "nope"}
         error = load_failure(write_named(tmp_path, "t.thread", thread_body(target=target)))
         assert len(with_code(error.diagnostics, "R140")) == 1
