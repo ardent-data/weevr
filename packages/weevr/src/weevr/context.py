@@ -14,6 +14,7 @@ from pyspark.sql import SparkSession
 
 from weevr.config.collect import diagnostics_of
 from weevr.config.document import ScopeRegistries, registry_as_dict
+from weevr.config.inheritance import merge_connections
 from weevr.config.loader import collect_resolved_config, load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.manifest import param_manifest
@@ -596,11 +597,7 @@ class Context:
                 column_set_defs=without_unused_project_column_sets(
                     scope.column_sets, document.project_scope, project_used
                 ),
-                connections={
-                    **(document.project_connections or {}),
-                    **(model.connections or {}),
-                }
-                or None,
+                connections=merge_connections(document.project_connections, model.connections),
                 execution=standalone_execution,
                 weave_name=loaded.config_name,
                 effective_lookups=scope.lookups,

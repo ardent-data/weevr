@@ -11,6 +11,7 @@ from typing import Any, Literal
 from pyspark.sql import SparkSession
 
 from weevr.config.document import ResolvedDocument, ScopeRegistries, registry_as_dict
+from weevr.config.inheritance import merge_connections
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.conditions import evaluate_condition
@@ -823,7 +824,7 @@ def execute_loom(
         # per-weave passes hand down the resolved mappings, excluding keys
         # a weave overrides so precedence still re-resolves those. The loom
         # reads with its connections over the project's.
-        loom_connections = {**project_connections, **(loom.connections or {})} or None
+        loom_connections = merge_connections(project_connections, loom.connections)
         loom_resolved_cs: dict[str, dict[str, str]] = {}
         loom_cs_results: list[ColumnSetResult] = []
         loom_column_sets = {**(project_used.column_sets or {}), **(loom.column_sets or {})}
@@ -915,17 +916,12 @@ def execute_loom(
                 weave_scope.column_sets, tree.project_scope, project_used
             )
 
-            # Merge project + loom + weave connections for weave-level
-            # lookup and column set materialization. Uses the same
-            # additive-update pattern as _cascade_connections in
-            # config/inheritance.py, but stops at the weave scope —
-            # thread-level connections are forwarded per-thread at the
-            # execute_thread call site.
-            merged_connections: dict[str, OneLakeConnection] = dict(project_connections)
-            if loom.connections:
-                merged_connections.update(loom.connections)
-            if weave.connections:
-                merged_connections.update(weave.connections)
+            # Project + loom + weave connections for weave-level lookup and
+            # column set materialization; thread-level connections are
+            # forwarded per-thread at the execute_thread call site.
+            merged_connections = merge_connections(
+                project_connections, loom.connections, weave.connections
+            )
 
             merged_variables = registry_as_dict(weave_scope.variables)
 
@@ -971,7 +967,7 @@ def execute_loom(
                     pre_cached_lookups=loom_cached_lookup_dfs or None,
                     effective_lookups=weave_scope.lookups,
                     thread_scopes=thread_scopes,
-                    connections=merged_connections or None,
+                    connections=merged_connections,
                     execution=effective_execution,
                 )
             finally:

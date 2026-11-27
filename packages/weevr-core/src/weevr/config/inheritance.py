@@ -444,23 +444,41 @@ def _export_disabled(export: dict[str, Any]) -> bool:
         return False
 
 
+def merge_connections[C](*tiers: Mapping[str, C] | None) -> dict[str, C] | None:
+    """Merge connection registries by name, outermost tier first.
+
+    The one precedence rule for connections: a same-named connection at a
+    later (nearer) tier replaces the earlier one. Used by the load-time
+    cascade and by the engine where a loom or weave reads with its scope's
+    connections.
+
+    Args:
+        *tiers: Each tier's connections, outermost first (project, loom,
+            weave, thread); ``None`` or empty tiers are skipped.
+
+    Returns:
+        The merged connections, or ``None`` when no tier declares any.
+    """
+    merged: dict[str, C] = {}
+    for connections in tiers:
+        if connections:
+            merged.update(connections)
+    return merged or None
+
+
 def _cascade_connections(
     tiers: Sequence[dict[str, Any] | None], thread_config: dict[str, Any]
 ) -> None:
     """Cascade connections from each tier into thread config.
 
-    Additive merge: each tier extends the connections dict. Same-named
-    connections at a lower tier override the definition from a higher one
-    (child wins); the thread's own are the lowest of all.
+    Additive merge (:func:`merge_connections`): same-named connections at a
+    lower tier override the definition from a higher one (child wins); the
+    thread's own are the lowest of all.
 
     Args:
         tiers: The enclosing tiers' connections, outermost first.
         thread_config: Fully cascaded thread config (mutated in place).
     """
-    merged: dict[str, Any] = {}
-    for connections in (*tiers, thread_config.get("connections")):
-        if connections:
-            merged.update(connections)
-
+    merged = merge_connections(*tiers, thread_config.get("connections"))
     if merged:
         thread_config["connections"] = merged
