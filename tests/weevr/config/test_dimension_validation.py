@@ -2,12 +2,14 @@
 
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import loom_body, weave_body, write_document, write_named
+from resolving import load_at
 from weevr.config import load_config, load_resolved
 from weevr.config.validation import validate_dimension_overrides
 from weevr.context import Context
@@ -269,3 +271,45 @@ class TestDimensionRulesOnLoad:
         result = ctx.run("w.weave", mode="validate")
         assert result.status == "failure"
         assert "C487" in {d.code for d in result.diagnostics}
+
+
+def _dimension_thread(name: str) -> dict[str, Any]:
+    """An inline dimension thread that sets the forbidden ``write.mode``."""
+    return {
+        "name": name,
+        "sources": {"s": {"type": "delta", "alias": "raw.t"}},
+        "target": {
+            "alias": f"out.{name}",
+            "dimension": {
+                "business_key": ["id"],
+                "surrogate_key": {"name": "sk", "columns": ["id"]},
+            },
+        },
+        "write": {"mode": "overwrite"},
+    }
+
+
+class TestOverrideLocation:
+    """A dimension override error points at the inline thread where it is written."""
+
+    def test_inline_thread_in_an_inline_weave(self, tmp_path: Path) -> None:
+        weave = {"name": "w", "config_version": "2.0", "threads": [_dimension_thread("t")]}
+        loom = write_named(tmp_path, "l.loom", loom_body([weave]))
+
+        with pytest.raises(ConfigError) as exc_info:
+            load_at(loom)
+
+        (found,) = [d for d in exc_info.value.diagnostics if d.code == "C486"]
+        assert found.pointer == "/weaves/0/threads/0/write/mode"
+        assert found.line is not None
+
+    def test_inline_thread_in_a_referenced_weave(self, tmp_path: Path) -> None:
+        write_named(tmp_path, "w.weave", weave_body([_dimension_thread("t")]))
+        loom = write_named(tmp_path, "l.loom", loom_body([{"ref": "w.weave"}]))
+
+        with pytest.raises(ConfigError) as exc_info:
+            load_at(loom)
+
+        (found,) = [d for d in exc_info.value.diagnostics if d.code == "C486"]
+        assert found.pointer == "/threads/0/write/mode"
+        assert found.file == str(tmp_path / "w.weave")

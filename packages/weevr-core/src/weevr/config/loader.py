@@ -986,7 +986,7 @@ def _pre_cascade_threads(
             (
                 thread.data,
                 thread.source_path or weave.source_path or enclosing,
-                () if thread.source_path else (() if weave.source_path else weave.at) + thread.at,
+                () if thread.source_path else thread.at,
             )
             for weave in children
             for thread in weave.children
