@@ -34,7 +34,12 @@ from weevr.config.hydration import (
     hydrate_children,
     hydrate_model,
 )
-from weevr.config.inheritance import CascadeTier, apply_tiers, check_defaults_shape
+from weevr.config.inheritance import (
+    CascadeTier,
+    apply_tiers,
+    check_defaults_shape,
+    layer_declarations,
+)
 from weevr.config.interpolation import check_fabric_context
 from weevr.config.locations import (
     ConfigLocation,
@@ -44,7 +49,7 @@ from weevr.config.locations import (
     make_location,
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
-from weevr.config.param_provenance import ParamProvenance
+from weevr.config.param_provenance import ParamProvenance, RegistryDeclaration
 from weevr.config.params import ScopePositions
 from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
@@ -103,6 +108,8 @@ class ResolvedConfig:
         project_connections: The project's connections, resolved in its own
             scope, for the lookups and column sets a loom or weave
             materializes; ``None`` when it declares none.
+        declarations: Where each registry entry and ``defaults:`` key the
+            config sees is declared, the project's included.
     """
 
     location: ConfigLocation
@@ -117,6 +124,7 @@ class ResolvedConfig:
     provenance: Mapping[str, ParamProvenance] = field(default_factory=dict)
     project_scope: ScopeRegistries | None = None
     project_connections: dict[str, OneLakeConnection] | None = None
+    declarations: Mapping[str, Mapping[str, RegistryDeclaration]] = field(default_factory=dict)
 
 
 def resolve_project_root(
@@ -217,7 +225,7 @@ def resolve_config(
         project=project,
         project_file=None if project_file is None else str(project_file),
     )
-    project_tier, project_scope, project_connections = _project_layers(
+    project_tier, project_scope, project_connections, project_declarations = _project_layers(
         project, project_file, walk, root
     )
 
@@ -266,6 +274,11 @@ def resolve_config(
     # they also run before the cascade adds loom/weave write and keys defaults.
     if config_type in COMPONENT_TYPES:
         check_dimension_overrides(config_type, data, children, location)
+    # Recorded from the pre-cascade dicts, in the cascade's tier order, so each
+    # name keeps the tier that declared it rather than the thread it lands in.
+    declarations = _record_declarations(
+        config_type, data, children, str(location), project_declarations
+    )
     data = _apply_cascade(config_type, data, children, project_tier)
 
     if config_type == "thread":
@@ -315,6 +328,7 @@ def resolve_config(
         provenance=walk.provenance,
         project_scope=project_scope,
         project_connections=project_connections,
+        declarations=declarations,
     )
 
 
@@ -471,7 +485,7 @@ def _assemble_document(
                 name=name,
                 entry=EntryMeta.from_entry(entry),
                 source_ref=node.source_path or enclosing,
-                provenance=Provenance(params=node.provenance),
+                provenance=Provenance.of(node.provenance, node.declarations),
             )
         return docs
 
@@ -495,7 +509,7 @@ def _assemble_document(
                 entry=EntryMeta.from_entry(entry),
                 children=thread_docs(weave, threads.get(name, {}), node.children, weave_file),
                 source_ref=weave_file,
-                provenance=Provenance(params=node.provenance),
+                provenance=Provenance.of(node.provenance, node.declarations),
             )
 
     return ResolvedDocument(
@@ -508,7 +522,7 @@ def _assemble_document(
         project_root=str(resolved.project_root),
         project_scope=resolved.project_scope,
         project_connections=resolved.project_connections,
-        provenance=Provenance(params=resolved.provenance),
+        provenance=Provenance.of(resolved.provenance, resolved.declarations),
     ).with_scopes()
 
 
@@ -735,7 +749,12 @@ def _project_layers(
     project_file: ConfigLocation | None,
     walk: WalkState,
     root: ConfigLocation,
-) -> tuple[CascadeTier | None, ScopeRegistries | None, dict[str, OneLakeConnection] | None]:
+) -> tuple[
+    CascadeTier | None,
+    ScopeRegistries | None,
+    dict[str, OneLakeConnection] | None,
+    dict[str, dict[str, RegistryDeclaration]] | None,
+]:
     """The project's cascade tier and registry layer, its blocks resolved in its own scope.
 
     Its ``defaults`` are checked under ``weevr.yaml``, so a malformed block is
@@ -743,14 +762,15 @@ def _project_layers(
     file paths in its lookups and column sets join ``root``, as a loom's do.
 
     Returns:
-        ``(tier, registries, connections)``: the cascade tier from its
-        ``defaults``, ``audit_templates`` and ``connections``; the registry
-        layer from its ``lookups`` and ``column_sets``; and its connections
-        hydrated. Each is ``None`` when the project declares none of its
-        blocks.
+        ``(tier, registries, connections, declarations)``: the cascade tier
+        from its ``defaults``, ``audit_templates`` and ``connections``; the
+        registry layer from its ``lookups`` and ``column_sets``; its
+        connections hydrated; and where each block entry is declared in
+        ``weevr.yaml``. The first three are ``None`` when the project
+        declares none of their blocks; all four with no project.
     """
     if project is None or project_file is None:
-        return None, None, None
+        return None, None, None, None
     file = str(project_file)
     with attribute_errors(project_file):
         blocks = walk.project_tier(project, file)
@@ -770,7 +790,8 @@ def _project_layers(
     if lookups or column_sets:
         registries = ScopeRegistries(lookups=lookups or None, column_sets=column_sets or None)
     connections = _project_block(blocks, "connections", _CONNECTIONS, file)
-    return tier, registries, connections or None
+    declarations = layer_declarations(None, "project", file, blocks)
+    return tier, registries, connections or None, declarations
 
 
 def _project_block[V](
@@ -806,6 +827,48 @@ def _tier(level: str, data: dict[str, Any]) -> CascadeTier:
         audit_templates=data.get("audit_templates"),
         connections=data.get("connections"),
     )
+
+
+def _record_declarations(
+    config_type: str,
+    data: dict[str, Any],
+    children: list[ResolvedChild],
+    file: str,
+    project: Mapping[str, Mapping[str, RegistryDeclaration]] | None,
+) -> Mapping[str, Mapping[str, RegistryDeclaration]]:
+    """Record where each registry entry and ``defaults:`` key every node sees is declared.
+
+    Walks the tiers in the cascade's order (project, loom, weave, thread),
+    each layering its own declarations over the enclosing scope's. Sets each
+    child's ``declarations``; an inline child points into the file holding it.
+
+    Returns:
+        The top-level config's declarations; empty for a config that is not
+        a thread, weave or loom.
+    """
+    if config_type not in ("loom", "weave", "thread"):
+        return {}
+    top = layer_declarations(project, config_type, file, data)
+
+    def threads(
+        nodes: list[ResolvedChild],
+        outer: Mapping[str, Mapping[str, RegistryDeclaration]],
+        enclosing: str,
+    ) -> None:
+        # An inline thread's ``at`` is its full position in the enclosing file.
+        for thread in nodes:
+            thread.declarations = layer_declarations(
+                outer, "thread", thread.source_path or enclosing, thread.data, thread.at
+            )
+
+    if config_type == "loom":
+        for weave in children:
+            weave_file = weave.source_path or file
+            weave.declarations = layer_declarations(top, "weave", weave_file, weave.data, weave.at)
+            threads(weave.children, weave.declarations, weave_file)
+    elif config_type == "weave":
+        threads(children, top, file)
+    return top
 
 
 def _apply_cascade(

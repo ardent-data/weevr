@@ -21,6 +21,7 @@ from weevr.config.param_provenance import (
     ParamProvenance,
     ParamSource,
     ParamTier,
+    RegistryDeclaration,
 )
 from weevr.config.root import find_project_root
 from weevr.config.run_store import (
@@ -46,6 +47,7 @@ __all__ = [
     "ParamSource",
     "ParamTier",
     "Provenance",
+    "RegistryDeclaration",
     "ResolvedDocument",
     "RunStoreLocation",
     "ScopeRegistries",

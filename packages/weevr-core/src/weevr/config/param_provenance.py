@@ -1,9 +1,10 @@
-"""Where a config scope's param values came from, recorded at load without values.
+"""Where a config scope's values came from, recorded at load without values.
 
 The records a load attaches to each node of its tree
-(:attr:`weevr.config.document.Provenance.params`): per param name, the value
-source, the winning declaration, and the pinning entry. They hold names, kinds,
-files and pointers only, never the values themselves.
+(:class:`weevr.config.document.Provenance`): per param name, the value source,
+the winning declaration, and the pinning entry; per registry entry and
+``defaults:`` key, the declaring tier and file. They hold names, kinds, files
+and pointers only, never the values themselves.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from typing import Literal
 from weevr.diagnostics.positions import json_pointer
 
 ParamTier = Literal["project", "loom", "weave", "thread"]
-"""The kind of config a param is declared in."""
+"""The kind of config a param, registry entry or ``defaults:`` key is declared in."""
 
 ParamSource = Literal["pin", "runtime", "inherited", "default", "fallback"]
 """Where one scope's value for a param came from; see :class:`ParamProvenance`."""
@@ -101,3 +102,23 @@ class ParamProvenance:
     source: ParamSource
     spec: ParamDeclaration | None = None
     pin: ParamPin | None = None
+
+
+@dataclass(frozen=True)
+class RegistryDeclaration:
+    """Where a registry entry or ``defaults:`` key a config sees is declared. Holds no value.
+
+    Attributes:
+        tier: The kind of the declaring config (``project``, ``loom``,
+            ``weave`` or ``thread``).
+        file: The declaring file: ``weevr.yaml`` for the project, else the
+            config's own file, or the file holding it when it is inline;
+            ``None`` when unknown.
+        pointer: The JSON pointer of the declaration in ``file``
+            (``/connections/<name>``, ``/defaults/<key>``, under an inline
+            child's position).
+    """
+
+    tier: ParamTier
+    file: str | None
+    pointer: str

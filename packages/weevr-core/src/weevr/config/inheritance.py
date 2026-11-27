@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import TypeAdapter, ValidationError
 
 from weevr.config.audit_templates import AuditTier, merge_tiered_audit_columns
+from weevr.config.param_provenance import ParamTier, RegistryDeclaration
 from weevr.diagnostics import diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import InheritanceError
@@ -62,6 +63,57 @@ def cascade_registry[V](
                     outer_level,
                 )
     return {**outer, **inner}
+
+
+_REGISTRY_BLOCKS = ("connections", "audit_templates", "lookups", "column_sets", "variables")
+"""The named registries a config scope declares, cascading by name, inner names winning."""
+
+_DEFAULTS_BLOCK = "defaults"
+"""The block whose top-level keys cascade whole-value, the nearest tier winning."""
+
+
+def layer_declarations(
+    outer: Mapping[str, Mapping[str, RegistryDeclaration]] | None,
+    tier: ParamTier,
+    file: str | None,
+    data: Mapping[str, Any],
+    at: tuple[str | int, ...] = (),
+) -> dict[str, dict[str, RegistryDeclaration]]:
+    """One scope's registry and ``defaults:`` declarations over its enclosing scope's.
+
+    Internal to the load, which calls it once per scope before the cascade;
+    the result is read through :class:`weevr.config.document.Provenance`.
+
+    Follows the cascade's rules at name level: a registry name the scope
+    declares wins over the same name above it (:func:`cascade_registry`,
+    and the by-name merge of connections and audit templates in
+    :func:`apply_tiers`), and so does a ``defaults:`` key. A key the cascade
+    merges across tiers (``target``, ``exports``) names the nearest tier
+    that sets it. A thread's own ``defaults:`` is not a cascade tier, so a
+    thread adds no ``defaults`` declarations.
+
+    Args:
+        outer: The enclosing scope's declarations; ``None`` at the outermost.
+        tier: The scope's kind.
+        file: The file the scope is written in.
+        data: The scope's config dict, before the cascade.
+        at: Where the scope sits in ``file``; empty for a config in its own file.
+
+    Returns:
+        The scope's declarations by block (each registry and ``defaults``,
+        every one present), then by name.
+    """
+    blocks = (*_REGISTRY_BLOCKS, _DEFAULTS_BLOCK)
+    layered = {block: dict((outer or {}).get(block, {})) for block in blocks}
+    for block in blocks:
+        if block == _DEFAULTS_BLOCK and tier == "thread":
+            continue
+        declared = data.get(block)
+        if not isinstance(declared, Mapping):
+            continue
+        for name in declared:
+            layered[block][name] = RegistryDeclaration(tier, file, json_pointer((*at, block, name)))
+    return layered
 
 
 def cascade(parent: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:

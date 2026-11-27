@@ -9,7 +9,7 @@ from typing import Any
 
 from weevr.config.collect import skip_on_error
 from weevr.config.locations import ConfigLocation
-from weevr.config.param_provenance import ParamProvenance
+from weevr.config.param_provenance import ParamProvenance, RegistryDeclaration
 from weevr.config.params import ScopePositions
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.config.scoping import (
@@ -49,6 +49,9 @@ class ResolvedChild:
             (``("threads", 2)``); empty for a child in its own file.
         provenance: Where each of the child's params came from
             (:meth:`weevr.config.params.ParamScope.provenance`).
+        declarations: Where each registry entry and ``defaults:`` key the
+            child sees is declared, set by the load before the cascade
+            (:func:`weevr.config.inheritance.layer_declarations`).
     """
 
     entry: dict[str, Any]
@@ -58,6 +61,7 @@ class ResolvedChild:
     children: list["ResolvedChild"] = field(default_factory=list)
     at: tuple[str | int, ...] = ()
     provenance: Mapping[str, ParamProvenance] = field(default_factory=dict)
+    declarations: Mapping[str, Mapping[str, RegistryDeclaration]] = field(default_factory=dict)
 
 
 def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionError:
