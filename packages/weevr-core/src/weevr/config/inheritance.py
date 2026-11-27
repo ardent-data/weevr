@@ -182,9 +182,6 @@ def check_defaults_shape(defaults: dict[str, Any] | None, scope: str) -> None:
         columns = target.get("audit_columns")
         if columns is not None and not isinstance(columns, dict):
             fail("target.audit_columns", "a mapping", columns, ("target", "audit_columns"))
-    legacy = defaults.get("audit_columns")
-    if legacy is not None and not isinstance(legacy, dict):
-        fail("audit_columns", "a mapping", legacy, ("audit_columns",))
     if "exports" in defaults:
         exports = defaults["exports"]
         if not isinstance(exports, list):
@@ -251,30 +248,17 @@ def _to_template_refs(val: Any) -> list[str] | None:
 
 
 def _tier_inline_columns(defaults: dict[str, Any] | None) -> dict[str, str]:
-    """A tier's inline audit columns: ``defaults.target.audit_columns`` over the legacy key."""
-    inline: dict[str, str] = {}
+    """A tier's inline audit columns: ``defaults.target.audit_columns``."""
     if not defaults:
-        return inline
-    legacy = defaults.get("audit_columns")
-    if legacy:
-        logger.warning(
-            "defaults.audit_columns is deprecated; use defaults.target.audit_columns instead"
-        )
-        inline.update(legacy)
-    new_path = defaults.get("target", {}).get("audit_columns")
-    if new_path:
-        inline.update(new_path)
-    return inline
+        return {}
+    return dict(defaults.get("target", {}).get("audit_columns") or {})
 
 
 def _cascade_audit(tiers: Sequence[CascadeTier], thread_config: dict[str, Any]) -> None:
     """Cascade audit columns with template resolution, inheritance, and exclusion.
 
-    Handles both the new path (``defaults.target.audit_columns``,
-    ``defaults.target.audit_template``) and the legacy path
-    (``defaults.audit_columns``) at every tier. The legacy path is still
-    supported but triggers a deprecation warning. When both are present, the
-    new path wins on key collision.
+    Reads ``defaults.target.audit_columns`` and ``defaults.target.audit_template``
+    at every tier.
 
     Args:
         tiers: The enclosing tiers, outermost first.
@@ -298,7 +282,6 @@ def _cascade_audit(tiers: Sequence[CascadeTier], thread_config: dict[str, Any]) 
 
     # Skip entirely if nothing is defined at any level
     if not any(tier.templates or tier.template_refs or tier.inline for tier in (*outer, thread)):
-        thread_config.pop("audit_columns", None)
         return
 
     merged = merge_tiered_audit_columns(
@@ -318,7 +301,6 @@ def _cascade_audit(tiers: Sequence[CascadeTier], thread_config: dict[str, Any]) 
         thread_config["target"].pop("audit_columns", None)
 
     # Clean up intermediate keys from the cascaded thread_config
-    thread_config.pop("audit_columns", None)
     thread_config.pop("audit_templates", None)
 
     target = thread_config["target"]

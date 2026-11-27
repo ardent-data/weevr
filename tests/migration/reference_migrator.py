@@ -209,6 +209,7 @@ def _expected(
 ) -> dict[str, Any]:
     """The parsed document the rules must produce, to check the line edits against."""
     expected = _rewrite_tree(copy.deepcopy(raw), tiers)
+    _move_audit_tree(expected)
     if converted:
         _convert_tree(expected, *converted)
     if raw.get("type") in KINDS:
@@ -454,6 +455,197 @@ def _defaults_entries(
     return header, entries
 
 
+_AUDIT_KEY = re.compile(r"^audit_columns\s*:")
+_AUDIT_HEADER = re.compile(r"^audit_columns\s*:\s*(#.*)?$")
+_TARGET_KEY = re.compile(r"^target\s*:")
+_TARGET_HEADER = re.compile(r"^target\s*:\s*(#.*)?$")
+_MAP_ENTRY = re.compile(r"^(?P<key>\"[^\"]*\"|'[^']*'|[^\s#:'\"][^:#]*?)\s*:\s+(?![#|>])\S")
+
+
+def _depth(body: str) -> int:
+    return len(body) - len(body.lstrip(" "))
+
+
+def _block_end(lines: list[tuple[str, str]], start: int, depth: int) -> int:
+    """The last content line of the block under ``lines[start]``, at ``depth``."""
+    last = start
+    for index in range(start + 1, len(lines)):
+        body = lines[index][0]
+        if _is_content(body):
+            if _depth(body) <= depth:
+                break
+            last = index
+    return last
+
+
+def _reindent(pair: tuple[str, str], shift: int) -> tuple[str, str]:
+    body, eol = pair
+    if not body.strip():
+        return pair
+    if shift >= 0:
+        return " " * shift + body, eol
+    return body[min(_depth(body), -shift) :], eol
+
+
+def _entry_key(body: str) -> str | None:
+    match = _MAP_ENTRY.match(body.lstrip(" "))
+    return None if match is None else str(yaml.safe_load(match["key"]))
+
+
+_Lines = list[tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class _AuditBlock:
+    """The ``audit_columns`` block of ``defaults``, with trailing comments that belong to it."""
+
+    first: int
+    last: int
+    defaults_indent: int
+    entry_indent: int
+    eol: str
+
+    def lines(self, lines: _Lines) -> _Lines:
+        return lines[self.first : self.last + 1]
+
+
+def _audit_block(lines: _Lines, top: list[int], indent: int) -> _AuditBlock | None:
+    """The block to move, when it is a block mapping of one-line entries."""
+    found = [i for i in top if _AUDIT_KEY.match(lines[i][0][indent:])]
+    if not found or not _AUDIT_HEADER.match(lines[found[0]][0][indent:]):
+        return None
+    first = found[0]
+    last = _block_end(lines, first, indent)
+    entries = [i for i in range(first + 1, last + 1) if _is_content(lines[i][0])]
+    if not entries:
+        return None
+    entry_indent = _depth(lines[entries[0]][0])
+    if any(_depth(lines[i][0]) != entry_indent or _entry_key(lines[i][0]) is None for i in entries):
+        return None
+    # Comment lines indented under the block, right after its last entry, belong to it.
+    while (
+        last + 1 < len(lines)
+        and lines[last + 1][0].strip().startswith("#")
+        and _depth(lines[last + 1][0]) > indent
+    ):
+        last += 1
+    return _AuditBlock(first, last, indent, entry_indent, lines[first][1] or "\n")
+
+
+def _place_in_new_target(lines: _Lines, block: _AuditBlock) -> tuple[int, _Lines]:
+    """``defaults`` has no ``target``: add one in the block's place."""
+    indent = block.defaults_indent
+    target = (" " * indent + "target:", block.eol)
+    return block.first - 1, [target, *(_reindent(p, indent) for p in block.lines(lines))]
+
+
+def _append_to_target(
+    lines: _Lines, block: _AuditBlock, target_last: int, child_indent: int
+) -> tuple[int, _Lines]:
+    """``target`` has no ``audit_columns``: the block goes to the end of ``target``."""
+    shift = child_indent - block.defaults_indent
+    return target_last, [_reindent(p, shift) for p in block.lines(lines)]
+
+
+def _merge_into_existing(
+    lines: _Lines, block: _AuditBlock, existing: int, child_indent: int
+) -> tuple[int, _Lines] | None:
+    """``target.audit_columns`` exists: append the entries whose key is new."""
+    if not _AUDIT_HEADER.match(lines[existing][0][child_indent:]):
+        return None
+    existing_last = _block_end(lines, existing, child_indent)
+    existing_entries = [
+        i for i in range(existing + 1, existing_last + 1) if _is_content(lines[i][0])
+    ]
+    if not existing_entries:
+        return None
+    existing_indent = _depth(lines[existing_entries[0]][0])
+    present = {
+        _entry_key(lines[i][0]) for i in existing_entries if _depth(lines[i][0]) == existing_indent
+    }
+    moved: _Lines = []
+    pending: _Lines = []  # an entry's comment lines go with it
+    for pair in lines[block.first + 1 : block.last + 1]:
+        pending.append(_reindent(pair, existing_indent - block.entry_indent))
+        if _is_content(pair[0]):
+            if _entry_key(pair[0]) not in present:
+                moved.extend(pending)
+            pending = []
+    moved.extend(pending)
+    return existing_last, moved
+
+
+def _move_audit_columns(lines: _Lines) -> _Lines:
+    """Rule 11: move the root ``defaults:`` block's ``audit_columns`` under its ``target``.
+
+    A shape the edit does not handle returns the lines unchanged.
+    """
+    header = next((i for i, (b, _) in enumerate(lines) if _DEFAULTS_HEADER.match(b)), None)
+    if header is None:
+        return lines
+    children = [
+        i for i in range(header + 1, _block_end(lines, header, 0) + 1) if _is_content(lines[i][0])
+    ]
+    if not children:
+        return lines
+    indent = _depth(lines[children[0]][0])
+    top = [i for i in children if _depth(lines[i][0]) == indent]
+    block = _audit_block(lines, top, indent)
+    if block is None:
+        return lines
+
+    targets = [i for i in top if _TARGET_KEY.match(lines[i][0][indent:])]
+    placed: tuple[int, _Lines] | None
+    if not targets:
+        placed = _place_in_new_target(lines, block)
+    elif not _TARGET_HEADER.match(lines[targets[0]][0][indent:]):
+        return lines
+    else:
+        target_last = _block_end(lines, targets[0], indent)
+        inner = [i for i in range(targets[0] + 1, target_last + 1) if _is_content(lines[i][0])]
+        if not inner:
+            return lines
+        child_indent = _depth(lines[inner[0]][0])
+        existing = [
+            i
+            for i in inner
+            if _depth(lines[i][0]) == child_indent and _AUDIT_KEY.match(lines[i][0][child_indent:])
+        ]
+        if existing:
+            placed = _merge_into_existing(lines, block, existing[0], child_indent)
+        else:
+            placed = _append_to_target(lines, block, target_last, child_indent)
+    if placed is None:
+        return lines
+    after, moved = placed
+
+    out: _Lines = []
+    for index, pair in enumerate(lines):
+        if not block.first <= index <= block.last:
+            out.append(pair)
+        if index == after:
+            out.extend(moved)
+    out = [(body, eol or block.eol) for body, eol in out[:-1]] + out[-1:]
+    out[-1] = (out[-1][0], lines[-1][1])
+    return out
+
+
+def _move_audit_tree(expected: dict[str, Any]) -> None:
+    """The parsed result of :func:`_move_audit_columns`, for the equivalence check."""
+    defaults = expected.get("defaults")
+    if not isinstance(defaults, dict) or "audit_columns" not in defaults:
+        return
+    legacy = defaults.pop("audit_columns")
+    target = defaults.get("target")
+    if not isinstance(target, dict):
+        target = defaults["target"] = {}
+    current = target.get("audit_columns")
+    if isinstance(legacy, dict) and isinstance(current, dict):
+        target["audit_columns"] = {**legacy, **current}
+    else:
+        target.setdefault("audit_columns", legacy)
+
+
 def _params_block(lines: list[tuple[str, str]]) -> tuple[int, int, int] | str | None:
     """The root ``params:`` block: ``(header, last content line, key indent)``.
 
@@ -696,6 +888,9 @@ def migrate_document(
 
     # Rules 6-10: the bare-reference rewrite.
     rewrites = _rewrite_references(lines, refs, chain, file)
+
+    # Rule 11: move defaults.audit_columns under defaults.target.
+    lines = _move_audit_columns(lines)
     pre_conversion = list(lines)
 
     # Rule 3: drop the root type line naming a kind.

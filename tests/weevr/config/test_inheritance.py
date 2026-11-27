@@ -423,7 +423,7 @@ class TestAuditColumnsInheritance:
     def test_loom_only(self):
         """Loom audit_columns cascade into thread target."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
         result = apply_tiers([CascadeTier("loom", loom)], thread)
@@ -435,10 +435,10 @@ class TestAuditColumnsInheritance:
     def test_weave_extends_loom(self):
         """Weave audit_columns extend loom set additively."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"}},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_batch": "'batch_1'"},
+            "target": {"audit_columns": {"_batch": "'batch_1'"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
         result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
@@ -451,10 +451,10 @@ class TestAuditColumnsInheritance:
     def test_weave_overrides_loom_value(self):
         """Weave overrides a loom audit column value for the same key."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'loom_default'"},
+            "target": {"audit_columns": {"_run_id": "'loom_default'"}},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'weave_override'"},
+            "target": {"audit_columns": {"_run_id": "'weave_override'"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
         result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
@@ -463,10 +463,10 @@ class TestAuditColumnsInheritance:
     def test_thread_extends_weave(self):
         """Thread audit_columns extend the inherited set."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()"}},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_batch": "'b1'"},
+            "target": {"audit_columns": {"_batch": "'b1'"}},
         }
         thread: dict[str, Any] = {
             "target": {
@@ -484,7 +484,7 @@ class TestAuditColumnsInheritance:
     def test_thread_overrides_weave_value(self):
         """Thread overrides a weave audit column value for the same key."""
         weave: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'weave'"},
+            "target": {"audit_columns": {"_run_id": "'weave'"}},
         }
         thread: dict[str, Any] = {
             "target": {
@@ -505,7 +505,7 @@ class TestAuditColumnsInheritance:
         """Non-audit dict keys still use standard replace semantics (regression)."""
         loom: dict[str, Any] = {
             "write": {"mode": "overwrite", "format": "delta"},
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()"}},
         }
         weave: dict[str, Any] = {
             "write": {"mode": "merge"},
@@ -521,7 +521,7 @@ class TestAuditColumnsInheritance:
     def test_top_level_audit_columns_removed_from_result(self):
         """audit_columns inherited from defaults is cleaned from the top level."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
         result = apply_tiers([CascadeTier("loom", loom)], thread)
@@ -870,10 +870,12 @@ class TestAuditTemplateInheritance:
     def test_audit_columns_exclude_applied(self):
         """Thread audit_columns_exclude removes columns after merge."""
         loom: dict[str, Any] = {
-            "audit_columns": {
-                "_loaded_at": "current_timestamp()",
-                "_run_id": "'abc'",
-                "_batch": "'b1'",
+            "target": {
+                "audit_columns": {
+                    "_loaded_at": "current_timestamp()",
+                    "_run_id": "'abc'",
+                    "_batch": "'b1'",
+                }
             },
         }
         thread: dict[str, Any] = {
@@ -886,50 +888,6 @@ class TestAuditTemplateInheritance:
         assert "_loaded_at" in result["target"]["audit_columns"]
         assert "_run_id" in result["target"]["audit_columns"]
         assert "_batch" not in result["target"]["audit_columns"]
-
-    def test_legacy_audit_columns_path_merged(self):
-        """defaults.audit_columns (legacy path) is still resolved into target."""
-        loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
-        }
-        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_tiers([CascadeTier("loom", loom)], thread)
-        assert result["target"]["audit_columns"] == {
-            "_loaded_at": "current_timestamp()",
-            "_run_id": "'abc'",
-        }
-
-    def test_legacy_audit_columns_path_warns(self, caplog):
-        """defaults.audit_columns triggers a deprecation warning."""
-        import logging
-
-        loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
-        }
-        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        with caplog.at_level(logging.WARNING, logger="weevr.config.inheritance"):
-            apply_tiers([CascadeTier("loom", loom)], thread)
-        assert any("deprecated" in record.message.lower() for record in caplog.records)
-
-    def test_legacy_and_new_path_coexist(self):
-        """Both legacy and new paths present; new path wins on key collision."""
-        loom: dict[str, Any] = {
-            "audit_columns": {
-                "_loaded_at": "legacy_value()",
-                "_legacy_only": "'yes'",
-            },
-            "target": {
-                "audit_columns": {
-                    "_loaded_at": "new_value()",
-                    "_new_only": "'yes'",
-                }
-            },
-        }
-        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_tiers([CascadeTier("loom", loom)], thread)
-        assert result["target"]["audit_columns"]["_loaded_at"] == "new_value()"
-        assert result["target"]["audit_columns"]["_legacy_only"] == "'yes'"
-        assert result["target"]["audit_columns"]["_new_only"] == "'yes'"
 
     def test_audit_templates_definitions_cascade(self):
         """User-defined templates from loom are available for thread resolution."""
@@ -956,7 +914,7 @@ class TestAuditTemplateInheritance:
             "target": {"audit_template": "base"},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'run_42'"},
+            "target": {"audit_columns": {"_run_id": "'run_42'"}},
         }
         thread: dict[str, Any] = {
             "target": {

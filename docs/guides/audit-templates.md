@@ -232,12 +232,12 @@ informational — it confirms that the built-in preset is not in use.
 ## Migration: `defaults.audit_columns`
 
 Older configurations may cascade audit columns from the loom or weave level
-with `defaults.audit_columns`. That path is deprecated: it still works, but
-each load logs a deprecation warning. Move the block under
+with `defaults.audit_columns`. That key was removed in weevr 2.0: a document
+that uses it fails to load (`C112`). Move the block under
 `defaults.target.audit_columns`:
 
 ```yaml
-# Deprecated (logs a warning)
+# Removed (fails to load)
 defaults:
   audit_columns:
     _loaded_at: "current_timestamp()"

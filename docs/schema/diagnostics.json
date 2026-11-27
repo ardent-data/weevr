@@ -948,6 +948,34 @@
       "replacement": "/kind",
       "reason": null,
       "removed_in": "2.0"
+    },
+    {
+      "kind": "thread",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "weave",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "loom",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "project",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
+      "reason": null,
+      "removed_in": "2.0"
     }
   ]
 }

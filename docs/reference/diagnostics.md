@@ -619,3 +619,7 @@ naming what to write instead. `*` matches any one key or list item.
 | loom | `/type` | `/kind` | 2.0 |
 | params | `/type` | `/kind` | 2.0 |
 | warp | `/type` | `/kind` | 2.0 |
+| thread | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |
+| weave | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |
+| loom | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |
+| project | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |

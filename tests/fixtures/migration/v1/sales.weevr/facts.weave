@@ -1,4 +1,8 @@
 config_version: "1.2"
 
+defaults:
+  audit_columns:  # stamped on every fact
+    _loaded_by: "'sales'"
+
 threads:
   - ref: threads/facts/fact_sales.thread

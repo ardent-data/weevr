@@ -1,5 +1,10 @@
 kind: weave
 config_version: "2.0"
 
+defaults:
+  target:
+    audit_columns:  # stamped on every fact
+      _loaded_by: "'sales'"
+
 threads:
   - ref: threads/facts/fact_sales.thread

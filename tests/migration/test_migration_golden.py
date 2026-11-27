@@ -676,3 +676,123 @@ class TestParamsBlockAtEndOfFile:
         )
         out, _ = _thread(text)
         assert out.endswith("    type: int\n  x:\n    name: x\n    type: int\n    default: 1")
+
+
+class TestAuditColumnsRule:
+    """Rule 11: ``defaults.audit_columns`` moves under ``defaults.target``."""
+
+    def _out(self, body: str) -> str:
+        out, report = _thread(_v1(body))
+        assert report.skipped == []
+        assert yaml.safe_load(_thread(out)[0]) == yaml.safe_load(out)  # idempotent
+        return out
+
+    def test_a_defaults_block_without_a_target_is_nested(self):
+        out = self._out(
+            "defaults:\n  audit_columns:  # run stamps\n    _a: 1\n    _b: 'x'\nsources: {}\n"
+        )
+        assert out == (
+            'kind: thread\nconfig_version: "2.0"\ndefaults:\n  target:\n'
+            "    audit_columns:  # run stamps\n      _a: 1\n      _b: 'x'\nsources: {}\n"
+        )
+
+    def test_a_defaults_target_without_audit_columns_takes_the_block(self):
+        out = self._out(
+            "defaults:\n  audit_columns:\n    _a: 1\n  target:\n    mode: x\nsources: {}\n"
+        )
+        assert yaml.safe_load(out)["defaults"] == {
+            "target": {"mode": "x", "audit_columns": {"_a": 1}}
+        }
+        assert "    mode: x\n    audit_columns:\n      _a: 1\nsources" in out
+
+    def test_existing_keys_win_and_new_keys_are_appended(self):
+        out = self._out(
+            "defaults:\n  audit_columns:\n    _a: old\n    # kept with _b\n    _b: 2\n"
+            "  target:\n    audit_columns:\n      _a: new\n    mode: x\n"
+        )
+        assert yaml.safe_load(out)["defaults"] == {
+            "target": {"audit_columns": {"_a": "new", "_b": 2}, "mode": "x"}
+        }
+        assert "      _a: new\n      # kept with _b\n      _b: 2\n    mode: x\n" in out
+
+    def test_a_missing_final_newline_stays_missing(self):
+        out = self._out("defaults:\n  audit_columns:\n    _a: 1")
+        assert out.endswith("    audit_columns:\n      _a: 1")
+
+    @pytest.mark.parametrize(
+        "block",
+        [
+            "defaults:\n  audit_columns: {_a: 1}\n",
+            "defaults:\n  audit_columns:\n    _a: |\n      x\n",
+            "defaults:\n  audit_columns:\n    _a: 1\n  target: {mode: x}\n",
+            "defaults:\n  audit_columns:\n    _a: 1\n  target: scalar\n",
+            "defaults:\n  audit_columns:\n    _a: 1\n  target:\n",
+        ],
+    )
+    def test_a_shape_the_edit_cannot_make_leaves_the_document_as_v1(self, block: str):
+        text = _v1(block)
+        out, report = _thread(text)
+        assert out == text
+        assert report.skipped == ["t.thread"]
+
+    def test_the_legacy_key_of_an_inline_scope_is_not_moved(self):
+        text = _v1("weaves:\n  - name: w\n    defaults:\n      audit_columns:\n        _a: 1\n")
+        out = migrate_document(text, ".loom")
+        assert "      audit_columns:\n        _a: 1\n" in out
+
+    def test_a_comment_after_the_last_entry_moves_with_the_block(self):
+        out = self._out(
+            "defaults:\n  audit_columns:\n    _a: old\n    _b: 2\n    # about the block\n"
+            "  target:\n    audit_columns:\n      _a: new\n    mode: x\n"
+        )
+        assert "      _a: new\n      _b: 2\n      # about the block\n    mode: x\n" in out
+
+    def test_a_target_block_before_audit_columns_takes_the_block(self):
+        out = self._out(
+            "defaults:\n  target:\n    mode: x\n  audit_columns:\n    _a: 1\nsources: {}\n"
+        )
+        assert out.endswith(
+            "defaults:\n  target:\n    mode: x\n    audit_columns:\n      _a: 1\nsources: {}\n"
+        )
+
+    def test_a_target_block_before_audit_columns_merges(self):
+        out = self._out(
+            "defaults:\n  target:\n    audit_columns:\n      _a: new\n  audit_columns:\n"
+            "    _a: old\n    _b: 2\n"
+        )
+        assert yaml.safe_load(out)["defaults"] == {
+            "target": {"audit_columns": {"_a": "new", "_b": 2}}
+        }
+        assert out.endswith("      _a: new\n      _b: 2\n")
+
+    def test_a_flow_mapping_of_existing_target_audit_columns_is_left_as_v1(self):
+        text = _v1(
+            "defaults:\n  audit_columns:\n    _a: 1\n  target:\n    audit_columns: {_b: 2}\n"
+        )
+        out, report = _thread(text)
+        assert out == text
+        assert report.skipped == ["t.thread"]
+
+    def test_crlf_line_endings_are_kept(self):
+        text = _v1("defaults:\n  audit_columns:\n    _a: 1\n  target:\n    mode: x\n").replace(
+            "\n", "\r\n"
+        )
+        out, report = _thread(text)
+        assert report.skipped == []
+        assert "\n" not in out.replace("\r\n", "")
+        assert yaml.safe_load(out)["defaults"]["target"]["audit_columns"] == {"_a": 1}
+
+    def test_a_four_space_indent_is_kept(self):
+        out = self._out(
+            "defaults:\n    audit_columns:\n        _a: old\n        _b: 2\n"
+            "    target:\n        audit_columns:\n            _a: new\n"
+        )
+        assert out.endswith(
+            "    target:\n        audit_columns:\n            _a: new\n            _b: 2\n"
+        )
+
+    def test_a_quoted_key_is_left_as_v1_and_reported(self):
+        text = _v1('defaults:\n  "audit_columns":\n    _a: 1\n')
+        out, report = _thread(text)
+        assert out == text
+        assert report.skipped == ["t.thread"]
