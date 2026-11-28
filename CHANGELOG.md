@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.0.0-alpha.3](https://github.com/ardent-data/weevr/compare/weevr-v2.0.0-alpha.2...weevr-v2.0.0-alpha.3) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** declare project scope in weevr.yaml ([#335](https://github.com/ardent-data/weevr/issues/335))
+* **config:** bind params per scope and remove bare references ([#333](https://github.com/ardent-data/weevr/issues/333))
+* **config:** v2 document envelope, project root and run store layout ([#332](https://github.com/ardent-data/weevr/issues/332))
+* **config:** report config problems as coded diagnostics ([#318](https://github.com/ardent-data/weevr/issues/318))
+
+### Features
+
+* **config:** bind params per scope and remove bare references ([#333](https://github.com/ardent-data/weevr/issues/333)) ([855193b](https://github.com/ardent-data/weevr/commit/855193b184b37e9e853a46b329e1eaa3220a8f9e))
+* **config:** declare project scope in weevr.yaml ([#335](https://github.com/ardent-data/weevr/issues/335)) ([8d3dd31](https://github.com/ardent-data/weevr/commit/8d3dd3101e8dfc494cc9493741469b1e8d102eff))
+* **config:** load configs into a typed document tree ([#316](https://github.com/ardent-data/weevr/issues/316)) ([59de288](https://github.com/ardent-data/weevr/commit/59de288d528a2e443785865497d587b0e5895990))
+* **config:** report config problems as coded diagnostics ([#318](https://github.com/ardent-data/weevr/issues/318)) ([2e0cff9](https://github.com/ardent-data/weevr/commit/2e0cff9d86f39895a0ecbfc50b2ee1362ca0921a))
+* **config:** v2 document envelope, project root and run store layout ([#332](https://github.com/ardent-data/weevr/issues/332)) ([2d8f8e0](https://github.com/ardent-data/weevr/commit/2d8f8e04aa3af589993ccf586a8dff1a2eefc844))
+
+
+### Bug Fixes
+
+* **config:** honor enabled false on every export ([#321](https://github.com/ardent-data/weevr/issues/321)) ([8f0b341](https://github.com/ardent-data/weevr/commit/8f0b341d4f6e56bbdf59df17061b935f93266f62))
+* **engine:** read YAML column sets from their file ([#326](https://github.com/ardent-data/weevr/issues/326)) ([3e3cf0b](https://github.com/ardent-data/weevr/commit/3e3cf0be919b160bd4414967abd015502b975d0a))
+* **model:** reject unsupported source types at load ([#328](https://github.com/ardent-data/weevr/issues/328)) ([41c7082](https://github.com/ardent-data/weevr/commit/41c70824704b29b91210f559f9d30efea71cff00))
+* **operations:** insert CDC updates for keys missing from the target ([#324](https://github.com/ardent-data/weevr/issues/324)) ([bcf2e98](https://github.com/ardent-data/weevr/commit/bcf2e98d04b1ca68aa8fa804ff2b74a651f66b71))
+
 ## [2.0.0-alpha.2](https://github.com/ardent-data/weevr/compare/weevr-v2.0.0-alpha.1...weevr-v2.0.0-alpha.2) (2026-11-15)
 
 
