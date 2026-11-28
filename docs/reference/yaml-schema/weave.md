@@ -141,7 +141,7 @@ or weave). The two modes are mutually exclusive.
 | `type` | `string` | yes | -- | Source type: `"delta"` or `"yaml"` |
 | `alias` | `string` | cond. | `null` | Lakehouse table alias. One of `alias` or `connection` is required when `type="delta"`. Mutually exclusive with `connection`. |
 | `path` | `string` | cond. | `null` | File path. Required when `type="yaml"`. |
-| `connection` | `string` | cond. | `null` | Reference to a named connection defined at the loom or weave level. Only valid for `type="delta"`. Mutually exclusive with `alias`. |
+| `connection` | `string` | cond. | `null` | Reference to a named connection defined at the project, loom, or weave level. Only valid for `type="delta"`. Mutually exclusive with `alias`. |
 | `schema` | `string` | no | `null` | Schema name within the connection's lakehouse. Only valid alongside `connection`. |
 | `table` | `string` | cond. | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
 | `from_column` | `string` | no | `"source_name"` | Column containing the original (raw) column names |

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from weevr.config.inheritance import apply_inheritance, cascade
+from weevr.config.inheritance import CascadeTier, apply_tiers, cascade
 from weevr.errors.exceptions import ConfigError
 
 
@@ -110,19 +110,19 @@ class TestCascade:
 
 
 class TestApplyInheritance:
-    """Test apply_inheritance function."""
+    """Test apply_tiers over loom and weave tiers."""
 
     def test_thread_only(self):
         """Thread only (no loom or weave defaults) returns thread as-is."""
         thread = {"mode": "merge", "table": "thread_table"}
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         assert result == thread
 
     def test_weave_to_thread(self):
         """Weave defaults cascade into thread."""
         weave_defaults = {"tags": ["weave"], "mode": "overwrite"}
         thread = {"mode": "merge", "table": "thread_table"}
-        result = apply_inheritance(None, weave_defaults, thread)
+        result = apply_tiers([CascadeTier("weave", weave_defaults)], thread)
         assert result["mode"] == "merge"  # Thread wins
         assert result["tags"] == ["weave"]  # From weave
         assert result["table"] == "thread_table"  # From thread
@@ -131,7 +131,7 @@ class TestApplyInheritance:
         """Loom defaults cascade into thread (skipping weave)."""
         loom_defaults = {"audit": "enabled", "mode": "overwrite"}
         thread = {"mode": "merge", "table": "thread_table"}
-        result = apply_inheritance(loom_defaults, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom_defaults)], thread)
         assert result["mode"] == "merge"  # Thread wins
         assert result["audit"] == "enabled"  # From loom
         assert result["table"] == "thread_table"  # From thread
@@ -141,7 +141,9 @@ class TestApplyInheritance:
         loom_defaults = {"audit": "enabled", "mode": "overwrite", "tags": ["loom"]}
         weave_defaults = {"mode": "append", "tags": ["weave"], "format": "delta"}
         thread = {"mode": "merge", "table": "thread_table"}
-        result = apply_inheritance(loom_defaults, weave_defaults, thread)
+        result = apply_tiers(
+            [CascadeTier("loom", loom_defaults), CascadeTier("weave", weave_defaults)], thread
+        )
         # Thread wins mode
         assert result["mode"] == "merge"
         # Weave wins tags (overrides loom)
@@ -158,7 +160,7 @@ class TestApplyInheritance:
         loom = {"priority_test": "loom", "loom_only": "loom_value"}
         weave = {"priority_test": "weave", "weave_only": "weave_value"}
         thread = {"priority_test": "thread", "thread_only": "thread_value"}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         # Thread value wins for overlapping key
         assert result["priority_test"] == "thread"
         # Each level's unique keys are preserved
@@ -171,7 +173,7 @@ class TestApplyInheritance:
         loom = {}
         weave = {"mode": "append"}
         thread = {"table": "thread_table"}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["mode"] == "append"
         assert result["table"] == "thread_table"
 
@@ -180,7 +182,7 @@ class TestApplyInheritance:
         loom = {"audit": "enabled"}
         weave = {}
         thread = {"table": "thread_table"}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["audit"] == "enabled"
         assert result["table"] == "thread_table"
 
@@ -189,7 +191,7 @@ class TestApplyInheritance:
         loom = {"audit": "enabled", "mode": "overwrite"}
         weave = {"mode": "append", "format": "delta"}
         thread = {}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         # Weave's mode wins over loom's
         assert result["mode"] == "append"
         # Weave's format is kept
@@ -202,7 +204,7 @@ class TestApplyInheritance:
         loom = {"execution": {"log_level": "minimal", "trace": True}}
         weave = {}
         thread = {"sources": {"s": "t"}, "target": {"table": "out"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["execution"] == {"log_level": "minimal", "trace": True}
 
     def test_execution_config_thread_overrides(self):
@@ -210,7 +212,7 @@ class TestApplyInheritance:
         loom = {"execution": {"log_level": "minimal", "trace": True}}
         weave = {}
         thread = {"execution": {"log_level": "debug"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         # Thread's execution dict replaces entirely (no deep merge)
         assert result["execution"] == {"log_level": "debug"}
         assert "trace" not in result["execution"]
@@ -220,7 +222,7 @@ class TestApplyInheritance:
         loom = {"execution": {"log_level": "minimal", "trace": True}}
         weave = {"execution": {"log_level": "verbose", "trace": False}}
         thread = {}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["execution"] == {"log_level": "verbose", "trace": False}
 
     def test_dict_replacement_in_cascade(self):
@@ -228,7 +230,7 @@ class TestApplyInheritance:
         loom = {"write": {"mode": "overwrite", "format": "delta", "partition": "date"}}
         weave = {"write": {"mode": "merge", "format": "parquet"}}
         thread = {"write": {"mode": "append"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         # Thread's write dict entirely replaces earlier levels
         assert result["write"] == {"mode": "append"}
         assert "format" not in result["write"]
@@ -242,7 +244,7 @@ class TestNamingInheritance:
         """Loom naming inherited by thread when thread has no naming."""
         loom = {"naming": {"columns": "snake_case"}}
         thread = {"target": {"alias": "data.output"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert result["target"]["naming"] == {"columns": "snake_case"}
 
     def test_weave_naming_overrides_loom(self):
@@ -250,14 +252,14 @@ class TestNamingInheritance:
         loom = {"naming": {"columns": "snake_case"}}
         weave = {"naming": {"columns": "camelCase"}}
         thread = {"target": {"alias": "data.output"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["target"]["naming"] == {"columns": "camelCase"}
 
     def test_thread_naming_overrides_weave(self):
         """Thread target naming overrides weave naming."""
         weave = {"naming": {"columns": "camelCase"}}
         thread = {"target": {"alias": "data.output", "naming": {"columns": "PascalCase"}}}
-        result = apply_inheritance(None, weave, thread)
+        result = apply_tiers([CascadeTier("weave", weave)], thread)
         # Thread already has naming, so parent naming is NOT applied
         assert result["target"]["naming"] == {"columns": "PascalCase"}
 
@@ -265,27 +267,27 @@ class TestNamingInheritance:
         """Thread can opt out of naming with columns=none."""
         loom = {"naming": {"columns": "snake_case"}}
         thread = {"target": {"alias": "data.output", "naming": {"columns": "none"}}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert result["target"]["naming"] == {"columns": "none"}
 
     def test_no_naming_at_any_level(self):
         """No naming config anywhere → no naming key in target."""
         thread = {"target": {"alias": "data.output"}}
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         assert "naming" not in result.get("target", {})
 
     def test_exclude_list_inherited(self):
         """Loom exclude list inherited when thread has no naming."""
         loom = {"naming": {"columns": "snake_case", "exclude": ["__*"]}}
         thread = {"target": {"alias": "data.output"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert result["target"]["naming"]["exclude"] == ["__*"]
 
     def test_thread_naming_replaces_parent_entirely(self):
         """Thread naming replaces parent entirely (not merged field-by-field)."""
         loom = {"naming": {"columns": "snake_case", "exclude": ["__*"]}}
         thread = {"target": {"alias": "data.output", "naming": {"columns": "camelCase"}}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         # Thread had naming, so loom naming is NOT applied
         assert result["target"]["naming"] == {"columns": "camelCase"}
         assert "exclude" not in result["target"]["naming"]
@@ -391,7 +393,7 @@ class TestHookInheritance:
         }
         weave: dict[str, Any] = {"mode": "append"}
         thread: dict[str, Any] = {"mode": "merge", "table": "out"}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         # Thread wins mode
         assert result["mode"] == "merge"
         # Loom's pre_steps inherited (weave didn't override)
@@ -410,7 +412,7 @@ class TestHookInheritance:
             "pre_steps": [_hook_step("row_count", "weave_check")],
         }
         thread: dict[str, Any] = {"table": "out"}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert len(result["pre_steps"]) == 1
         assert result["pre_steps"][0]["name"] == "weave_check"
 
@@ -421,10 +423,10 @@ class TestAuditColumnsInheritance:
     def test_loom_only(self):
         """Loom audit_columns cascade into thread target."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert result["target"]["audit_columns"] == {
             "_loaded_at": "current_timestamp()",
             "_run_id": "'abc'",
@@ -433,13 +435,13 @@ class TestAuditColumnsInheritance:
     def test_weave_extends_loom(self):
         """Weave audit_columns extend loom set additively."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"}},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_batch": "'batch_1'"},
+            "target": {"audit_columns": {"_batch": "'batch_1'"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["target"]["audit_columns"] == {
             "_loaded_at": "current_timestamp()",
             "_run_id": "'abc'",
@@ -449,22 +451,22 @@ class TestAuditColumnsInheritance:
     def test_weave_overrides_loom_value(self):
         """Weave overrides a loom audit column value for the same key."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'loom_default'"},
+            "target": {"audit_columns": {"_run_id": "'loom_default'"}},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'weave_override'"},
+            "target": {"audit_columns": {"_run_id": "'weave_override'"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["target"]["audit_columns"]["_run_id"] == "'weave_override'"
 
     def test_thread_extends_weave(self):
         """Thread audit_columns extend the inherited set."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()"}},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_batch": "'b1'"},
+            "target": {"audit_columns": {"_batch": "'b1'"}},
         }
         thread: dict[str, Any] = {
             "target": {
@@ -472,7 +474,7 @@ class TestAuditColumnsInheritance:
                 "audit_columns": {"_thread": "'my_thread'"},
             }
         }
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["target"]["audit_columns"] == {
             "_loaded_at": "current_timestamp()",
             "_batch": "'b1'",
@@ -482,7 +484,7 @@ class TestAuditColumnsInheritance:
     def test_thread_overrides_weave_value(self):
         """Thread overrides a weave audit column value for the same key."""
         weave: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'weave'"},
+            "target": {"audit_columns": {"_run_id": "'weave'"}},
         }
         thread: dict[str, Any] = {
             "target": {
@@ -490,26 +492,26 @@ class TestAuditColumnsInheritance:
                 "audit_columns": {"_run_id": "'thread_override'"},
             }
         }
-        result = apply_inheritance(None, weave, thread)
+        result = apply_tiers([CascadeTier("weave", weave)], thread)
         assert result["target"]["audit_columns"]["_run_id"] == "'thread_override'"
 
     def test_no_audit_columns_anywhere(self):
         """No audit_columns at any level leaves target without the key."""
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         assert "audit_columns" not in result.get("target", {})
 
     def test_standard_dicts_still_replace(self):
         """Non-audit dict keys still use standard replace semantics (regression)."""
         loom: dict[str, Any] = {
             "write": {"mode": "overwrite", "format": "delta"},
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()"}},
         }
         weave: dict[str, Any] = {
             "write": {"mode": "merge"},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         # write dict replaced entirely (standard behavior)
         assert result["write"] == {"mode": "merge"}
         assert "format" not in result["write"]
@@ -519,10 +521,10 @@ class TestAuditColumnsInheritance:
     def test_top_level_audit_columns_removed_from_result(self):
         """audit_columns inherited from defaults is cleaned from the top level."""
         loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
+            "target": {"audit_columns": {"_loaded_at": "current_timestamp()"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         # Should be in target, not at top level
         assert "audit_columns" not in result or result.get("audit_columns") is None
         assert result["target"]["audit_columns"] == {"_loaded_at": "current_timestamp()"}
@@ -543,7 +545,7 @@ class TestExportsInheritance:
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
         if level == "thread":
             thread["exports"] = exports
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["exports"] == []
 
     def test_string_false_override_suppresses_inherited(self):
@@ -553,7 +555,7 @@ class TestExportsInheritance:
             "target": {"alias": "data.out"},
             "exports": [{"name": "archive", "enabled": "false"}],
         }
-        result = apply_inheritance(None, weave, thread)
+        result = apply_tiers([CascadeTier("weave", weave)], thread)
         assert result["exports"] == []
 
     @pytest.mark.parametrize("value", [True, "true", "yes", 1])
@@ -563,7 +565,7 @@ class TestExportsInheritance:
             "target": {"alias": "data.out"},
             "exports": [{**self._ARCHIVE, "enabled": value}],
         }
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         assert [e["name"] for e in result["exports"]] == ["archive"]
 
     @pytest.mark.parametrize("value", ["maybe", " false", None])
@@ -573,7 +575,7 @@ class TestExportsInheritance:
             "target": {"alias": "data.out"},
             "exports": [{**self._ARCHIVE, "enabled": value}],
         }
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         assert [e["name"] for e in result["exports"]] == ["archive"]
 
     def test_loom_only(self):
@@ -584,7 +586,7 @@ class TestExportsInheritance:
             ],
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert len(result["exports"]) == 1
         assert result["exports"][0]["name"] == "archive"
 
@@ -601,7 +603,7 @@ class TestExportsInheritance:
             ],
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         names = [e["name"] for e in result["exports"]]
         assert "archive" in names
         assert "csv_feed" in names
@@ -620,7 +622,7 @@ class TestExportsInheritance:
             ],
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert len(result["exports"]) == 1
         assert result["exports"][0]["path"] == "/weave/archive"
 
@@ -637,7 +639,7 @@ class TestExportsInheritance:
                 {"name": "csv_feed", "type": "csv", "path": "/csv"},
             ],
         }
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         names = [e["name"] for e in result["exports"]]
         assert "archive" in names
         assert "csv_feed" in names
@@ -655,7 +657,7 @@ class TestExportsInheritance:
                 {"name": "archive", "type": "parquet", "path": "/thread/archive"},
             ],
         }
-        result = apply_inheritance(None, weave, thread)
+        result = apply_tiers([CascadeTier("weave", weave)], thread)
         assert len(result["exports"]) == 1
         assert result["exports"][0]["path"] == "/thread/archive"
 
@@ -673,7 +675,7 @@ class TestExportsInheritance:
                 {"name": "archive", "enabled": False},
             ],
         }
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         names = [e["name"] for e in result["exports"]]
         assert "archive" not in names
         assert "csv_feed" in names
@@ -681,7 +683,7 @@ class TestExportsInheritance:
     def test_no_exports_anywhere(self):
         """No exports at any level leaves thread without exports key."""
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         assert "exports" not in result
 
     def test_empty_thread_exports_inherits_parent(self):
@@ -695,7 +697,7 @@ class TestExportsInheritance:
             "target": {"alias": "data.out"},
             "exports": [],
         }
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert len(result["exports"]) == 1
         assert result["exports"][0]["name"] == "archive"
 
@@ -711,7 +713,7 @@ class TestExportsInheritance:
             "target": {"alias": "data.out"},
             "exports": [{"name": "thread_exp", "type": "csv", "path": "/csv"}],
         }
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         names = [e["name"] for e in result["exports"]]
         assert len(names) == 3
         assert "loom_exp" in names
@@ -728,7 +730,7 @@ class TestConnectionsInheritance:
             "connections": {"src": {"type": "delta", "alias": "db.src"}},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread, loom_connections=loom["connections"])
+        result = apply_tiers([CascadeTier("loom", loom, connections=loom["connections"])], thread)
         assert result["connections"] == {"src": {"type": "delta", "alias": "db.src"}}
 
     def test_thread_connections_override_loom(self):
@@ -738,7 +740,7 @@ class TestConnectionsInheritance:
             "target": {"alias": "data.out"},
             "connections": {"src": {"type": "delta", "alias": "db.thread_src"}},
         }
-        result = apply_inheritance(None, None, thread, loom_connections=loom_conns)
+        result = apply_tiers([CascadeTier("loom", None, connections=loom_conns)], thread)
         assert result["connections"]["src"]["alias"] == "db.thread_src"
         assert len(result["connections"]) == 1
 
@@ -749,7 +751,7 @@ class TestConnectionsInheritance:
             "target": {"alias": "data.out"},
             "connections": {"src_b": {"type": "delta", "alias": "db.b"}},
         }
-        result = apply_inheritance(None, None, thread, loom_connections=loom_conns)
+        result = apply_tiers([CascadeTier("loom", None, connections=loom_conns)], thread)
         assert "src_a" in result["connections"]
         assert "src_b" in result["connections"]
         assert len(result["connections"]) == 2
@@ -759,12 +761,12 @@ class TestConnectionsInheritance:
         loom_conns: dict[str, Any] = {"src": {"type": "delta", "alias": "db.loom_src"}}
         weave_conns: dict[str, Any] = {"src": {"type": "delta", "alias": "db.weave_src"}}
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(
-            None,
-            None,
+        result = apply_tiers(
+            [
+                CascadeTier("loom", None, connections=loom_conns),
+                CascadeTier("weave", None, connections=weave_conns),
+            ],
             thread,
-            loom_connections=loom_conns,
-            weave_connections=weave_conns,
         )
         assert result["connections"]["src"]["alias"] == "db.weave_src"
         assert len(result["connections"]) == 1
@@ -777,12 +779,12 @@ class TestConnectionsInheritance:
             "target": {"alias": "data.out"},
             "connections": {"thread_src": {"type": "delta", "alias": "db.thread"}},
         }
-        result = apply_inheritance(
-            None,
-            None,
+        result = apply_tiers(
+            [
+                CascadeTier("loom", None, connections=loom_conns),
+                CascadeTier("weave", None, connections=weave_conns),
+            ],
             thread,
-            loom_connections=loom_conns,
-            weave_connections=weave_conns,
         )
         assert "loom_src" in result["connections"]
         assert "weave_src" in result["connections"]
@@ -792,7 +794,7 @@ class TestConnectionsInheritance:
     def test_no_connections_at_any_level(self):
         """No connections at any level leaves thread without connections key."""
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         assert "connections" not in result
 
 
@@ -805,7 +807,7 @@ class TestAuditTemplateInheritance:
             "target": {"audit_template": "minimal"},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert result["target"]["audit_columns"] == {
             "_weevr_loaded_at": "current_timestamp()",
             "_weevr_run_id": "${param.run_id}",
@@ -818,7 +820,7 @@ class TestAuditTemplateInheritance:
             "target": {"audit_template": "minimal"},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(None, weave, thread)
+        result = apply_tiers([CascadeTier("weave", weave)], thread)
         assert result["target"]["audit_columns"] == {
             "_weevr_loaded_at": "current_timestamp()",
             "_weevr_run_id": "${param.run_id}",
@@ -839,12 +841,12 @@ class TestAuditTemplateInheritance:
         weave_audit_templates: dict[str, Any] = {
             "override_tpl": {"columns": {"_ts": "thread_ts()", "_extra": "'extra'"}},
         }
-        result = apply_inheritance(
-            None,
-            None,
+        result = apply_tiers(
+            [
+                CascadeTier("loom", None, audit_templates=loom_audit_templates),
+                CascadeTier("weave", None, audit_templates=weave_audit_templates),
+            ],
             thread,
-            loom_audit_templates=loom_audit_templates,
-            weave_audit_templates=weave_audit_templates,
         )
         ac = result["target"]["audit_columns"]
         # Thread-level template ref resolves using available template defs
@@ -862,16 +864,18 @@ class TestAuditTemplateInheritance:
                 "audit_template_inherit": False,
             }
         }
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert "audit_columns" not in result.get("target", {})
 
     def test_audit_columns_exclude_applied(self):
         """Thread audit_columns_exclude removes columns after merge."""
         loom: dict[str, Any] = {
-            "audit_columns": {
-                "_loaded_at": "current_timestamp()",
-                "_run_id": "'abc'",
-                "_batch": "'b1'",
+            "target": {
+                "audit_columns": {
+                    "_loaded_at": "current_timestamp()",
+                    "_run_id": "'abc'",
+                    "_batch": "'b1'",
+                }
             },
         }
         thread: dict[str, Any] = {
@@ -880,54 +884,10 @@ class TestAuditTemplateInheritance:
                 "audit_columns_exclude": ["_batch"],
             }
         }
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert "_loaded_at" in result["target"]["audit_columns"]
         assert "_run_id" in result["target"]["audit_columns"]
         assert "_batch" not in result["target"]["audit_columns"]
-
-    def test_legacy_audit_columns_path_merged(self):
-        """defaults.audit_columns (legacy path) is still resolved into target."""
-        loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
-        }
-        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread)
-        assert result["target"]["audit_columns"] == {
-            "_loaded_at": "current_timestamp()",
-            "_run_id": "'abc'",
-        }
-
-    def test_legacy_audit_columns_path_warns(self, caplog):
-        """defaults.audit_columns triggers a deprecation warning."""
-        import logging
-
-        loom: dict[str, Any] = {
-            "audit_columns": {"_loaded_at": "current_timestamp()"},
-        }
-        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        with caplog.at_level(logging.WARNING, logger="weevr.config.inheritance"):
-            apply_inheritance(loom, None, thread)
-        assert any("deprecated" in record.message.lower() for record in caplog.records)
-
-    def test_legacy_and_new_path_coexist(self):
-        """Both legacy and new paths present; new path wins on key collision."""
-        loom: dict[str, Any] = {
-            "audit_columns": {
-                "_loaded_at": "legacy_value()",
-                "_legacy_only": "'yes'",
-            },
-            "target": {
-                "audit_columns": {
-                    "_loaded_at": "new_value()",
-                    "_new_only": "'yes'",
-                }
-            },
-        }
-        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread)
-        assert result["target"]["audit_columns"]["_loaded_at"] == "new_value()"
-        assert result["target"]["audit_columns"]["_legacy_only"] == "'yes'"
-        assert result["target"]["audit_columns"]["_new_only"] == "'yes'"
 
     def test_audit_templates_definitions_cascade(self):
         """User-defined templates from loom are available for thread resolution."""
@@ -940,11 +900,8 @@ class TestAuditTemplateInheritance:
                 "audit_template": "my_standard",
             }
         }
-        result = apply_inheritance(
-            None,
-            None,
-            thread,
-            loom_audit_templates=loom_audit_templates,
+        result = apply_tiers(
+            [CascadeTier("loom", None, audit_templates=loom_audit_templates)], thread
         )
         assert result["target"]["audit_columns"] == {"_ts": "current_timestamp()", "_id": "'x'"}
 
@@ -957,7 +914,7 @@ class TestAuditTemplateInheritance:
             "target": {"audit_template": "base"},
         }
         weave: dict[str, Any] = {
-            "audit_columns": {"_run_id": "'run_42'"},
+            "target": {"audit_columns": {"_run_id": "'run_42'"}},
         }
         thread: dict[str, Any] = {
             "target": {
@@ -966,11 +923,12 @@ class TestAuditTemplateInheritance:
                 "audit_columns_exclude": ["_source_file"],
             }
         }
-        result = apply_inheritance(
-            loom,
-            weave,
+        result = apply_tiers(
+            [
+                CascadeTier("loom", loom, audit_templates=loom_audit_templates),
+                CascadeTier("weave", weave),
+            ],
             thread,
-            loom_audit_templates=loom_audit_templates,
         )
         ac = result["target"]["audit_columns"]
         # thread template minimal cols present
@@ -992,7 +950,7 @@ class TestAuditTemplateInheritance:
             }
         }
         with pytest.raises(ConfigError, match="nonexistent"):
-            apply_inheritance(None, None, thread)
+            apply_tiers([], thread)
 
     def test_config_error_lists_available_templates(self):
         """ConfigError for unknown template includes available names."""
@@ -1006,7 +964,7 @@ class TestAuditTemplateInheritance:
             }
         }
         with pytest.raises(ConfigError, match="custom_template") as exc_info:
-            apply_inheritance(None, None, thread, loom_audit_templates=loom_templates)
+            apply_tiers([CascadeTier("loom", None, audit_templates=loom_templates)], thread)
         assert "fabric" in str(exc_info.value)
         assert "minimal" in str(exc_info.value)
 
@@ -1020,12 +978,7 @@ class TestAuditTemplateInheritance:
             "target": {"audit_template": ["tpl_a", "tpl_b"]},
         }
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(
-            loom,
-            None,
-            thread,
-            loom_audit_templates=loom_templates,
-        )
+        result = apply_tiers([CascadeTier("loom", loom, audit_templates=loom_templates)], thread)
         ac = result["target"]["audit_columns"]
         assert ac["_a"] == "1"
         assert ac["_b"] == "2"
@@ -1039,7 +992,7 @@ class TestAuditTemplateInheritance:
                 "audit_columns_exclude": ["_drop_*"],
             }
         }
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         ac = result["target"]["audit_columns"]
         assert "_keep" in ac
         assert "_drop_me" not in ac
@@ -1052,7 +1005,7 @@ class TestTargetPolicyInheritance:
         """Loom defaults.target.schema_drift cascades to thread target."""
         loom: dict[str, Any] = {"target": {"schema_drift": "strict"}}
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert result["target"]["schema_drift"] == "strict"
 
     def test_weave_on_drift_overrides_loom(self):
@@ -1060,20 +1013,20 @@ class TestTargetPolicyInheritance:
         loom: dict[str, Any] = {"target": {"on_drift": "warn"}}
         weave: dict[str, Any] = {"target": {"on_drift": "error"}}
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["target"]["on_drift"] == "error"
 
     def test_thread_warp_enforcement_overrides_weave(self):
         """Thread target.warp_enforcement overrides weave."""
         weave: dict[str, Any] = {"target": {"warp_enforcement": "warn"}}
         thread: dict[str, Any] = {"target": {"alias": "data.out", "warp_enforcement": "enforce"}}
-        result = apply_inheritance(None, weave, thread)
+        result = apply_tiers([CascadeTier("weave", weave)], thread)
         assert result["target"]["warp_enforcement"] == "enforce"
 
     def test_missing_key_uses_default_not_set(self):
         """Missing key at any level means no value is set (model defaults apply)."""
         thread: dict[str, Any] = {"target": {"alias": "data.out"}}
-        result = apply_inheritance(None, None, thread)
+        result = apply_tiers([], thread)
         # Keys not set in any level → not in cascaded result
         assert "schema_drift" not in result["target"]
         assert "on_drift" not in result["target"]
@@ -1083,7 +1036,7 @@ class TestTargetPolicyInheritance:
         """Non-target keys like mapping_mode are not touched by policy cascade."""
         loom: dict[str, Any] = {"target": {"schema_drift": "strict"}}
         thread: dict[str, Any] = {"target": {"alias": "data.out", "mapping_mode": "explicit"}}
-        result = apply_inheritance(loom, None, thread)
+        result = apply_tiers([CascadeTier("loom", loom)], thread)
         assert result["target"]["mapping_mode"] == "explicit"
         assert result["target"]["schema_drift"] == "strict"
 
@@ -1098,7 +1051,7 @@ class TestTargetPolicyInheritance:
         }
         weave: dict[str, Any] = {"target": {"schema_drift": "strict"}}
         thread: dict[str, Any] = {"target": {"alias": "data.out", "on_drift": "error"}}
-        result = apply_inheritance(loom, weave, thread)
+        result = apply_tiers([CascadeTier("loom", loom), CascadeTier("weave", weave)], thread)
         assert result["target"]["schema_drift"] == "strict"
         assert result["target"]["on_drift"] == "error"
         assert result["target"]["warp_enforcement"] == "warn"

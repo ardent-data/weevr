@@ -328,6 +328,40 @@ order is the one above.
   key, the engine raises `P112` (unknown namespace) and suggests no rewrite. The
   migration writes `${param.a.b}` and reports it as a rule 10 fallback.
 
+### 11. Move `defaults.audit_columns` under `defaults.target`
+
+v2 reads inline audit columns from `defaults.target.audit_columns` only;
+`defaults.audit_columns` fails with `C112`. See
+[Audit templates](../guides/audit-templates.md#migration-defaultsaudit_columns)
+for how the key cascades in v2. When a document's root `defaults:`
+block has an `audit_columns:` block, its entries move under `target:` in the
+same block, as `defaults.target.audit_columns`:
+
+```diff
+ defaults:
+-  audit_columns:
+-    _loaded_at: "current_timestamp()"
++  target:
++    audit_columns:
++      _loaded_at: "current_timestamp()"
+```
+
+- When `defaults:` has no `target:`, a `target:` line is added in the place of
+  the `audit_columns:` block, and the block's lines move in by the indent of
+  the `defaults:` entries.
+- When `defaults.target` has no `audit_columns`, the block moves to the end of
+  the `target:` block, indented to match its entries.
+- When `defaults.target.audit_columns` exists, the entries merge into it and
+  an existing key wins, as the v1 cascade applied the `target` path over the
+  old one. Entries whose key is new are appended to the end of the existing
+  block, indented to match it. A comment line above an entry moves with it, and
+  is dropped when the entry is.
+- Only a one-line `key: value` entry is moved, and only when `audit_columns:`
+  and `target:` are block mappings. A document with any other shape, such as a
+  flow mapping or a block scalar value, is left as v1 and reported.
+- Only a document's root `defaults:` is read; the `defaults:` block of an inline
+  weave or thread is not changed.
+
 ### Example
 
 A v1 thread with a root `type:` and its v2 result:

@@ -63,8 +63,8 @@ environment-specific paths through `Context(..., params={...})`. See the
 
 ## How does configuration inheritance work?
 
-Configuration cascades through three levels: **Loom** > **Weave** >
-**Thread**. The rule is simple -- most specific wins.
+Configuration cascades through four tiers: **Project** (`weevr.yaml`) >
+**Loom** > **Weave** > **Thread**. The rule is simple -- most specific wins.
 
 A loom can define default write modes, execution settings, and audit
 columns. A weave can override any of those. A thread can override
@@ -72,9 +72,13 @@ anything the weave set. Scalar values are replaced outright; collections
 (lists, maps) are replaced entirely by default. The exceptions use
 **additive merge** -- each level extends the set, and same-named entries
 at a lower level override those from the higher level:
-`audit_columns`, `exports`, and `connections` (merged when the config
-loads), plus `lookups` and `column_sets` (merged at run time across loom,
-weave, and thread) and loom and weave `variables`.
+`target.audit_columns`, `exports`, `connections` and `audit_templates`
+(merged when the config loads), plus `lookups` and `column_sets` (merged by
+name across project, loom, weave, and thread) and loom and weave `variables`.
+The project is the outermost tier, so a connection, audit template, default,
+lookup or column set declared in `weevr.yaml` applies to every config in the
+project. The
+[cascade table](guides/config-resolution.md#cascade-by-key) lists every key.
 
 ```text
 Loom default:   write.mode = overwrite

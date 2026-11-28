@@ -191,8 +191,8 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     _config(
         "C210",
         "reserved-project-block",
-        "weevr.yaml declares a project-scope block (connections, params, defaults, "
-        "audit_templates) that is reserved and not yet supported.",
+        "weevr.yaml declares a project-scope variables block, which is reserved and not "
+        "yet supported.",
     ),
     # C3xx — references and entry forms (config/resolver.py, macros.py, warp.py)
     _config(
@@ -477,6 +477,12 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "R140",
         "unknown-audit-template",
         "An audit template name is neither user-defined nor a built-in preset.",
+    ),
+    _config_warning(
+        "R150",
+        "chained-thread-repeats-audit-columns",
+        "A thread reads another thread's target and would add the audit columns "
+        "that target already carries.",
     ),
     # R2xx — connections
     _config(

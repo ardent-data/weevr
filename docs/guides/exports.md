@@ -9,8 +9,8 @@ systems, or compliance copies.
 
 Exports write the **same DataFrame** that goes to the primary target —
 post-mapping and with audit columns applied. They are declared in the
-`exports:` key at the thread, weave, or loom level and execute
-sequentially after the primary write, watermark persistence, and
+`exports:` key at the thread level, or in `defaults:` at the project, loom, or
+weave level, and execute sequentially after the primary write, watermark persistence, and
 post-write assertions.
 
 !!! warning "Aborted exports are not retried"
@@ -94,7 +94,8 @@ or loom, which leaves an empty segment in the path (for example
 
 ## Cascade Inheritance
 
-Exports cascade additively through loom → weave → thread:
+Exports cascade additively through project → loom → weave → thread (through `defaults.exports`
+on the first three):
 
 - Each level can define exports; all are collected by name.
 - Same-named exports at a lower level override the higher-level definition.

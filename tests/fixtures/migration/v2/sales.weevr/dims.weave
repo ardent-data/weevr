@@ -1,5 +1,11 @@
 kind: weave
 config_version: "2.0"
 
+defaults:
+  target:
+    audit_columns:
+      _run_id: "'nightly'"
+      _loaded_by: "'sales'"
+
 threads:
   - ref: threads/dims/dim_customer.thread

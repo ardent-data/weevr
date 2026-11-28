@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from pydantic import ConfigDict, Field, field_validator
 
 from weevr.diagnostics.rules import rule_error
+from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
+from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
+from weevr.model.lookup import Lookup
+from weevr.model.params import ParamSpec
 
 SCHEMA_SAFE_NAME = r"^[A-Za-z][A-Za-z0-9_]*$"
 """A name usable as a SQL schema name or part of one: a letter, then letters, digits or ``_``."""
@@ -57,9 +62,17 @@ class Project(FrozenBase):
     """A project's root document, ``weevr.yaml``.
 
     Identifies the project, optionally pins the weevr versions it runs on,
-    and says where its run store is. The project-scope blocks
-    (``connections``, ``params``, ``defaults``, ``audit_templates``) are
-    reserved for a later release and rejected at load.
+    says where its run store is, and declares what every config in the
+    project sees. Its ``params`` are the outermost tier of the spec cascade:
+    runtime params bind over their defaults, and a loom, weave or thread
+    declaring the same name shadows them. Its ``connections``,
+    ``audit_templates`` and ``defaults`` are the outermost tier of the load
+    cascade, in the shapes a loom declares them: connections and audit
+    templates merge by name (the nearest declaration wins), and a lower
+    ``defaults:`` block replaces the project's key by key. Its ``lookups``
+    and ``column_sets`` are the outermost layer of every config's effective
+    registries, shadowed by name below. ``variables`` is reserved and
+    rejected at load.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -89,6 +102,58 @@ class Project(FrozenBase):
     run_store: RunStore | None = Field(
         default=None,
         description="Run-store settings; omitted means the container's default.",
+    )
+    params: dict[str, ParamSpec] | None = Field(
+        default=None,
+        description=(
+            "Typed parameter declarations every loom, weave and thread in the project sees; "
+            "a declaration of the same name in a document shadows the project's."
+        ),
+    )
+    strict_params: bool | None = Field(
+        default=None,
+        description=(
+            "Enforce the params contract project-wide: a ${param.x} reference must be "
+            "declared (P120) and every runtime param declared or referenced (P121). A "
+            "document's own strict_params, or the load's, overrides it; unset is lenient."
+        ),
+    )
+    defaults: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Default values inherited by every loom, weave and thread in the project; "
+            "a lower tier's defaults block replaces a key the project sets."
+        ),
+    )
+    audit_templates: dict[str, AuditTemplate] | None = Field(
+        default=None,
+        description=(
+            "Named audit column templates every loom, weave and thread in the project sees; "
+            "a template of the same name declared lower down shadows the project's."
+        ),
+    )
+    connections: dict[str, OneLakeConnection] | None = Field(
+        default=None,
+        description=(
+            "Named connection definitions every loom, weave and thread in the project sees; "
+            "a connection of the same name declared lower down shadows the project's."
+        ),
+    )
+
+    lookups: dict[str, Lookup] | None = Field(
+        default=None,
+        description=(
+            "Named lookup definitions every loom, weave and thread in the project sees; "
+            "a lookup of the same name declared lower down shadows the project's. A "
+            "materialized one is read once per run that uses it, and never when unused."
+        ),
+    )
+    column_sets: dict[str, ColumnSet] | None = Field(
+        default=None,
+        description=(
+            "Named column sets every loom, weave and thread in the project sees; "
+            "a column set of the same name declared lower down shadows the project's."
+        ),
     )
 
     @field_validator("requires_weevr")

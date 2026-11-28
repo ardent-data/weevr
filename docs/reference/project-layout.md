@@ -39,8 +39,23 @@ config_version: "2.0"
 `weevr.yaml` has `kind: project`. It gives the project an `id` and `name`,
 can pin the weevr versions it needs (`requires_weevr`), and can configure the
 run store. The keys are on the [Project schema](yaml-schema/project.md) page.
-The scope blocks `connections`, `params`, `defaults` and `audit_templates` are
-reserved and fail with [`C210`](diagnostics.md#c210).
+
+It is also the project scope: `params`, `strict_params`, `connections`,
+`audit_templates`, `defaults`, `lookups` and `column_sets` declared here are
+the outermost tier of every loom, weave and thread in the project. A project
+is deployed as a whole, while a loom is what executes; the project holds what
+the looms share. Lower tiers shadow the project's by name, and
+[Config resolution](../guides/config-resolution.md#cascade-by-key) lists how
+each key cascades. `variables:` is reserved at the project tier and fails with
+[`C210`](diagnostics.md#c210).
+
+### YAML features
+
+Documents are YAML, parsed for their content. Custom tags (`!something`) are
+not supported. Anchors and aliases (`&name`, `*name`) parse, but tools that
+rewrite documents, such as `weevr migrate`, work on the text and do not
+preserve or create them: an anchor can be expanded or lost on rewrite. Write
+shared values as params, connections or `defaults:` instead.
 
 ## Project root
 
@@ -106,7 +121,8 @@ When you load or run a single document directly, it sees the project scope
 (when a `weevr.yaml` was found), its own configuration, and the invocation
 params. It does not borrow defaults from a loom that would normally contain
 it. A thread that needs its loom's defaults runs through the loom, selecting
-threads with `threads=[...]`.
+threads with `threads=[...]`. A standalone thread still cascades through the
+project tier when there is one, and its own `target.audit_template` is applied at load.
 
 ## Definition layout
 

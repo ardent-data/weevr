@@ -25,10 +25,11 @@ concrete.
 - **Reference resolution** — `ref:` entries in weave and loom configs load
   child configuration files recursively. Circular references are detected
   and rejected.
-- **Inheritance cascade** — Defaults flow downward: loom defaults → weave
-  defaults → thread config. The most specific value wins. Replacement is
-  whole-value, not deep merge, except for the special cascades described in
-  Stage 8 (naming, audit columns, exports, connections, target policies).
+- **Inheritance cascade** — Defaults flow downward: project defaults → loom
+  defaults → weave defaults → thread config. The most specific value wins.
+  Replacement is whole-value, not deep merge, except for the special cascades
+  described in Stage 8 (naming, audit columns, exports, connections, target
+  policies). The [cascade table](#cascade-by-key) lists every key.
 - **Typed extensions** — Files use `.thread`, `.weave`, and `.loom` extensions
   to declare their config type unambiguously.
 - **Macro expansion** — `foreach` blocks in step lists expand into repeated
@@ -132,9 +133,13 @@ provenance). Nothing is added to the config itself.
   `keys` blocks are checked against the dimension override rules, before
   any loom or weave defaults are merged in, so inherited defaults never
   trip them. Then, for multi-level configs, cascade defaults:
+    - Project defaults (`weevr.yaml`) merge into loom defaults
     - Loom defaults merge into weave defaults
     - Merged defaults merge into each thread config
     - Thread values always win (most specific)
+
+    A thread loaded on its own still cascades through the project tier.
+    It never sees a loom or weave it isn't run through.
 
     Naming configuration cascades separately as a whole block rather
     than per-field. Audit columns (`audit_columns`), **exports**, and
@@ -148,7 +153,8 @@ provenance). Nothing is added to the config itself.
     thread's target, and the most specific level wins.
 
     Named registries — `lookups`, `column_sets`, and `variables` — merge
-    by name from loom to weave to thread: each scope sees the outer
+    by name from project to loom to weave to thread (the project declares
+    no variables): each scope sees the outer
     scopes' entries plus its own, and its own win a name clash. The
     merged registries are computed once, here, and recorded on the
     [document tree](#the-document-tree); plan, preview, validate, and
@@ -172,7 +178,7 @@ missing name is injected from the stem), and `qualified_key` is set to the
 file's path relative to the project root. Relative `path` values on file
 sources (CSV, JSON, Parquet) are resolved against the project root,
 both a thread's sources and the source of every lookup, whether the thread,
-weave, or loom declares it. The `path` of a YAML column set at any level
+weave, loom, or project declares it. The `path` of a YAML column set at any level
 resolves the same way. The fully resolved dictionary
 is then validated through the typed Pydantic model (`Thread`, `Weave`,
 or `Loom`). Semantic errors at this stage raise `ModelValidationError`.
@@ -206,6 +212,60 @@ longer match the file, so the diagnostic points at the step list.
 
 A key the removed-key table lists fails with `C111` (removed) or `C112`
 (renamed), naming what to write instead.
+
+## Cascade by key
+
+Four tiers contribute to a thread: the **project** (`weevr.yaml`), the
+**loom**, the **weave**, and the thread itself. Each tier's `defaults:` block
+and its named registries cascade down. The nearest tier wins, and a thread's
+own keys beat every tier's `defaults:`.
+
+Values (params) and shape (declarations) travel differently. Params bind per
+scope and flow down by name. Declarations such as connections, audit
+templates, lookups, column sets, and `defaults:` cascade as written here.
+
+### `defaults:` keys
+
+| Key | Behavior | Lands in |
+|---|---|---|
+| any other key (for example `write`) | Replace: the nearest tier that sets the key supplies the whole value; no deep merge | the thread's own key |
+| `naming` | Replace: the nearest tier's block, used only when the thread's `target` sets no `naming` | `target.naming` |
+| `target.audit_columns` | Merge by column name, outermost tier first, then the thread's own; a nearer tier wins a name clash. The thread's `audit_template_inherit: false` also drops every outer tier's inline columns, and `audit_columns_exclude` removes matching columns from the result | `target.audit_columns` |
+| `target.audit_template` | Merge: each tier's references resolve to columns and apply outermost first, before that tier's own `audit_columns`; the thread's `audit_template_inherit: false` drops every tier's | `target.audit_columns` |
+| `target.schema_drift`, `target.on_drift`, `target.warp_enforcement` | Per-key merge: the nearest tier that sets the key wins; the thread's own `target` beats every tier | the same key on `target` |
+| `exports` | Merge by export name: a nearer tier's export of the same name replaces the whole entry; one with `enabled: false` is removed | `exports` |
+| other `target.*` keys | Replace: a thread always has its own `target`, which replaces the tier's block, so only the keys above reach it | not inherited |
+
+### Registries
+
+| Registry | Behavior | Lands in |
+|---|---|---|
+| `connections` | Merge by name: the nearest tier's definition wins | the thread's `connections` |
+| `audit_templates` | Merge by name: every tier's definitions are visible to every tier's references, the nearest definition of a name winning | consumed by the audit merge; not kept on the thread |
+| `lookups` | Merge by name, the project outermost: inner names shadow outer ones | `effective.lookups` on each document node |
+| `column_sets` | As `lookups` | `effective.column_sets` |
+| `variables` | As `lookups`, from loom downward; the project tier rejects `variables:` | `effective.variables` |
+| `params` | Not cascaded as a registry: each scope's declarations bind by name, a nearer declaration shadowing an outer one (see [Params](params.md)) | the `${param.x}` namespace |
+
+Two behaviors follow from the table:
+
+- The project's connections, audit templates, and `defaults:` apply to every
+  loom, weave, and thread in the project, and so does the project's
+  `params:` block. A required project param with no default and no value fails
+  every load in the project with `P101`, just as a required loom param fails
+  its loom. A project declaration counts as use for `P121`.
+- A project lookup or column set is the outermost layer of every config's
+  effective registries, so the load-time reference checks (`R120`, `R122`,
+  `R124`) see it without Spark. At run time it is read only when a running
+  thread names it and the name resolves to the project's: once at loom start
+  under a loom, at weave level for a standalone weave, and on demand for a
+  standalone thread.
+
+Provenance records the tier behind each entry. For each connection, audit
+template, lookup, column set, variable, and top-level `defaults` key,
+`ResolvedDocument.provenance` holds a `RegistryDeclaration` (exported from
+`weevr.config`) giving the declaring tier, file, and pointer. See
+[The document tree](#the-document-tree).
 
 ## Loading without running
 
@@ -287,10 +347,10 @@ everything it pulls in, as a frozen tree. Each node has:
 | `kind` | `"thread"`, `"weave"`, or `"loom"` |
 | `name` | The effective name (`as`, else `name`, else the file stem) |
 | `entry` | An `EntryMeta` for the entry that pulled it in: `ref`, `alias` (`as`), `params`, `dependencies`, `condition`. `None` for the loaded file |
-| `provenance` | Where its values came from: `provenance.params` maps each param to its source (`runtime`, `pin`, `inherited`, `default`, or `fallback`), the winning declaration, and the pinning entry. Names and locations only, never values |
+| `provenance` | Where its values came from: `provenance.params` maps each param to its source (`runtime`, `pin`, `inherited`, `default`, or `fallback`), the winning declaration, and the pinning entry. `provenance.connections`, `.audit_templates`, `.lookups`, `.column_sets`, `.variables`, and `.defaults` map each name the node sees (for `defaults`, each top-level key) to a `RegistryDeclaration`: the tier that declares it (`project`, `loom`, `weave`, or `thread`), the file, and the JSON pointer. The nearest tier wins. Names and locations only, never values |
 | `children` | A loom's weaves or a weave's threads, by effective name, in entry order |
 | `source_ref` | The file it is written in: its own, or the file holding it inline |
-| `effective` | The `lookups`, `column_sets`, and `variables` it sees, merged over every enclosing scope |
+| `effective` | The `lookups`, `column_sets`, and `variables` it sees, merged over every enclosing scope, the project's included |
 | `declared` | The ones it declares itself |
 
 ```python
@@ -323,7 +383,7 @@ weave models by name.
 | `config/assets.py` | Registry assets as declared, for the pin check (`P122`) |
 | `config/manifest.py` | `param_manifest()`: the params a config takes, read without values |
 | `config/manifest_types.py` | `ParamManifest` and `ManifestParam` |
-| `config/inheritance.py` | Three-level cascade: loom → weave → thread, including the named registry merge (`cascade_registry`) |
+| `config/inheritance.py` | The cascade: project → loom → weave → thread, including the named registry merge (`cascade_registry`) |
 | `config/validation.py` | Pre-resolution schema validation; dimension override checks (run during load, before the cascade); lookup and column set reference checks (run during hydration); incremental cross-field checks (run at the end of the load, on every thread) |
 | `config/document.py` | The resolved config tree: `ResolvedDocument`, `EntryMeta`, and each node's registries |
 | `config/macros.py` | `foreach` block expansion in step lists; rejects `foreach` in `with:` sub-pipelines |

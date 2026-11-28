@@ -258,7 +258,7 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is reserved and not yet supported.",
+      "summary": "weevr.yaml declares a project-scope variables block, which is reserved and not yet supported.",
       "docs_anchor": "c210"
     },
     {
@@ -882,6 +882,16 @@
       "docs_anchor": "r140"
     },
     {
+      "code": "R150",
+      "name": "chained-thread-repeats-audit-columns",
+      "category": "config",
+      "severity": "warning",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A thread reads another thread's target and would add the audit columns that target already carries.",
+      "docs_anchor": "r150"
+    },
+    {
       "code": "R201",
       "name": "undefined-connection",
       "category": "config",
@@ -946,6 +956,34 @@
       "kind": "warp",
       "path": "/type",
       "replacement": "/kind",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "thread",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "weave",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "loom",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "project",
+      "path": "/defaults/audit_columns",
+      "replacement": "/defaults/target/audit_columns",
       "reason": null,
       "removed_in": "2.0"
     }

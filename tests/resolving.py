@@ -91,3 +91,18 @@ def collected_at(
 def with_code(diagnostics: list[Diagnostic], code: str) -> list[Diagnostic]:
     """The diagnostics in ``diagnostics`` with ``code``."""
     return [d for d in diagnostics if d.code == code]
+
+
+def leaf_node(loaded: Any) -> ResolvedDocument:
+    """The first leaf of a loaded tree: its thread node, whatever the root kind.
+
+    Args:
+        loaded: A load result (``load_at`` or ``load_resolved``).
+
+    Returns:
+        The leaf :class:`ResolvedDocument`, found by following first children.
+    """
+    document: ResolvedDocument = loaded.document
+    while document.children:
+        document = next(iter(document.children.values()))
+    return document

@@ -474,7 +474,6 @@ class TestEnvelopeAndRegistries:
         [
             ({"target": "x"}, "/defaults/target"),
             ({"target": {"audit_columns": []}}, "/defaults/target/audit_columns"),
-            ({"audit_columns": 3}, "/defaults/audit_columns"),
             ({"exports": {}}, "/defaults/exports"),
             ({"exports": [{}, "x"]}, "/defaults/exports/1"),
         ],

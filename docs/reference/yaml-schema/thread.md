@@ -54,7 +54,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. Any other `type` fails config load. |
-| `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. An undefined name fails the config load; see [Loading without running](../../guides/config-resolution.md#loading-without-running) for a thread loaded on its own. |
+| `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, loom, or project level) at execution time. An undefined name fails the config load; see [Loading without running](../../guides/config-resolution.md#loading-without-running) for a thread loaded on its own. |
 | `alias` | `string` | conditional | `null` | Delta table to read: a table name such as `schema.table` (read from the metastore) or a table path. A path is used as given, never joined to the project root; see [How relative locations resolve](#how-relative-locations-resolve). Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
 | `path` | `string` | conditional | `null` | File path. A relative path is joined to the project root. Required for file-based types (`csv`, `json`, `parquet`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
@@ -349,7 +349,7 @@ static entries in `columns` override matching column set entries.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `columns` | `dict[string, string]` | no | `{}` | Map of old name to new name |
-| `column_set` | `string` | no | `null` | Name of a column set defined at thread, weave, or loom level |
+| `column_set` | `string` | no | `null` | Name of a column set defined at thread, weave, loom, or project level |
 
 `column_set` must name a set the thread can see: its own `column_sets`, or its
 weave's or loom's. A name no level defines fails when a weave or loom loads,
@@ -1584,7 +1584,7 @@ and lakehouse by GUID or variable reference. Sources, targets, and exports can
 then refer to a connection by name instead of embedding raw GUIDs or
 `abfss://` paths inline.
 
-Connections cascade from loom to weave to thread. When the same name is defined
+Connections cascade from project to loom to weave to thread. When the same name is defined
 at multiple levels, the most-specific level wins.
 
 | Key | Type | Required | Default | Description |

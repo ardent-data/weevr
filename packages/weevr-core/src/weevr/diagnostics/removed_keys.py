@@ -28,7 +28,7 @@ class RemovedKey:
 
     Attributes:
         kind: The config kind the key was read in (``thread``, ``weave``,
-            ``loom``, ``params`` or ``warp``).
+            ``loom``, ``params``, ``warp`` or ``project``).
         path: JSON pointer to the old key; ``*`` matches any one segment.
         replacement: Pointer to the key that replaced it, in the same form,
             for a rename. ``*`` segments take the matched values.
@@ -53,6 +53,16 @@ REMOVED_KEYS: tuple[RemovedKey, ...] = (
     *(
         RemovedKey(kind, "/type", replacement="/kind", removed_in="2.0")
         for kind in ("thread", "weave", "loom", "params", "warp")
+    ),
+    # Inline audit columns of ``defaults`` sit with the rest of the target defaults.
+    *(
+        RemovedKey(
+            kind,
+            "/defaults/audit_columns",
+            replacement="/defaults/target/audit_columns",
+            removed_in="2.0",
+        )
+        for kind in ("thread", "weave", "loom", "project")
     ),
 )
 """Every removed or renamed key, by the topic that removed it. Rows are only added."""

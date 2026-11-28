@@ -621,6 +621,28 @@ class PlanIssue:
     diagnostic: Diagnostic | None = None
 
 
+def with_derived_load_warnings(
+    document: ResolvedDocument, warnings: Sequence[Diagnostic]
+) -> list[Diagnostic]:
+    """Add the warnings only the whole loaded tree can show to a load's warnings.
+
+    Today that is ``R150``, for a thread repeating the audit columns of the
+    thread it reads. Call this once, on the loader's warnings, before logging
+    them and wrapping them in :meth:`LoadedConfig.from_document`, which adds
+    nothing itself, so the warnings are logged and reported alike.
+
+    Args:
+        document: The tree the config loader returned.
+        warnings: The load's warning diagnostics.
+
+    Returns:
+        ``warnings`` followed by the derived ones.
+    """
+    from weevr.engine.audit_chain import audit_chain_diagnostics
+
+    return [*warnings, *audit_chain_diagnostics(document)]
+
+
 class LoadedConfig:
     """A hydrated config with its resolved children, returned without executing.
 

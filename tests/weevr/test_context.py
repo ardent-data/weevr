@@ -1624,6 +1624,73 @@ class TestContextRunStore:
         assert ctx.run_store is not None
         assert ctx.run_store.base == "abfss://ops-ws@onelake.dfs.fabric.microsoft.com/central-lh"
 
+    def _project_with_connection(self, tmp_path: Path, workspace: str, **extra: Any) -> Path:
+        project = _stub_execution_project(tmp_path)
+        body: dict = {
+            "config_version": "2.0",
+            "id": TEST_PROJECT_ID,
+            "name": "sales",
+            "run_store": {"connection": "central"},
+            "connections": {
+                "central": {"type": "onelake", "workspace": workspace, "lakehouse": "proj-lh"}
+            },
+            **extra,
+        }
+        write_document(project / "weevr.yaml", body, kind="project")
+        return project
+
+    def test_project_connection_resolves_before_any_load(self, tmp_path: Path) -> None:
+        project = self._project_with_connection(tmp_path, "proj-ws")
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        assert ctx.run_store is not None
+        assert ctx.run_store.base == "abfss://proj-ws@onelake.dfs.fabric.microsoft.com/proj-lh"
+
+    def test_project_connection_reads_context_params(self, tmp_path: Path) -> None:
+        ws = {"ws": {"name": "ws", "type": "string", "required": False, "default": "dev-ws"}}
+        project = self._project_with_connection(tmp_path, "${param.ws}", params=ws)
+        default = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        assert default.run_store is not None
+        assert default.run_store.base.startswith("abfss://dev-ws@")
+        ctx = Context(
+            spark=MagicMock(spec=SparkSession), project=str(project), params={"ws": "prod-ws"}
+        )
+        assert ctx.run_store is not None
+        assert ctx.run_store.base.startswith("abfss://prod-ws@")
+
+    def test_only_the_named_project_connection_is_resolved(self, tmp_path: Path) -> None:
+        project = _stub_execution_project(tmp_path)
+        body: dict = {
+            "config_version": "2.0",
+            "id": TEST_PROJECT_ID,
+            "name": "sales",
+            "run_store": {"connection": "central"},
+            "connections": {
+                "central": {"type": "onelake", "workspace": "proj-ws", "lakehouse": "proj-lh"},
+                "broken": {
+                    "type": "onelake",
+                    "workspace": "${param.missing}",
+                    "lakehouse": "lh",
+                },
+            },
+        }
+        write_document(project / "weevr.yaml", body, kind="project")
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        assert ctx.run_store is not None
+        assert ctx.run_store.base == "abfss://proj-ws@onelake.dfs.fabric.microsoft.com/proj-lh"
+
+    def test_loaded_config_connection_wins_by_name(self, tmp_path: Path) -> None:
+        project = self._project_with_connection(tmp_path, "proj-ws")
+        write_document(
+            project / "stub.loom",
+            'config_version: "2.0"\nweaves:\n  - ref: stub.weave\n'
+            "connections:\n  central:\n    type: onelake\n"
+            "    workspace: ops-ws\n    lakehouse: central-lh\n",
+        )
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        ctx.load("stub.loom")
+        assert ctx.run_store is not None
+        assert ctx.run_store.base == "abfss://ops-ws@onelake.dfs.fabric.microsoft.com/central-lh"
+
 
 class TestLogLevelWiring:
     """YAML log_level application with Context-argument precedence."""

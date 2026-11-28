@@ -118,12 +118,23 @@ The project document, `weevr.yaml` (`kind: project`). See
 | `description` | `str` | `None` | What the project is for |
 | `requires_weevr` | `str` | `None` | PEP 440 specifier the installed weevr must satisfy |
 | `run_store` | `RunStore` | `None` | Run-store settings; omitted means the container default |
+| `params` | `dict[str, ParamSpec]` | `None` | Typed params every loom, weave and thread sees |
+| `strict_params` | `bool` | `None` | Enforce the params contract project-wide (`P120`, `P121`) |
+| `connections` | `dict[str, Connection]` | `None` | Named connections every config sees |
+| `audit_templates` | `dict[str, AuditTemplate]` | `None` | Named audit column templates every config sees |
+| `defaults` | `dict[str, any]` | `None` | Defaults cascaded into every loom, weave and thread |
+| `lookups` | `dict[str, Lookup]` | `None` | Named lookups every config sees |
+| `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets every config sees |
+
+`variables:` is reserved at the project tier and rejected at load (`C210`).
+Each block cascades as in the
+[cascade table](../guides/config-resolution.md#cascade-by-key).
 
 ### RunStore
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `connection` | `str` | `None` | Connection whose lakehouse holds the run store |
+| `connection` | `str` | `None` | Connection whose lakehouse holds the run store; looked up in the loaded config, then in `weevr.yaml` |
 | `layout` | `str` | `per_project` | `per_project` or `shared` |
 | `schema` | `str` | `None` | Shared schema (default `weevr`), or per-project name override |
 
@@ -671,7 +682,7 @@ Deployment unit grouping one or more weaves.
 ## OneLakeConnection
 
 Named connection declaration for Fabric OneLake sources and targets.
-Declared in the `connections:` block at loom, weave, or thread level
+Declared in the `connections:` block at project, loom, weave, or thread level
 and cascaded through the standard merge rules.
 
 | Field | Type | Default | Description |
@@ -705,14 +716,14 @@ Named column mapping sourced from Delta, YAML, or runtime parameters.
 A `delta` source can be addressed two ways: by registered table alias
 (default Spark catalog) or by named connection plus table (resolves
 through the lakehouse referenced by a `connections:` entry on the
-loom or weave). The two modes are mutually exclusive.
+project, loom or weave). The two modes are mutually exclusive.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | `Literal["delta", "yaml"]` | *required* | Source type |
 | `alias` | `str` | `None` | Registered table alias. One of `alias` or `connection` is required when `type="delta"`. Mutually exclusive with `connection`. |
 | `path` | `str` | `None` | File path to the YAML mapping file. Required when `type="yaml"`. |
-| `connection` | `str` | `None` | Reference to a named connection defined at the loom or weave level. Only valid for `type="delta"`. Mutually exclusive with `alias`. |
+| `connection` | `str` | `None` | Reference to a named connection defined at the project, loom, or weave level. Only valid for `type="delta"`. Mutually exclusive with `alias`. |
 | `schema` | `str` | `None` | Schema name within the connection's lakehouse. Only valid alongside `connection`. |
 | `table` | `str` | `None` | Table name within the connection's lakehouse. Required when `connection` is set. |
 | `from_column` | `str` | `"source_name"` | Column containing raw names |
@@ -723,7 +734,7 @@ loom or weave). The two modes are mutually exclusive.
 
 ## Lookup
 
-A named data definition declared at loom, weave, or thread level and referenced
+A named data definition declared at project, loom, weave, or thread level and referenced
 by threads via `source.lookup`.
 
 | Field | Type | Default | Description |

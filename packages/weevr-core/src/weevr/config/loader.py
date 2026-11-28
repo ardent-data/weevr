@@ -15,9 +15,17 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from pydantic import TypeAdapter, ValidationError
+
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import collecting, diagnostics_of, errors_recorded
-from weevr.config.document import ConfigKind, EntryMeta, Provenance, ResolvedDocument
+from weevr.config.document import (
+    ConfigKind,
+    EntryMeta,
+    Provenance,
+    ResolvedDocument,
+    ScopeRegistries,
+)
 from weevr.config.document_load import load_document
 from weevr.config.hydration import (
     check_column_set_references,
@@ -26,7 +34,12 @@ from weevr.config.hydration import (
     hydrate_children,
     hydrate_model,
 )
-from weevr.config.inheritance import apply_inheritance, check_defaults_shape
+from weevr.config.inheritance import (
+    CascadeTier,
+    apply_tiers,
+    check_defaults_shape,
+    layer_declarations,
+)
 from weevr.config.interpolation import check_fabric_context
 from weevr.config.locations import (
     ConfigLocation,
@@ -36,14 +49,14 @@ from weevr.config.locations import (
     make_location,
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
-from weevr.config.param_provenance import ParamProvenance
+from weevr.config.param_provenance import ParamProvenance, RegistryDeclaration
 from weevr.config.params import ScopePositions
 from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
     ResolvedChild,
     resolve_references,
 )
-from weevr.config.root import find_project_root, read_project
+from weevr.config.root import PROJECT_FILE, find_project_root, read_project
 from weevr.config.scoping import WalkState, param_use_diagnostics, resolve_config_variables
 from weevr.config.validation import (
     dimension_override_diagnostics,
@@ -56,9 +69,13 @@ from weevr.config.validation import (
 )
 from weevr.config.warp import discover_warp, find_warp
 from weevr.diagnostics import Diagnostic, diagnostic
-from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer
-from weevr.errors import ConfigError, VariableResolutionError
+from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer, place_all
+from weevr.diagnostics.pydantic import from_validation_error
+from weevr.errors import ConfigError, ModelValidationError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
+from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
+from weevr.model.lookup import Lookup
 from weevr.model.project import Project
 from weevr.model.warp import WarpBinding
 
@@ -86,6 +103,13 @@ class ResolvedConfig:
         project: The project document at ``project_root``; ``None`` when it
             has no ``weevr.yaml``.
         provenance: Where each of the config's own params came from.
+        project_scope: The project's lookups and column sets, resolved in
+            its own scope; ``None`` when it declares neither.
+        project_connections: The project's connections, resolved in its own
+            scope, for the lookups and column sets a loom or weave
+            materializes; ``None`` when it declares none.
+        declarations: Where each registry entry and ``defaults:`` key the
+            config sees is declared, the project's included.
     """
 
     location: ConfigLocation
@@ -98,6 +122,9 @@ class ResolvedConfig:
     warnings: list[Diagnostic] = field(default_factory=list)
     project: Project | None = None
     provenance: Mapping[str, ParamProvenance] = field(default_factory=dict)
+    project_scope: ScopeRegistries | None = None
+    project_connections: dict[str, OneLakeConnection] | None = None
+    declarations: Mapping[str, Mapping[str, RegistryDeclaration]] = field(default_factory=dict)
 
 
 def resolve_project_root(
@@ -187,6 +214,7 @@ def resolve_config(
     config_dict = validated.model_dump(exclude_unset=True)
 
     errors_before = errors_recorded()
+    project_file = None if project is None else root.join(PROJECT_FILE)
     walk = WalkState.start(
         config_dict,
         file=str(location),
@@ -194,6 +222,11 @@ def resolve_config(
         runtime_params=runtime_params,
         fabric_context=fabric_context,
         strict_override=strict_params,
+        project=project,
+        project_file=None if project_file is None else str(project_file),
+    )
+    project_tier, project_scope, project_connections, project_declarations = _project_layers(
+        project, project_file, walk, root
     )
 
     inline_scopes: ScopePositions = {}
@@ -234,12 +267,19 @@ def resolve_config(
     if config_type in COMPONENT_TYPES:
         walk_complete = errors_recorded() == errors_before
         warnings.extend(param_use_diagnostics(walk, walk_complete=walk_complete))
-        warnings.extend(collect_execution_warnings(config_type, data, children))
+        warnings.extend(
+            collect_execution_warnings(config_type, data, children, project_tier=project_tier)
+        )
     # Dimension override rules apply to what each thread declares itself, so
     # they also run before the cascade adds loom/weave write and keys defaults.
     if config_type in COMPONENT_TYPES:
         check_dimension_overrides(config_type, data, children, location)
-    _apply_cascade(config_type, data, children)
+    # Recorded from the pre-cascade dicts, in the cascade's tier order, so each
+    # name keeps the tier that declared it rather than the thread it lands in.
+    declarations = _record_declarations(
+        config_type, data, children, str(location), project_declarations
+    )
+    data = _apply_cascade(config_type, data, children, project_tier)
 
     if config_type == "thread":
         reject_foreach_in_with(data)
@@ -286,6 +326,9 @@ def resolve_config(
         warnings=warnings,
         project=project,
         provenance=walk.provenance,
+        project_scope=project_scope,
+        project_connections=project_connections,
+        declarations=declarations,
     )
 
 
@@ -306,11 +349,12 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[D
         ModelValidationError: If the config or any child fails model validation.
     """
     lookup_warnings: list[Diagnostic] = []
+    project_scope = resolved.project_scope or ScopeRegistries()
     if resolved.config_type == "thread":
-        # A standalone thread sees only its own lookups at run time
+        # A standalone thread sees its own lookups over the project's at run time
         check_resolve_lookups(
             resolved.data,
-            None,
+            project_scope.lookups,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -318,7 +362,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[D
         )
         check_column_set_references(
             resolved.data,
-            None,
+            project_scope.column_sets,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -337,6 +381,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[D
         prepare=lambda child_dict: resolve_source_paths(child_dict, root),
         warnings=lookup_warnings,
         bind=lambda thread, source: bind_thread_warp(thread, location_like(source, root), root),
+        outer=project_scope,
     )
 
     warnings = list(resolved.warnings)
@@ -440,7 +485,7 @@ def _assemble_document(
                 name=name,
                 entry=EntryMeta.from_entry(entry),
                 source_ref=node.source_path or enclosing,
-                provenance=Provenance(params=node.provenance),
+                provenance=Provenance.of(node.provenance, node.declarations),
             )
         return docs
 
@@ -464,7 +509,7 @@ def _assemble_document(
                 entry=EntryMeta.from_entry(entry),
                 children=thread_docs(weave, threads.get(name, {}), node.children, weave_file),
                 source_ref=weave_file,
-                provenance=Provenance(params=node.provenance),
+                provenance=Provenance.of(node.provenance, node.declarations),
             )
 
     return ResolvedDocument(
@@ -475,7 +520,9 @@ def _assemble_document(
         source_ref=top_file,
         project=resolved.project,
         project_root=str(resolved.project_root),
-        provenance=Provenance(params=resolved.provenance),
+        project_scope=resolved.project_scope,
+        project_connections=resolved.project_connections,
+        provenance=Provenance.of(resolved.provenance, resolved.declarations),
     ).with_scopes()
 
 
@@ -643,12 +690,14 @@ def load_resolved(
             omitted, the nearest folder above the file holding ``weevr.yaml``
             is the root; with none, the file's directory is, and the result's
             ``project`` is ``None``.
-        strict_params: Overrides every document's ``strict_params:``. ``True``
-            fails the load on a ``${param.x}`` no declaration in its chain
-            covers (``P120``) and on a runtime param nothing declares or
-            references (``P121``); ``False`` keeps both warnings even where a
-            document sets ``strict_params: true``. ``None`` (the default)
-            leaves each document's setting, most specific wins, absent is
+        strict_params: Overrides every document's ``strict_params:`` and the
+            project's. ``True`` fails the load on a ``${param.x}`` no
+            declaration in its chain covers (``P120``) and on a runtime param
+            nothing declares or references (``P121``); ``False`` keeps both
+            warnings even where a document sets ``strict_params: true``.
+            ``None`` (the default) leaves each document's setting, most
+            specific wins; a document that sets none inherits, at the root
+            from ``weevr.yaml``'s ``strict_params``, and absent everywhere is
             lenient.
         fabric_context: The Fabric values ``${fabric.x}`` resolves from, keyed
             ``workspace_id``, ``lakehouse_id`` and ``workspace_name`` (a
@@ -671,7 +720,7 @@ def load_resolved(
     """
     # Imported here, not at module level: weevr.result reaches the engine
     # wheel's weevr.engine package, which needs weevr.config fully imported.
-    from weevr.result import LoadedConfig
+    from weevr.result import LoadedConfig, with_derived_load_warnings
 
     if project_root is None or isinstance(project_root, ConfigLocation):
         root = project_root
@@ -684,42 +733,178 @@ def load_resolved(
         fabric_context=fabric_context,
         strict_params=strict_params,
     )
+    warnings = with_derived_load_warnings(document, warnings)
     for warning in render_diagnostics(warnings):
         logger.warning(warning)
     return LoadedConfig.from_document(document, warnings)
 
 
-def _apply_cascade(config_type: str, data: dict[str, Any], children: list[ResolvedChild]) -> None:
-    """Cascade loom and weave defaults into each child thread's dict.
+_LOOKUPS: TypeAdapter[dict[str, Lookup]] = TypeAdapter(dict[str, Lookup])
+_COLUMN_SETS: TypeAdapter[dict[str, ColumnSet]] = TypeAdapter(dict[str, ColumnSet])
+_CONNECTIONS: TypeAdapter[dict[str, OneLakeConnection]] = TypeAdapter(dict[str, OneLakeConnection])
+
+
+def _project_layers(
+    project: Project | None,
+    project_file: ConfigLocation | None,
+    walk: WalkState,
+    root: ConfigLocation,
+) -> tuple[
+    CascadeTier | None,
+    ScopeRegistries | None,
+    dict[str, OneLakeConnection] | None,
+    dict[str, dict[str, RegistryDeclaration]] | None,
+]:
+    """The project's cascade tier and registry layer, its blocks resolved in its own scope.
+
+    Its ``defaults`` are checked under ``weevr.yaml``, so a malformed block is
+    reported there rather than against the config being loaded. Relative
+    file paths in its lookups and column sets join ``root``, as a loom's do.
+
+    Returns:
+        ``(tier, registries, connections, declarations)``: the cascade tier
+        from its ``defaults``, ``audit_templates`` and ``connections``; the
+        registry layer from its ``lookups`` and ``column_sets``; its
+        connections hydrated; and where each block entry is declared in
+        ``weevr.yaml``. The first three are ``None`` when the project
+        declares none of their blocks; all four with no project.
+    """
+    if project is None or project_file is None:
+        return None, None, None, None
+    file = str(project_file)
+    with attribute_errors(project_file):
+        blocks = walk.project_tier(project, file)
+        check_defaults_shape(blocks.get("defaults"), "project")
+    resolve_source_paths(blocks, root)
+    tier = None
+    if blocks.keys() & {"defaults", "audit_templates", "connections"}:
+        tier = CascadeTier(
+            "project",
+            defaults=blocks.get("defaults"),
+            audit_templates=blocks.get("audit_templates"),
+            connections=blocks.get("connections"),
+        )
+    lookups = _project_block(blocks, "lookups", _LOOKUPS, file)
+    column_sets = _project_block(blocks, "column_sets", _COLUMN_SETS, file)
+    registries = None
+    if lookups or column_sets:
+        registries = ScopeRegistries(lookups=lookups or None, column_sets=column_sets or None)
+    connections = _project_block(blocks, "connections", _CONNECTIONS, file)
+    declarations = layer_declarations(None, "project", file, blocks)
+    return tier, registries, connections or None, declarations
+
+
+def _project_block[V](
+    blocks: dict[str, Any], block: str, adapter: TypeAdapter[dict[str, V]], file: str
+) -> dict[str, V] | None:
+    """Hydrate one resolved project registry block; ``None`` when the project has none.
+
+    Raises:
+        ModelValidationError: A substituted value the block's model rejects,
+            reported under ``weevr.yaml``.
+    """
+    body = blocks.get(block)
+    if body is None:
+        return None
+    try:
+        return adapter.validate_python(body)
+    except ValidationError as exc:
+        raise ModelValidationError(
+            f"Project {block} failed validation: {exc}",
+            cause=exc,
+            file_path=file,
+            diagnostics=place_all(
+                from_validation_error(exc, body, file=file), file, body, (block,)
+            ),
+        ) from exc
+
+
+def _tier(level: str, data: dict[str, Any]) -> CascadeTier:
+    """The cascade tier a loom's or weave's resolved dict contributes."""
+    return CascadeTier(
+        level,
+        defaults=data.get("defaults"),
+        audit_templates=data.get("audit_templates"),
+        connections=data.get("connections"),
+    )
+
+
+def _record_declarations(
+    config_type: str,
+    data: dict[str, Any],
+    children: list[ResolvedChild],
+    file: str,
+    project: Mapping[str, Mapping[str, RegistryDeclaration]] | None,
+) -> Mapping[str, Mapping[str, RegistryDeclaration]]:
+    """Record where each registry entry and ``defaults:`` key every node sees is declared.
+
+    Walks the tiers in the cascade's order (project, loom, weave, thread),
+    each layering its own declarations over the enclosing scope's. Sets each
+    child's ``declarations``; an inline child points into the file holding it.
+
+    Returns:
+        The top-level config's declarations; empty for a config that is not
+        a thread, weave or loom.
+    """
+    if config_type not in ("loom", "weave", "thread"):
+        return {}
+    top = layer_declarations(project, config_type, file, data)
+
+    def threads(
+        nodes: list[ResolvedChild],
+        outer: Mapping[str, Mapping[str, RegistryDeclaration]],
+        enclosing: str,
+    ) -> None:
+        # An inline thread's ``at`` is its full position in the enclosing file.
+        for thread in nodes:
+            thread.declarations = layer_declarations(
+                outer, "thread", thread.source_path or enclosing, thread.data, thread.at
+            )
+
+    if config_type == "loom":
+        for weave in children:
+            weave_file = weave.source_path or file
+            weave.declarations = layer_declarations(top, "weave", weave_file, weave.data, weave.at)
+            threads(weave.children, weave.declarations, weave_file)
+    elif config_type == "weave":
+        threads(children, top, file)
+    return top
+
+
+def _apply_cascade(
+    config_type: str,
+    data: dict[str, Any],
+    children: list[ResolvedChild],
+    project_tier: CascadeTier | None = None,
+) -> dict[str, Any]:
+    """Cascade project, loom and weave defaults and registries into each thread's dict.
 
     A referenced weave's ``defaults`` are checked under its own file, so a
-    malformed block is reported there rather than against the loom.
+    malformed block is reported there rather than against the loom. A
+    standalone thread is cascaded under the project's tier alone, or under
+    none, so its own audit settings apply the same either way.
+
+    Returns:
+        ``data``, cascaded itself when it is a thread.
     """
+    outer = [] if project_tier is None else [project_tier]
     if config_type == "loom":
         for weave in children:
             if weave.source_path is not None:
                 with attribute_errors(weave.source_path):
                     check_defaults_shape(weave.data.get("defaults"), "weave")
+            tiers = [*outer, _tier("loom", data), _tier("weave", weave.data)]
             for thread in weave.children:
-                thread.data = apply_inheritance(
-                    data.get("defaults"),
-                    weave.data.get("defaults"),
-                    thread.data,
-                    loom_audit_templates=data.get("audit_templates"),
-                    weave_audit_templates=weave.data.get("audit_templates"),
-                    loom_connections=data.get("connections"),
-                    weave_connections=weave.data.get("connections"),
-                )
+                thread.data = apply_tiers(tiers, thread.data)
 
     elif config_type == "weave":
+        tiers = [*outer, _tier("weave", data)]
         for thread in children:
-            thread.data = apply_inheritance(
-                None,
-                data.get("defaults"),
-                thread.data,
-                weave_audit_templates=data.get("audit_templates"),
-                weave_connections=data.get("connections"),
-            )
+            thread.data = apply_tiers(tiers, thread.data)
+
+    elif config_type == "thread":
+        return apply_tiers(outer, data)
+    return data
 
 
 def check_dimension_overrides(
@@ -759,10 +944,16 @@ def check_dimension_overrides(
 
 
 def collect_execution_warnings(
-    config_type: str, resolved: dict[str, Any], children: list[ResolvedChild]
+    config_type: str,
+    resolved: dict[str, Any],
+    children: list[ResolvedChild],
+    *,
+    project_tier: CascadeTier | None = None,
 ) -> list[Diagnostic]:
-    """Gather thread-scope execution warnings from pre-cascade dicts."""
+    """Gather thread-scope execution warnings from pre-cascade dicts and the project's defaults."""
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
+    if project_tier is not None:
+        defaults_by_scope.append(("project", project_tier.defaults))
     if config_type == "loom":
         loom_label = f"loom '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((loom_label, resolved.get("defaults")))
@@ -795,7 +986,7 @@ def _pre_cascade_threads(
             (
                 thread.data,
                 thread.source_path or weave.source_path or enclosing,
-                () if thread.source_path else (() if weave.source_path else weave.at) + thread.at,
+                () if thread.source_path else thread.at,
             )
             for weave in children
             for thread in weave.children

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import skip_on_error
+from weevr.config.document import ScopeRegistries
 from weevr.config.inheritance import cascade_registry
 from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
@@ -287,6 +288,7 @@ def hydrate_children(
     prepare: ChildPreparer | None = None,
     warnings: list[Diagnostic] | None = None,
     bind: ThreadBinder | None = None,
+    outer: ScopeRegistries | None = None,
 ) -> tuple[dict[str, Weave], dict[str, dict[str, Thread]]]:
     """Hydrate the weaves and threads a weave or loom pulls in.
 
@@ -303,6 +305,9 @@ def hydrate_children(
             child weave dict of a loom, before validation.
         warnings: Collects load warnings from the children's checks.
         bind: Optional hook called with each hydrated thread and its file.
+        outer: The registries enclosing the top-level config (the
+            project's); the children's references are checked against them
+            under the top-level config's and their own.
 
     Returns:
         ``(weaves, threads)``: hydrated weaves by name (looms only), and each
@@ -318,16 +323,29 @@ def hydrate_children(
     """
     weaves: dict[str, Weave] = {}
     threads: dict[str, dict[str, Thread]] = {}
+    project = outer if outer is not None else ScopeRegistries()
+    level = "project"
+    top_lookups = cascade_registry(
+        project.lookups, resolved.get("lookups"), "lookup", level, config_type, log_shadowing=False
+    )
+    top_column_sets = cascade_registry(
+        project.column_sets,
+        resolved.get("column_sets"),
+        "column_set",
+        level,
+        config_type,
+        log_shadowing=False,
+    )
 
     if config_type == "weave":
         threads[name] = hydrate_threads(
             children,
             source,
             prepare,
-            outer_lookups=resolved.get("lookups"),
+            outer_lookups=top_lookups,
             warnings=warnings,
             bind=bind,
-            outer_column_sets=resolved.get("column_sets"),
+            outer_column_sets=top_column_sets,
         )
 
     elif config_type == "loom":
@@ -370,7 +388,7 @@ def hydrate_children(
                     weave_source,
                     prepare,
                     outer_lookups=cascade_registry(
-                        resolved.get("lookups"),
+                        top_lookups,
                         weave_dict.get("lookups"),
                         "lookup",
                         "loom",
@@ -380,7 +398,7 @@ def hydrate_children(
                     warnings=warnings,
                     bind=bind,
                     outer_column_sets=cascade_registry(
-                        resolved.get("column_sets"),
+                        top_column_sets,
                         weave_dict.get("column_sets"),
                         "column_set",
                         "loom",

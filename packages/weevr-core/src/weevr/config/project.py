@@ -1,7 +1,8 @@
 """Load-time checks of the project document beyond its schema.
 
-The project-scope blocks a later release will define are reserved: found in a
-``weevr.yaml`` they fail with their own code rather than as unknown keys. The
+The project-scope ``variables`` block is reserved: found in a ``weevr.yaml`` it
+fails with its own code rather than as an unknown key. The project's
+connections resolve on their own, outside any load, for the run store. The
 engine floor (``requires_weevr``) is checked against the installed weevr when
 the document loads.
 """
@@ -20,12 +21,12 @@ from weevr.diagnostics.positions import json_pointer
 from weevr.errors import ConfigError
 from weevr.model.project import Project
 
-RESERVED_PROJECT_BLOCKS: tuple[str, ...] = ("connections", "params", "defaults", "audit_templates")
+RESERVED_PROJECT_BLOCKS: tuple[str, ...] = ("variables",)
 """Root keys of ``weevr.yaml`` reserved for project scope."""
 
 
 def split_reserved_blocks(raw: Mapping[str, Any]) -> tuple[dict[str, Any], list[Diagnostic]]:
-    """Separate the reserved project-scope blocks from a project document.
+    """Separate the reserved project-scope blocks (``variables``) from a project document.
 
     Args:
         raw: The project document as written.
@@ -40,7 +41,7 @@ def split_reserved_blocks(raw: Mapping[str, Any]) -> tuple[dict[str, Any], list[
             "C210",
             f"'{key}' is reserved for the project scope and not yet supported in weevr.yaml",
             pointer=json_pointer((key,)),
-            hint="Declare it in the documents that use it until project scope is supported.",
+            hint="Declare it in the looms, weaves or threads that use it.",
         )
         for key in found
     ]

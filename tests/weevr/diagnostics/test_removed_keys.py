@@ -132,3 +132,35 @@ class TestLoad:
             load_config(weave)
         [diag] = [d for d in exc_info.value.diagnostics if d.code == "C111"]
         assert (diag.file, diag.pointer) == (str(weave), "/threads/0/legacy_mode")
+
+
+@pytest.mark.parametrize("kind", ["thread", "weave", "loom", "project"])
+def test_defaults_audit_columns_is_renamed_under_target(kind: str) -> None:
+    [diag] = removed_key_diagnostics(
+        {"defaults": {"audit_columns": {"_a": "1"}, "target": {"mode": "x"}}}, kind
+    )
+    assert (diag.code, diag.pointer, diag.expected) == (
+        "C112",
+        "/defaults/audit_columns",
+        ("/defaults/target/audit_columns",),
+    )
+
+
+def test_target_audit_columns_under_defaults_is_accepted() -> None:
+    document = {"defaults": {"target": {"audit_columns": {"_a": "1"}}}}
+    assert removed_key_diagnostics(document, "loom") == []
+
+
+def test_a_loom_using_defaults_audit_columns_fails_the_load(tmp_path: Path) -> None:
+    path = tmp_path / "n.loom"
+    data = {
+        "config_version": "2.0",
+        "kind": "loom",
+        "defaults": {"audit_columns": {"_a": "1"}},
+        "weaves": [],
+    }
+    write_document(path, yaml.safe_dump(data, sort_keys=False))
+    with pytest.raises(ConfigError) as exc_info:
+        load_config(path)
+    [diag] = [d for d in exc_info.value.diagnostics if d.code == "C112"]
+    assert (diag.file, diag.pointer) == (str(path), "/defaults/audit_columns")

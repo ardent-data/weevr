@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from weevr.config.param_provenance import ParamTier
+
 __all__ = ["ManifestParam", "ParamManifest"]
 
 
@@ -26,6 +28,8 @@ class ManifestParam:
         pointer: Where the declaration sits in ``file``, as a JSON pointer
             (``/params/region``, or ``/threads/0/params/region`` for an
             inline thread).
+        tier: The kind of config that declares it: ``project`` for a
+            ``weevr.yaml`` declaration, else ``loom``, ``weave`` or ``thread``.
     """
 
     name: str
@@ -35,6 +39,7 @@ class ManifestParam:
     description: str | None
     file: str
     pointer: str
+    tier: ParamTier | None = None
 
 
 @dataclass(frozen=True)
@@ -45,8 +50,8 @@ class ParamManifest:
         executable: The config's name (declared, else the file stem).
         kind: The config kind (``"thread"``, ``"weave"``, ``"loom"``).
         file: The config file.
-        declared: Every param declaration in the file and the children it
-            pulls in, in walk order. A file referenced more than once
+        declared: Every param declaration in the project's ``weevr.yaml``,
+            the file, and the children it pulls in, in walk order. A file referenced more than once
             reports its declarations once; a re-declaration that shadows an
             ancestor's is reported beside it.
         invoker_required: Names the invoker must supply: a required spec in

@@ -11,6 +11,7 @@ from typing import Any, Literal
 from pyspark.sql import SparkSession
 
 from weevr.config.document import ResolvedDocument, ScopeRegistries, registry_as_dict
+from weevr.config.inheritance import merge_connections
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.conditions import evaluate_condition
@@ -24,6 +25,7 @@ from weevr.engine.lookups import (
     materialize_lookups,
 )
 from weevr.engine.planner import ExecutionPlan, build_plan
+from weevr.engine.project_usage import used_project_registries, without_unused_project_column_sets
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.engine.target_identity import resolve_target_identity
 from weevr.engine.variables import VariableContext
@@ -152,7 +154,7 @@ def execute_weave(
             lookup dict so threads can reference them without re-materializing.
             The parent scope owns their lifecycle — weave cleanup never
             unpersists them.
-        connections: Merged loom + weave connections forwarded to
+        connections: Merged project + loom + weave connections forwarded to
             ``materialize_column_sets`` so connection-backed column sets can
             resolve their lakehouse target.
         execution: Effective execution settings for this weave (already
@@ -791,6 +793,12 @@ def execute_loom(
 
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
+    # Project lookups and column sets a thread of this run uses join the
+    # loom's own: read once at loom start, cleaned up at loom end. One no
+    # thread uses is never read.
+    project_used = used_project_registries(tree, threads)
+    project_connections = dict(tree.project_connections or {})
+
     # Loom-level resource lifecycle
     loom_variable_ctx = VariableContext(dict(loom.variables) if loom.variables else None)
     loom_cached_lookup_dfs: dict[str, Any] = {}
@@ -814,26 +822,29 @@ def execute_loom(
 
         # Resolve loom-level column sets ONCE (shared across all weaves);
         # per-weave passes hand down the resolved mappings, excluding keys
-        # a weave overrides so precedence still re-resolves those
+        # a weave overrides so precedence still re-resolves those. The loom
+        # reads with its connections over the project's.
+        loom_connections = merge_connections(project_connections, loom.connections)
         loom_resolved_cs: dict[str, dict[str, str]] = {}
         loom_cs_results: list[ColumnSetResult] = []
-        if loom.column_sets:
+        loom_column_sets = {**(project_used.column_sets or {}), **(loom.column_sets or {})}
+        if loom_column_sets:
             loom_resolved_cs, loom_cs_results = materialize_column_sets(
                 spark,
-                dict(loom.column_sets),
+                loom_column_sets,
                 params or {},
                 collector=collector,
                 parent_span_id=loom_span_id,
-                connections=dict(loom.connections) if loom.connections else None,
+                connections=loom_connections,
             )
 
         # Materialize loom-level lookups (shared across all weaves)
         loom_lookup_results: list[LookupResult] = []
-        loom_connections = dict(loom.connections) if loom.connections else None
-        if loom.lookups:
+        loom_lookups = {**(project_used.lookups or {}), **(loom.lookups or {})}
+        if loom_lookups:
             loom_cached_lookup_dfs, loom_lookup_results = materialize_lookups(
                 spark,
-                dict(loom.lookups),
+                loom_lookups,
                 collector=collector,
                 parent_span_id=loom_span_id,
                 connections=loom_connections,
@@ -901,18 +912,16 @@ def execute_loom(
                 else None
             )
             weave_cs = dict(weave.column_sets) if weave.column_sets else None
-            merged_column_set_defs = registry_as_dict(weave_scope.column_sets)
+            merged_column_set_defs = without_unused_project_column_sets(
+                weave_scope.column_sets, tree.project_scope, project_used
+            )
 
-            # Merge loom + weave connections for weave-level column set
-            # materialization. Uses the same additive-update pattern as
-            # _cascade_connections in config/inheritance.py, but stops at
-            # the weave scope — thread-level connections are forwarded
-            # per-thread at the execute_thread call site.
-            merged_connections: dict[str, OneLakeConnection] = {}
-            if loom.connections:
-                merged_connections.update(loom.connections)
-            if weave.connections:
-                merged_connections.update(weave.connections)
+            # Project + loom + weave connections for weave-level lookup and
+            # column set materialization; thread-level connections are
+            # forwarded per-thread at the execute_thread call site.
+            merged_connections = merge_connections(
+                project_connections, loom.connections, weave.connections
+            )
 
             merged_variables = registry_as_dict(weave_scope.variables)
 
@@ -958,7 +967,7 @@ def execute_loom(
                     pre_cached_lookups=loom_cached_lookup_dfs or None,
                     effective_lookups=weave_scope.lookups,
                     thread_scopes=thread_scopes,
-                    connections=merged_connections or None,
+                    connections=merged_connections,
                     execution=effective_execution,
                 )
             finally:

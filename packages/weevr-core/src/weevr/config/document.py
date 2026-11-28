@@ -4,7 +4,8 @@ A load produces one :class:`ResolvedDocument` for the file it was given, with
 a child document for each config that file pulls in: a loom's weaves, and
 each weave's threads. Every node holds the hydrated model, every child
 records the parent entry that pulled it in as an :class:`EntryMeta`, and every
-node records where its param values came from as its :class:`Provenance`.
+node records where its param values, registry entries and ``defaults:`` keys
+came from as its :class:`Provenance`.
 
 It imports only :mod:`weevr.model`, the registry cascade and the provenance
 records, so it loads without PySpark or the engine wheel.
@@ -13,14 +14,15 @@ records, so it loads without PySpark or the engine wheel.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from types import MappingProxyType
 from typing import Any, Literal
 
 from weevr.config.inheritance import cascade_registry
-from weevr.config.param_provenance import ParamProvenance
+from weevr.config.param_provenance import ParamProvenance, RegistryDeclaration
 from weevr.model import Loom, Thread, Weave
 from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
 from weevr.model.loom import WeaveEntry
 from weevr.model.project import Project
@@ -136,11 +138,16 @@ def _frozen_params() -> Mapping[str, ParamProvenance]:
     return MappingProxyType({})
 
 
+def _frozen_declarations() -> Mapping[str, RegistryDeclaration]:
+    return MappingProxyType({})
+
+
 @dataclass(frozen=True)
 class Provenance:
     """Where one config's resolved values came from, read at load. Read-only.
 
-    Holds names and source kinds only, never the values themselves.
+    Holds names and source kinds only, never the values themselves. Every
+    mapping is empty for a tree built from models.
 
     Attributes:
         params: By param name, where this config's value came from: each
@@ -150,14 +157,60 @@ class Provenance:
             source (``runtime``, ``pin``, ``inherited``, ``default`` or
             ``fallback``), the winning declaration's tier, file and pointer
             (``None`` for an undeclared name), and the pinning entry when the
-            value traces to a pin. Empty for a tree built from models.
+            value traces to a pin.
+        connections: By name, where each connection this config sees is
+            declared: its own, and every enclosing tier's up to the
+            project's. Each record
+            (:class:`weevr.config.param_provenance.RegistryDeclaration`) gives the
+            declaring tier (``project``, ``loom``, ``weave`` or ``thread``),
+            file and pointer; a name several tiers declare names the
+            nearest one, whose entry the cascade keeps.
+        audit_templates: Likewise, each audit template this config sees.
+        lookups: Likewise, each lookup in this config's ``effective``
+            registries.
+        column_sets: Likewise, each column set in ``effective``.
+        variables: Likewise, each variable in ``effective`` (the project
+            declares none).
+        defaults: By top-level key of the ``defaults:`` blocks this config
+            cascades from (the project's and each enclosing loom's or
+            weave's, its own for a loom or weave), the nearest tier setting
+            the key. A key the cascade merges across tiers (``target``,
+            ``exports``) names the nearest tier that sets it. A thread's own
+            ``defaults:`` is not a cascade tier and is not recorded.
     """
 
     params: Mapping[str, ParamProvenance] = field(default_factory=_frozen_params)
+    connections: Mapping[str, RegistryDeclaration] = field(default_factory=_frozen_declarations)
+    audit_templates: Mapping[str, RegistryDeclaration] = field(default_factory=_frozen_declarations)
+    lookups: Mapping[str, RegistryDeclaration] = field(default_factory=_frozen_declarations)
+    column_sets: Mapping[str, RegistryDeclaration] = field(default_factory=_frozen_declarations)
+    variables: Mapping[str, RegistryDeclaration] = field(default_factory=_frozen_declarations)
+    defaults: Mapping[str, RegistryDeclaration] = field(default_factory=_frozen_declarations)
 
     def __post_init__(self) -> None:
-        """Freeze ``params``."""
-        object.__setattr__(self, "params", MappingProxyType(dict(self.params)))
+        """Freeze every mapping."""
+        for each in fields(self):
+            object.__setattr__(self, each.name, MappingProxyType(dict(getattr(self, each.name))))
+
+    @classmethod
+    def of(
+        cls,
+        params: Mapping[str, ParamProvenance],
+        declarations: Mapping[str, Mapping[str, RegistryDeclaration]],
+    ) -> Provenance:
+        """Build from a scope's param records and its declarations by block.
+
+        Args:
+            params: The scope's param records.
+            declarations: By block (a field name other than ``params``), then
+                by name, as :func:`weevr.config.inheritance.layer_declarations`
+                returns them; a block it lacks is empty.
+
+        Returns:
+            The provenance.
+        """
+        blocks = {each.name: declarations.get(each.name, {}) for each in fields(cls)}
+        return cls(**{**blocks, "params": params})
 
 
 @dataclass(frozen=True)
@@ -176,16 +229,26 @@ class ResolvedDocument:
         source_ref: The file the config is written in: its own file, or for
             an inline child, the file that holds it.
         effective: The lookups, column sets and variables this config sees:
-            its own merged over every enclosing scope's, its own names
-            winning. Computed at load.
+            its own merged over every enclosing scope's, the project's
+            outermost, its own names winning. Computed at load.
         project: The project the load ran under: the ``weevr.yaml`` at the
             project root; ``None`` when the root has none. Set on the loaded
             file's node only.
         project_root: The project root the load resolved references and
             Source paths against; ``None`` when unknown. Set on the loaded
             file's node only.
+        project_scope: The project's lookups and column sets, resolved in
+            the project's own scope: the outermost layer of every node's
+            ``effective``. ``None`` when the project declares neither (or
+            there is no project). Set on the loaded file's node only.
+        project_connections: The project's connections, resolved in its own
+            scope. A loom or weave materializes lookups and column sets with
+            its own connections over these. ``None`` when the project
+            declares none. Set on the loaded file's node only.
         provenance: Where this config's values came from: per param, its
-            value source and winning declaration (:class:`Provenance`).
+            value source and winning declaration; per registry entry and
+            ``defaults:`` key it sees, the declaring tier and file
+            (:class:`Provenance`).
     """
 
     model: Thread | Weave | Loom
@@ -197,6 +260,8 @@ class ResolvedDocument:
     effective: ScopeRegistries = field(default_factory=ScopeRegistries)
     project: Project | None = None
     project_root: str | None = None
+    project_scope: ScopeRegistries | None = None
+    project_connections: Mapping[str, OneLakeConnection] | None = None
     provenance: Provenance = field(default_factory=Provenance)
 
     def __post_init__(self) -> None:
@@ -215,12 +280,15 @@ class ResolvedDocument:
 
         Args:
             outer: The enclosing scope's effective registries; ``None`` for
-                the loaded file itself.
+                the loaded file itself, which sits under its
+                ``project_scope`` when it has one.
             outer_level: The enclosing scope's kind, for shadowing logs.
 
         Returns:
             A copy of the tree with ``effective`` set on every node.
         """
+        if outer is None and self.project_scope is not None:
+            outer, outer_level = self.project_scope, "project"
         declared = self.declared
         effective = declared if outer is None else declared.under(outer, outer_level, self.kind)
         children = {

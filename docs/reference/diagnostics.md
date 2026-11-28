@@ -194,8 +194,7 @@ The Context's project directory holds no weevr.yaml; expected lists every locati
 
 `reserved-project-block` · error · stable
 
-weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is
-reserved and not yet supported.
+weevr.yaml declares a project-scope variables block, which is reserved and not yet supported.
 
 ## C3xx — References and entry forms
 
@@ -586,6 +585,12 @@ A thread loaded on its own has a rename step whose column set it does not define
 
 An audit template name is neither user-defined nor a built-in preset.
 
+### R150
+
+`chained-thread-repeats-audit-columns` · warning · stable
+
+A thread reads another thread's target and would add the audit columns that target already carries.
+
 ## R2xx — Connections
 
 ### R201
@@ -620,3 +625,7 @@ naming what to write instead. `*` matches any one key or list item.
 | loom | `/type` | `/kind` | 2.0 |
 | params | `/type` | `/kind` | 2.0 |
 | warp | `/type` | `/kind` | 2.0 |
+| thread | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |
+| weave | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |
+| loom | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |
+| project | `/defaults/audit_columns` | `/defaults/target/audit_columns` | 2.0 |

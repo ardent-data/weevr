@@ -81,20 +81,65 @@ def project_yaml(name: str = "test", project_id: str = TEST_PROJECT_ID) -> str:
     return f'kind: project\nconfig_version: "2.0"\nid: {project_id}\nname: {name}\n'
 
 
-def write_project(root: Path, name: str = "test", project_id: str = TEST_PROJECT_ID) -> Path:
+def write_project(
+    root: Path, name: str = "test", project_id: str = TEST_PROJECT_ID, **extra: Any
+) -> Path:
     """Make ``root`` a project directory: create it and write its ``weevr.yaml``.
 
     Args:
         root: The project directory; created with its parents when missing.
         name: The project name.
         project_id: The project id.
+        **extra: Further top-level blocks (``connections``, ``lookups``, ...), dumped
+            as YAML after the identity keys in the order given.
 
     Returns:
-        ``root``.
+        ``root``; the file is ``root / "weevr.yaml"``.
     """
     root.mkdir(parents=True, exist_ok=True)
-    (root / "weevr.yaml").write_text(project_yaml(name, project_id))
+    text = project_yaml(name, project_id)
+    if extra:
+        text += yaml.safe_dump(extra, sort_keys=False)
+    (root / "weevr.yaml").write_text(text)
     return root
+
+
+def lake_connection(workspace: str, lakehouse: str = "lh") -> dict[str, Any]:
+    """A OneLake connection body.
+
+    Args:
+        workspace: The workspace.
+        lakehouse: The lakehouse.
+
+    Returns:
+        The connection mapping.
+    """
+    return {"type": "onelake", "workspace": workspace, "lakehouse": lakehouse}
+
+
+def delta_lookup(alias: str, **extra: Any) -> dict[str, Any]:
+    """A lookup reading the delta table ``alias``.
+
+    Args:
+        alias: The source table alias.
+        **extra: Further lookup keys.
+
+    Returns:
+        The lookup mapping.
+    """
+    return {"source": {"type": "delta", "alias": alias}, **extra}
+
+
+def delta_column_set(alias: str) -> dict[str, Any]:
+    """A column set read from the delta table ``alias``.
+
+    Args:
+        alias: The source table alias.
+
+    Returns:
+        The column-set mapping.
+    """
+    return {"source": {"type": "delta", "alias": alias}}
 
 
 def write_named(root: Path, name: str, body: str | Mapping[str, Any]) -> Path:
